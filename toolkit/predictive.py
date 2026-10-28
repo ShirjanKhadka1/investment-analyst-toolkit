@@ -114,8 +114,14 @@ def ensemble_forecast(train, series_for_weights=None, train_size=None):
 
 def anomaly_flags(series, z=3.0):
     """Indices where a one-step return is |z| standard deviations from the
-    mean return. Returns indices into the series, with the return value."""
+    mean return. Returns indices into the series, with the return value.
+
+    Prices must be positive: a zero or negative price previously
+    produced a division-by-zero or a meaningless return.
+    """
     series = validate_series("series", series, min_length=5)
+    if any(p <= 0 for p in series):
+        raise ValueError("series prices must all be positive for anomaly_flags")
     rets = [series[i] / series[i - 1] - 1 for i in range(1, len(series))]
     mean = sum(rets) / len(rets)
     sd = math.sqrt(sum((r - mean) ** 2 for r in rets) / (len(rets) - 1)) if len(rets) > 1 else 0.0
@@ -127,8 +133,24 @@ def anomaly_flags(series, z=3.0):
 
 def volatility_regime(series, window=20):
     """High/low volatility regime: rolling return std vs its own median.
-    'high' if the latest window std is above the median window std."""
+    'high' if the latest window std is above the median window std.
+
+    Convention, stated: rolling stds use the population denominator
+    (len(window)), unlike performance._stdev's sample denominator
+    (n - 1). The regime is a within-series comparison, so the choice
+    moves the median and the latest std together; do not compare
+    these std values directly against performance volatilities.
+    Prices must be positive (returns are price ratios).
+    Tie rule (Phase 4): 'high' only when the latest std exceeds the
+    median by more than a 1e-9 relative tolerance. Without it, a
+    perfectly flat-volatility series flipped to 'high' on floating-
+    point noise (~1e-14 relative) in the window stds — proven by a
+    failing test before this fix. Real volatility gaps are orders
+    of magnitude larger than 1e-9, so this changes no real reading.
+    """
     series = validate_series("series", series, min_length=window + 2)
+    if any(p <= 0 for p in series):
+        raise ValueError("series prices must all be positive for volatility_regime")
     rets = [series[i] / series[i - 1] - 1 for i in range(1, len(series))]
     windows = []
     for i in range(len(rets) - window + 1):
@@ -138,5 +160,5 @@ def volatility_regime(series, window=20):
     if not windows:
         raise ValueError("not enough data for a volatility window")
     med = sorted(windows)[len(windows) // 2]
-    return {"regime": "high" if windows[-1] > med else "low",
+    return {"regime": "high" if windows[-1] > med * (1.0 + 1e-9) else "low",
             "latest_std": windows[-1], "median_std": med}

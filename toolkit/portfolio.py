@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 
-from .checks import require_non_negative, require_positive
+from .checks import require_non_negative, require_positive, validate_series
 
 
 def _mean(xs):
@@ -41,13 +41,22 @@ def mean_returns(return_matrix):
 
 
 def sample_covariance(return_matrix):
-    """Sample covariance matrix (n x n) from asset return lists."""
+    """Sample covariance matrix (n x n) from asset return lists.
+
+    Every asset series must have the same length and contain only finite
+    numbers; mismatched or non-finite input raises instead of silently
+    truncating or producing a NaN matrix. Denominator is (t - 1):
+    the sample (not population) covariance.
+    """
     n = len(return_matrix)
     if n == 0:
         raise ValueError("no assets")
-    t = len(return_matrix[0])
-    if t < 2:
-        raise ValueError("need at least 2 observations")
+    validated = [validate_series(f"return_matrix[{i}]", r, min_length=2)
+                 for i, r in enumerate(return_matrix)]
+    t = len(validated[0])
+    if any(len(r) != t for r in validated):
+        raise ValueError("all asset return series must have the same length")
+    return_matrix = validated
     means = mean_returns(return_matrix)
     cov = [[0.0] * n for _ in range(n)]
     for i in range(n):

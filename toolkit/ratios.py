@@ -5,12 +5,19 @@ so callers cannot mix up the two. Every denominator is checked: a zero
 denominator raises, it never returns 0 or infinity silently.
 """
 
-from .checks import require_non_negative, require_positive
+from .checks import require_finite, require_non_negative, require_positive
 
 
 def profitability(revenue, gross_profit, operating_profit, net_income):
-    """Gross, operating, and net margins. Revenue must be positive."""
+    """Gross, operating, and net margins. Revenue must be positive.
+
+    Profit inputs are checked finite only: a negative profit (a loss)
+    is real and must flow through as a negative margin.
+    """
     require_positive("revenue", revenue)
+    require_finite("gross_profit", gross_profit)
+    require_finite("operating_profit", operating_profit)
+    require_finite("net_income", net_income)
     return {
         "gross_margin": gross_profit / revenue,
         "operating_margin": operating_profit / revenue,
@@ -20,6 +27,7 @@ def profitability(revenue, gross_profit, operating_profit, net_income):
 
 def liquidity(current_assets, current_liabilities, inventory=0.0):
     """Current ratio and quick ratio (current assets less inventory)."""
+    require_finite("current_assets", current_assets)
     require_positive("current_liabilities", current_liabilities)
     require_non_negative("inventory", inventory)
     return {
@@ -34,6 +42,8 @@ def leverage(total_debt, total_equity, total_assets=None):
     Negative equity is not an error here — it is a real, distressed state —
     but it makes the ratio negative, which callers must interpret, not ignore.
     """
+    require_finite("total_debt", total_debt)
+    require_finite("total_equity", total_equity)
     if total_equity == 0:
         raise ValueError("total_equity must not be zero for debt-to-equity")
     out = {"debt_to_equity": total_debt / total_equity}
@@ -51,6 +61,8 @@ def dupont_roe(net_income, revenue, total_assets, total_equity):
     """
     require_positive("revenue", revenue)
     require_positive("total_assets", total_assets)
+    require_finite("net_income", net_income)
+    require_finite("total_equity", total_equity)
     if total_equity == 0:
         raise ValueError("total_equity must not be zero for DuPont ROE")
     net_margin = net_income / revenue

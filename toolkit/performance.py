@@ -7,6 +7,19 @@ from __future__ import annotations
 
 import math
 
+from .checks import require_finite, require_positive, validate_series
+
+
+def _validate_periods(periods_per_year):
+    require_positive("periods_per_year", periods_per_year)
+    return periods_per_year
+
+
+def _validate_regime(regime):
+    if regime is not None and regime not in ("high", "low"):
+        raise ValueError(f"volatility_regime must be 'high', 'low' or None, got {regime!r}")
+    return regime
+
 
 def _mean(xs):
     return sum(xs) / len(xs) if xs else 0.0
@@ -20,7 +33,15 @@ def _stdev(xs):
 
 
 def sharpe_ratio(returns, risk_free=0.0, periods_per_year=252):
-    """Annualised Sharpe: mean(excess) / stdev(excess) * sqrt(periods)."""
+    """Annualised Sharpe: mean(excess) / stdev(excess) * sqrt(periods).
+
+    Sharpe (1966; 1994 revision): excess return per unit of total
+    volatility. risk_free is per-period, on the same frequency as
+    returns. Sample stdev (n - 1) in the denominator.
+    """
+    returns = validate_series("returns", returns, min_length=1)
+    require_finite("risk_free", risk_free)
+    _validate_periods(periods_per_year)
     excess = [r - risk_free for r in returns]
     sd = _stdev(excess)
     if sd == 0.0:
@@ -29,7 +50,14 @@ def sharpe_ratio(returns, risk_free=0.0, periods_per_year=252):
 
 
 def sortino_ratio(returns, risk_free=0.0, periods_per_year=252):
-    """Annualised Sortino: downside deviation only in the denominator."""
+    """Annualised Sortino: downside deviation only in the denominator.
+
+    Sortino & Price: downside deviation = sqrt(mean(min(0, excess)^2))
+    over ALL observations (not just downside ones).
+    """
+    returns = validate_series("returns", returns, min_length=1)
+    require_finite("risk_free", risk_free)
+    _validate_periods(periods_per_year)
     excess = [r - risk_free for r in returns]
     downside = [min(0.0, e) for e in excess]
     dd = math.sqrt(sum(d * d for d in downside) / len(downside)) if downside else 0.0
@@ -39,7 +67,15 @@ def sortino_ratio(returns, risk_free=0.0, periods_per_year=252):
 
 
 def max_drawdown(prices):
-    """Maximum peak-to-trough fall, as a positive fraction (0.30 = 30%)."""
+    """Maximum peak-to-trough fall, as a positive fraction (0.30 = 30%).
+
+    Prices must be positive and finite: a negative price previously
+    produced a drawdown above 1.0 (e.g. 1.5), which is not a fall
+    any holder could experience.
+    """
+    prices = validate_series("prices", prices, min_length=2)
+    if any(p <= 0 for p in prices):
+        raise ValueError("prices must all be positive for max_drawdown")
     if len(prices) < 2:
         raise ValueError("need at least 2 prices")
     peak = prices[0]
@@ -58,6 +94,7 @@ def cvar(returns, alpha=0.05):
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError("alpha must be in (0, 1)")
+    returns = validate_series("returns", returns, min_length=1)
     if not returns:
         raise ValueError("no returns")
     ordered = sorted(returns)
@@ -66,7 +103,14 @@ def cvar(returns, alpha=0.05):
 
 
 def calmar_ratio(returns, prices, periods_per_year=252):
-    """Annualised return / max drawdown. Raises if drawdown is zero."""
+    """Annualised return / max drawdown. Raises if drawdown is zero.
+
+    Note: annualised return here is the arithmetic mean x periods,
+    not a geometrically compounded CAGR — a stated convention of
+    this module, not a general Calmar definition.
+    """
+    _validate_periods(periods_per_year)
+    returns = validate_series("returns", returns, min_length=2)
     dd = max_drawdown(prices)
     if dd == 0.0:
         raise ValueError("zero drawdown — Calmar undefined")
@@ -77,10 +121,14 @@ def calmar_ratio(returns, prices, periods_per_year=252):
 
 
 def annualised_return(returns, periods_per_year=252):
+    returns = validate_series("returns", returns, min_length=1)
+    _validate_periods(periods_per_year)
     return _mean(returns) * periods_per_year
 
 
 def annualised_volatility(returns, periods_per_year=252):
+    returns = validate_series("returns", returns, min_length=1)
+    _validate_periods(periods_per_year)
     return _stdev(returns) * math.sqrt(periods_per_year)
 
 
@@ -105,11 +153,25 @@ def _safe(fn, *args):
         return None
 
 
-def performance_report(returns, prices, risk_free=0.0, periods_per_year=252, label=""):
+def performance_report(returns, prices, risk_free=0.0, periods_per_year=252, label="",
+                       volatility_regime=None):
     """One dict of metrics, with the label of the split it was computed on.
-    Undefined ratios are None (not a crash, not a made-up number)."""
+    Undefined ratios are None (not a crash, not a made-up number).
+
+    volatility_regime: optional documented label, 'high' or 'low' (or
+    None when not supplied). It is a pass-through descriptor only —
+    it changes no metric. The intended source is
+    predictive.volatility_regime()['regime']; callers must compute
+    and pass it explicitly so the report never invents a regime.
+    Downside: a 'low' label is not a promise of future calm.
+    Falsifier: if high-regime windows do not show larger realised
+    moves than low-regime windows out of sample, the label carries
+    no predictive content and must not be used as one.
+    """
+    _validate_regime(volatility_regime)
     return {
         "label": label,
+        "volatility_regime": volatility_regime,
         "annualised_return": annualised_return(returns, periods_per_year),
         "annualised_volatility": annualised_volatility(returns, periods_per_year),
         "sharpe": _safe(sharpe_ratio, returns, risk_free, periods_per_year),

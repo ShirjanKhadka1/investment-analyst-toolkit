@@ -9,13 +9,15 @@ DCF convention used here (stated, so it can be challenged):
   unless the caller adjusts the cash flows first).
 """
 
-from .checks import require_rate
+from .checks import require_finite, require_rate, validate_series
 
 
 def dcf_value(free_cash_flows, discount_rate, terminal_growth, terminal_year_fcf):
     """Enterprise value from explicit FCFs + a single-stage terminal value."""
     require_rate("discount_rate", discount_rate)
     require_rate("terminal_growth", terminal_growth)
+    free_cash_flows = validate_series("free_cash_flows", free_cash_flows, min_length=1)
+    require_finite("terminal_year_fcf", terminal_year_fcf)
     if discount_rate <= terminal_growth:
         raise ValueError(
             f"discount_rate ({discount_rate}) must exceed "
@@ -34,6 +36,7 @@ def dcf_value(free_cash_flows, discount_rate, terminal_growth, terminal_year_fcf
 
 def gordon_value(next_dividend, required_return, growth):
     """Gordon growth model: P = D1 / (k - g). k must exceed g."""
+    require_finite("next_dividend", next_dividend)
     require_rate("required_return", required_return)
     require_rate("growth", growth)
     if required_return <= growth:
@@ -47,4 +50,6 @@ def implied_price_from_multiple(metric_value, multiple):
     Trivial arithmetic, kept as a function so the multiple and the metric are
     named in code and in tests, instead of buried in a spreadsheet cell.
     """
+    require_finite("metric_value", metric_value)
+    require_finite("multiple", multiple)
     return metric_value * multiple

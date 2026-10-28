@@ -34,6 +34,16 @@ def require_non_negative(name, value):
     return value
 
 
+def require_finite(name, value):
+    """A finite number of any sign (losses, negative returns and negative
+    profits are real). Rejects None, bool, str, NaN and inf."""
+    if value is None:
+        raise ValueError(f"{name} is required")
+    if not _is_number(value):
+        raise ValueError(f"{name} must be a finite number, got {value!r}")
+    return value
+
+
 def require_rate(name, value):
     if value is None:
         raise ValueError(f"{name} is required")

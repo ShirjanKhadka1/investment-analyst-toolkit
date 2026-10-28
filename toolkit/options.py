@@ -32,9 +32,16 @@ def black_scholes(S, K, T, r, sigma, kind="call"):
 
 
 def greeks(S, K, T, r, sigma, kind="call"):
-    """Delta, gamma, theta (per year), vega (per 1.0 vol), rho (per 1.0 rate)."""
+    """Delta, gamma, theta (per year), vega (per 1.0 vol), rho (per 1.0 rate).
+
+    kind must be 'call' or 'put'; anything else raises instead of
+    silently returning put Greeks (pre-Phase-4 bug: an unknown kind
+    fell through to the put branch).
+    """
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
         raise ValueError("S, K, T, sigma must all be positive")
+    if kind not in ("call", "put"):
+        raise ValueError("kind must be 'call' or 'put'")
     d1 = (math.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * math.sqrt(T))
     d2 = d1 - sigma * math.sqrt(T)
     pdf = _norm_pdf(d1)

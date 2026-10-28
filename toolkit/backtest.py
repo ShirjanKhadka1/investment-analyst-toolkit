@@ -6,9 +6,19 @@ buy-and-hold benchmark on the same data.
 """
 from __future__ import annotations
 
+from .checks import require_non_negative, require_positive, validate_series
+
+
+def _validate_prices(prices):
+    prices = validate_series("prices", prices, min_length=1)
+    if any(p <= 0 for p in prices):
+        raise ValueError("prices must all be positive")
+    return prices
+
 
 def moving_average_crossover_signals(prices, fast=10, slow=30):
     """1 = long, 0 = flat. Signal at t uses closes up to t only."""
+    prices = _validate_prices(prices)
     if fast < 1 or slow <= fast:
         raise ValueError("need 0 < fast < slow")
     signals = []
@@ -28,11 +38,20 @@ def backtest(prices, signals, initial_capital=10000.0, cost_per_trade=0.0):
     Position for period t is signals[t-1] (yesterday's signal), so no
     trade is made on information from today. A change in position pays
     cost_per_trade once.
+
+    Validation (pre-Phase-4 gaps): prices must be positive, signals
+    must be exactly 0 or 1, and cost_per_trade must not be negative —
+    a negative cost previously ADDED money on every trade.
     """
+    prices = _validate_prices(prices)
+    signals = list(signals)
     if len(prices) != len(signals):
         raise ValueError("prices and signals must be the same length")
+    if any(s not in (0, 1) for s in signals):
+        raise ValueError("signals must be 0 or 1 only")
     if initial_capital <= 0:
         raise ValueError("initial capital must be positive")
+    require_non_negative("cost_per_trade", cost_per_trade)
     equity = [initial_capital]
     capital = initial_capital
     position = 0
@@ -55,6 +74,6 @@ def backtest(prices, signals, initial_capital=10000.0, cost_per_trade=0.0):
 
 def buy_and_hold_equity(prices, initial_capital=10000.0):
     """Buy-and-hold benchmark on the same prices."""
-    if not prices or prices[0] == 0:
-        raise ValueError("bad prices for benchmark")
+    prices = _validate_prices(prices)
+    require_positive("initial_capital", initial_capital)
     return [initial_capital * p / prices[0] for p in prices]
