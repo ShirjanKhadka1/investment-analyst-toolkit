@@ -95,14 +95,25 @@ def train_test_split(series, train_size):
     return series[:train_size], series[train_size:]
 
 
+def _safe(fn, *args):
+    """Edge-case guard for reports: an undefined ratio (e.g. Sortino on a
+    series with no downside, Sharpe on zero volatility) becomes None with
+    a reason — it never crashes a whole autonomous run."""
+    try:
+        return fn(*args)
+    except ValueError as e:
+        return None
+
+
 def performance_report(returns, prices, risk_free=0.0, periods_per_year=252, label=""):
-    """One dict of metrics, with the label of the split it was computed on."""
+    """One dict of metrics, with the label of the split it was computed on.
+    Undefined ratios are None (not a crash, not a made-up number)."""
     return {
         "label": label,
         "annualised_return": annualised_return(returns, periods_per_year),
         "annualised_volatility": annualised_volatility(returns, periods_per_year),
-        "sharpe": sharpe_ratio(returns, risk_free, periods_per_year),
-        "sortino": sortino_ratio(returns, risk_free, periods_per_year),
+        "sharpe": _safe(sharpe_ratio, returns, risk_free, periods_per_year),
+        "sortino": _safe(sortino_ratio, returns, risk_free, periods_per_year),
         "max_drawdown": max_drawdown(prices),
         "cvar_5pct": cvar(returns, 0.05),
     }
