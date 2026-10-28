@@ -128,12 +128,17 @@ MIT.
 ```
 Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400})`.
 
+## v0.5.1 — Walk-forward model comparison (patch)
+- **Walk-forward model comparison:** `predictive.compare_models_walk_forward()` runs naive + all existing models through the same walk-forward split, ranks them by MAE, and reports `beats_naive: False` when naive wins — that result is kept in the record, not hidden.
+- Tests: 52/52 passed, verified 28 Oct 2026 in a fresh venv and by GitHub Actions CI (pytest on Python 3.10/3.11/3.12).
+
 ## v0.5.0 — Proven record, failure learning, archiving (live on GitHub)
 - **Proven record, not claims:** every prediction is written to `predictions.jsonl` BEFORE its outcome is known, scored on the next run (direction + abs error), and reported as direction accuracy + mean abs error over n scored predictions. Pending predictions never count as wins.
 - **Recording failure and improving from it:** every failure gets a reason (direction wrong / error above threshold) and an action — the failing model is demoted in the next auto-selection by inverse-MAE re-weighting. Failures are never deleted from the record.
 - **Archiving:** every run is timestamped and indexed in `archive/index.json`; `latest` is only a pointer. Pruning is opt-in and never deletes a symbol's latest run.
-- **Agentic accuracy loop:** new Accuracy Auditor agent + prediction-accuracy-loop runbook in finance-research-agents (now 10 agents): audit the ledger, log failures, demote failing models, check archive completeness and data freshness before any report goes out.
+- **Agentic accuracy loop:** new Accuracy Auditor agent + prediction-accuracy-loop runbook in finance-research-agents: audit the ledger, log failures, demote failing models, check archive completeness and data freshness before any report goes out.
 - **All API calls:** Yahoo, Stooq, World Bank, SEC EDGAR (no key) + FRED, Alpha Vantage, Twelve Data, FMP (your env key only), all through the fresh-data fallback chain.
 - **Honest limit, stated plainly:** no system is failure-free. This one is built so failures are measured, logged, and acted on — that is the closest to "no failure" that is honest.
-- Tests: 47/47 passed (37 at v0.5 + 10 free-data tests), verified 28 Oct 2026 and by GitHub Actions CI (pytest on Python 3.10/3.11/3.12). Historical version counts above are as-at their version; the current count is this one, verified by CI.
+- Tests: 52/52 passed (47 at v0.5 + free-data, + 5 model-comparison tests), verified 28 Oct 2026 in a fresh venv and by GitHub Actions CI (pytest on Python 3.10/3.11/3.12). Historical version counts above are as-at their version; the current count is this one.
 - **Free-data layer (post-v0.5):** `toolkit/free_data.py` — unified no-key fetcher (Yahoo → Stooq for stocks; CoinGecko for crypto; ECB reference rates; World Bank macro), every series carrying source, retrieval time, last date and age, stale data never presented as fresh. No live NEPSE feed exists in this layer: no documented free public NEPSE OHLCV API was verified (see the NEPSE scanner's teardown).
+- **Walk-forward model comparison (post-v0.5):** `predictive.compare_models_walk_forward()` runs naive + all existing models through the same walk-forward split, ranks them by MAE, and reports `beats_naive: False` when naive wins — that result is kept in the record, not hidden.
