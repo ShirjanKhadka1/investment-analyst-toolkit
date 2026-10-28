@@ -1,0 +1,65 @@
+# Scheduled autonomous research update — public output, research only.
+#
+# Schedule: daily at 01:00 UTC = 06:45 NPT (Nepal, UTC+5:45).
+# Why this time: US market data for the previous trading day has landed
+# by 01:00 UTC, and 06:45 NPT is before the NEPSE trading day (which
+# opens around 11:00 NPT), so the report is ready for the Nepal morning
+# without pretending to be intraday or real-time. GitHub's cron is
+# approximate (it may run minutes late); the report always carries its
+# own run timestamp, so a late run is visible, never hidden.
+#
+# Public output: generated reports are committed to reports/daily/ on
+# main by this workflow only. That path holds generated files only —
+# no hand-written content, no credentials, no keys. A failed symbol
+# keeps its previous latest.md (last-known-good) and its timestamped
+# report is labelled STALE_OR_FAILED; stale output is never published
+# as fresh. Research only: no trades, no spend, no recommendations.
+#
+# Email alerts are deliberately absent: email access is a recorded
+# blocker (Gmail connector not connected), so failure visibility here
+# is the public workflow run log + the STALE label in the repo itself.
+# Cloudflare cron backup is likewise absent (Cloudflare access
+# unverified, recorded blocker) — this workflow is the only schedule.
+#
+# Manual dispatch (workflow_dispatch) exists so the first run can be
+# observed on demand. dry_run=true runs the update into a temporary
+# directory and commits nothing.
+name: Scheduled update
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Run without committing any report"
+        required: false
+        default: "false"
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  daily-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run autonomous update (AAPL, MSFT)
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python -m toolkit.cli autonomous-once --symbols AAPL,MSFT --output-dir /tmp/daily-dry-run
+          else
+            python -m toolkit.cli autonomous-once --symbols AAPL,MSFT --output-dir reports/daily
+          fi
+      - name: Commit reports (scheduled runs only)
+        if: inputs.dry_run != true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add reports/daily
+          git diff --cached --quiet || git commit -m "chore: daily autonomous research update [skip ci]"
+          git push
