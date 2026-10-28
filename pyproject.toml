@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "investment-analyst-toolkit"
-version = "0.2.0"
+version = "0.4.0"
 description = "Tested, explicit finance calculations for investment and research analysts"
 readme = "README.md"
 requires-python = ">=3.10"
