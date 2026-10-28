@@ -1,0 +1,5 @@
+# Ruff configuration for the toolkit (Phase 7).
+# No ignores: the toolkit passes ruff clean under the default
+# rule set (ruff 0.17.3, measured 28 Oct 2026). If a future
+# rule needs an ignore, record the reason here — never silently.
+[lint]

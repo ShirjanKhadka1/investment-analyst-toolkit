@@ -12,3 +12,16 @@ license = {text = "MIT"}
 
 [tool.setuptools.packages.find]
 include = ["toolkit*"]
+
+# Phase 7: coverage gate. Measured 28 Oct 2026: 82% total (data.py
+# 41% — network fetchers cannot run offline — is the drag).
+# fail_under=80 is set AT the measured level, not above it: the
+# gate must pass today, and the plan is to raise it as coverage
+# grows. Never lower it silently to make a failing run pass.
+[tool.coverage.run]
+source = ["toolkit"]
+omit = ["toolkit/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

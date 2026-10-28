@@ -1,0 +1,14 @@
+# Phase 7: pre-commit config (local developer tool, not CI).
+# Run `pre-commit install` once, then ruff runs on every commit.
+# ruff-format is deliberately NOT hooked: the codebase passes
+# `ruff check` but is not ruff-formatted, and a format hook
+# would fail every existing file on first use.
+# The rev below must match a published ruff-pre-commit tag;
+# it mirrors ruff 0.17.3 (measured 28 Oct 2026) and is TO VERIFY
+# on the first pre-commit run.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
