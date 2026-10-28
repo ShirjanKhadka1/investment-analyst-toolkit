@@ -10,7 +10,7 @@ from toolkit import ratios, valuation
 ratios.profitability(revenue=1000, gross_profit=400, operating_profit=150, net_income=90)
 valuation.dcf_value(fcfs=[100, 110, 121], discount_rate=0.10, terminal_year_fcf=130, terminal_growth=0.03)
 ```
-Zero dependencies, Python 3.10+. Tests: `pytest` — 8/8 passing (verified 28 Oct 2026).
+Zero dependencies, Python 3.10+. Tests: `pytest` — 47/47 passing (verified 28 Oct 2026, and by GitHub Actions CI).
 Demo: `examples/demo_company.py` (demo data only, never a real company).
 
 ## Connections

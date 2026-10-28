@@ -110,7 +110,7 @@ MIT.
 - `toolkit/backtest.py` — moving-average crossover signals (no lookahead: position uses yesterday's signal), backtest with trade costs, buy-and-hold benchmark on the same data.
 - `toolkit/cli.py` — command line: `python -m toolkit.cli option ...` and `forecast-demo`, no network, no key.
 - Agent pack: `agents/debate-analyst.md` — bull vs bear debate + risk veto, toolkit numbers for every argument.
-- Tests: 23/23 passed. This v0.3 layer is NOT yet in the deployment currently uploading (v0.2) — it will be deployed as the next update, so the live repo ends up at the advanced version, not the weaker one.
+- Tests at v0.3: 23/23 passed. (Historical count for that version only; current count is in the v0.5.0 section below and is verified by CI.)
 
 ## v0.4.0 — Quality data, autonomous updates, predictive models, zero-error guards
 - **No stale data, ever:** `fetch_fresh_prices()` tries sources in order (Yahoo → Stooq → Alpha Vantage / Twelve Data / FMP with your key), skips any source that fails or is older than `max_age_days`, and raises listing every attempt if all are stale — it never returns stale data labelled fresh, and never invents a price.
@@ -119,7 +119,7 @@ MIT.
 - **Autonomous auto-updating:** `toolkit/autonomous.py` — `run_once()` fetches fresh data, re-runs prediction + performance, writes timestamped + `latest` reports and a hash-chained audit log; one symbol failing never kills the run (its old report is kept, marked STALE). `run_loop()` repeats daily by default. Research only — no trades, no spend.
 - **Zero-error guards:** every series is validated at the boundary — finite numbers only (NaN/inf/None/str/bool rejected), price pairs must be ISO dates, strictly increasing, unique, close > 0. Bad input fails loudly with what to fix, never as a wrong number downstream.
 - CLI: `python -m toolkit.cli data --symbol AAPL`, `predict`, `autonomous-once --symbols AAPL,MSFT`.
-- Tests: 23 + 10 new = 33 tests expected (see test run below).
+- Tests at v0.4: 33 tests. (Historical count for that version only; current count is in the v0.5.0 section below and is verified by CI.)
 
 ### Autonomous scheduling (no human needed after setup)
 ```
@@ -128,11 +128,12 @@ MIT.
 ```
 Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400})`.
 
-## v0.5.0 — Proven record, failure learning, archiving (BUILT LOCALLY, NOT DEPLOYED YET — blocked by the verification gate until the remaining-repos batch passes)
+## v0.5.0 — Proven record, failure learning, archiving (live on GitHub)
 - **Proven record, not claims:** every prediction is written to `predictions.jsonl` BEFORE its outcome is known, scored on the next run (direction + abs error), and reported as direction accuracy + mean abs error over n scored predictions. Pending predictions never count as wins.
 - **Recording failure and improving from it:** every failure gets a reason (direction wrong / error above threshold) and an action — the failing model is demoted in the next auto-selection by inverse-MAE re-weighting. Failures are never deleted from the record.
 - **Archiving:** every run is timestamped and indexed in `archive/index.json`; `latest` is only a pointer. Pruning is opt-in and never deletes a symbol's latest run.
 - **Agentic accuracy loop:** new Accuracy Auditor agent + prediction-accuracy-loop runbook in finance-research-agents (now 10 agents): audit the ledger, log failures, demote failing models, check archive completeness and data freshness before any report goes out.
 - **All API calls:** Yahoo, Stooq, World Bank, SEC EDGAR (no key) + FRED, Alpha Vantage, Twelve Data, FMP (your env key only), all through the fresh-data fallback chain.
 - **Honest limit, stated plainly:** no system is failure-free. This one is built so failures are measured, logged, and acted on — that is the closest to "no failure" that is honest.
-- Tests: 37/37 passed (33 + 4 new tracker/archive tests).
+- Tests: 47/47 passed (37 at v0.5 + 10 free-data tests), verified 28 Oct 2026 and by GitHub Actions CI (pytest on Python 3.10/3.11/3.12). Historical version counts above are as-at their version; the current count is this one, verified by CI.
+- **Free-data layer (post-v0.5):** `toolkit/free_data.py` — unified no-key fetcher (Yahoo → Stooq for stocks; CoinGecko for crypto; ECB reference rates; World Bank macro), every series carrying source, retrieval time, last date and age, stale data never presented as fresh. No live NEPSE feed exists in this layer: no documented free public NEPSE OHLCV API was verified (see the NEPSE scanner's teardown).
