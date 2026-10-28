@@ -47,6 +47,54 @@ def auto_select_model(series, train_size):
             "results": results}
 
 
+def compare_models_walk_forward(series, train_size):
+    """Walk-forward model-comparison report.
+
+    Runs every available forecaster (naive + the models in _models())
+    through the SAME walk-forward split, ranks them by out-of-sample
+    MAE, and says plainly whether any model beat naive.
+
+    Returns a dict with:
+      train_size, n_test, best_model, best_mae, naive_mae,
+      beats_naive (True only if the best MAE is strictly below naive's
+        MAE — the same strict rule as auto_select_model),
+      naive_wins (True when no model strictly beats naive, i.e. naive
+        is best or tied — a reported result, never hidden),
+      ranking (one entry per model, sorted by MAE ascending, each with
+        mae, rmse, interval_coverage, n_test and its own beats_naive),
+      results (the raw per-model dict from walk_forward_evaluate),
+      note (a plain-language statement of the outcome).
+
+    Research only: a lower past out-of-sample MAE is not a guarantee
+    of future accuracy, and this report is not a buy/sell/hold signal.
+    Raises on a too-short series or a train_size that leaves no test
+    set, instead of guessing."""
+    series = validate_series("series", series, min_length=10)
+    if not 0 < train_size < len(series):
+        raise ValueError("train_size must leave a non-empty test set")
+    results = walk_forward_evaluate(series, _models(), train_size)
+    ranking = [{"model": name, "mae": r["mae"], "rmse": r["rmse"],
+                "interval_coverage": r["interval_coverage"], "n_test": r["n_test"],
+                "beats_naive": r.get("beats_naive_mae", False)}
+               for name, r in results.items()]
+    ranking.sort(key=lambda r: r["mae"])
+    best = ranking[0]
+    naive_mae = results["naive"]["mae"]
+    beats_naive = best["mae"] < naive_mae
+    naive_wins = not beats_naive
+    if naive_wins:
+        note = ("Naive wins: no model beat the naive forecast out of sample "
+                "on this split; that result is reported, not hidden.")
+    else:
+        note = ("Best model beat naive out of sample on this split; past "
+                "out-of-sample MAE is not a guarantee of future accuracy.")
+    return {"train_size": train_size, "n_test": len(series) - train_size,
+            "best_model": best["model"], "best_mae": best["mae"],
+            "naive_mae": naive_mae, "beats_naive": beats_naive,
+            "naive_wins": naive_wins, "ranking": ranking,
+            "results": results, "note": note}
+
+
 def ensemble_forecast(train, series_for_weights=None, train_size=None):
     """Inverse-MAE-weighted average of the models. If no weights series is
     given, falls back to a plain mean — and says so in the return value."""
