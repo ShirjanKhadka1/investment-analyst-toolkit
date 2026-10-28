@@ -88,7 +88,13 @@ def run_once(config):
             report = f"# Autonomous Research Update — {symbol}\n\nRun: {stamp} | Status: STALE_OR_FAILED\n\nError: {e}\n\nPrevious report kept unchanged. No data was invented.\n\n*Research only. Not investment advice.*\n"
         summary["symbols"][symbol] = body
         _write(os.path.join(out_dir, symbol, f"{stamp}.md"), report)
-        _write(os.path.join(out_dir, symbol, "latest.md"), report)
+        # Last-known-good rule: latest.md is updated ONLY on a fresh
+        # run. On failure the timestamped report above IS the STALE
+        # marker, and the previous latest.md is kept unchanged — a
+        # failed run must never overwrite the last good report with
+        # an error page, and stale output is never published as fresh.
+        if body["status"] == "fresh":
+            _write(os.path.join(out_dir, symbol, "latest.md"), report)
         archive_mod.archive_run(out_dir, symbol, report, body, stamp)
         entry = {"symbol": symbol, "status": body["status"], "run_at": stamp}
         h = _audit_hash(prev_hash, entry)
