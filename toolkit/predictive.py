@@ -11,8 +11,12 @@ from __future__ import annotations
 import math
 
 from .checks import validate_series
-from .forecast import (linear_trend_forecast, moving_average_forecast,
-                       naive_forecast, walk_forward_evaluate)
+from .forecast import (
+    linear_trend_forecast,
+    moving_average_forecast,
+    naive_forecast,
+    walk_forward_evaluate,
+)
 
 
 def exponential_smoothing_forecast(train, alpha=0.3):
@@ -34,6 +38,18 @@ def _models():
     }
 
 
+def _ensemble_equal(train):
+    """Equal-weight mean of the member models on the training window only.
+
+    This is the walk-forward-safe ensemble candidate: at each walk-forward
+    step it uses only series[:t], never the test point. It differs from
+    ensemble_forecast(), whose inverse-MAE weighting is a point-forecast
+    helper and is NOT walk-forward evaluated."""
+    train = validate_series("train", train, min_length=1)
+    points = [fn(train) for fn in _models().values()]
+    return sum(points) / len(points)
+
+
 def auto_select_model(series, train_size):
     """Walk-forward MAE for every model; returns best model + full table.
     Raises on a too-short series instead of guessing."""
@@ -47,12 +63,19 @@ def auto_select_model(series, train_size):
             "results": results}
 
 
-def compare_models_walk_forward(series, train_size):
+def compare_models_walk_forward(series, train_size, include_ensemble=False):
     """Walk-forward model-comparison report.
 
     Runs every available forecaster (naive + the models in _models())
     through the SAME walk-forward split, ranks them by out-of-sample
     MAE, and says plainly whether any model beat naive.
+
+    include_ensemble (default False, preserving the original four-model
+    ranking and agreement with auto_select_model): when True, adds
+    'ensemble_equal' — the equal-weight mean of the member models,
+    recomputed from the training window only at each walk-forward step,
+    so it is judged with no lookahead. The ensemble is a candidate like
+    any other: if it loses to naive, the report says so.
 
     Returns a dict with:
       train_size, n_test, best_model, best_mae, naive_mae,
@@ -72,7 +95,10 @@ def compare_models_walk_forward(series, train_size):
     series = validate_series("series", series, min_length=10)
     if not 0 < train_size < len(series):
         raise ValueError("train_size must leave a non-empty test set")
-    results = walk_forward_evaluate(series, _models(), train_size)
+    models = dict(_models())
+    if include_ensemble:
+        models["ensemble_equal"] = _ensemble_equal
+    results = walk_forward_evaluate(series, models, train_size)
     ranking = [{"model": name, "mae": r["mae"], "rmse": r["rmse"],
                 "interval_coverage": r["interval_coverage"], "n_test": r["n_test"],
                 "beats_naive": r.get("beats_naive_mae", False)}
