@@ -76,6 +76,16 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
+Tests: 124/124 passed (28 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0).
+Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
+settings (see mypy.ini — untyped code is unchecked by default mypy, so
+this is a guardrail, not full type safety), coverage 82% total with a
+`fail_under=80` gate (data.py at 41% — its network fetchers cannot run
+offline — is the drag; the gate sits at the measured level and rises
+only as coverage genuinely grows). CI runs pytest on Linux/macOS/Windows
+× Python 3.10/3.11/3.12; the macOS/Windows combinations are CI-only
+until their first GitHub run is observed.
+
 ## What this is NOT
 
 - Not a stock screener with live prices (no data vendor, no scraping).
@@ -142,6 +152,13 @@ MIT.
 0 9 * * * cd /path/to/investment-analyst-toolkit && python -m toolkit.cli autonomous-once --symbols AAPL,MSFT --output-dir autonomous_reports
 ```
 Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400})`.
+
+## Phase 7 — quality / security / supply chain (local, deploy after Phase 6 verifies)
+- **Lint/type/coverage, measured not claimed:** `ruff check` clean (ruff 0.17.3, with documented ignores only in scanner/agent configs — see their ruff.toml files), `mypy` clean under default settings (see mypy.ini — untyped code is unchecked by default mypy, so this is a guardrail, not full type safety), coverage **82%** total with `fail_under=80` set at the measured level.
+- **Real bugs found by lint, then fixed:** keyed fetchers built URLs from the unresolved `api_key` argument, so an env-supplied key never reached the request (now resolved-key URLs, proven by tests); a test used `_dt` imported inside a different test, so its loop test passed for the wrong reason (now uses module-level `datetime`); dead variables and redundant int casts removed.
+- **Property tests (6 new):** put-call parity across a full parameter grid, discounted-intrinsic bounds (a European put may trade below undiscounted intrinsic when rates are positive — the test was corrected, not the engine), DCF/Gordon monotonicity, portfolio volatility bounds.
+- **CI:** OS × Python matrix (Linux/macOS/Windows × 3.10/3.11/3.12) with pinned pytest 9.2.0; quality job (ruff, mypy, coverage) and smoke job on ubuntu. macOS/Windows are CI-only until their first GitHub run is observed. CodeQL + Dependabot configs added; their GitHub-side enablement, and secret scanning / push protection, are TO VERIFY after deployment. SBOM.md: runtime dependencies none (stdlib-only); CI deps pinned (pytest 9.2.0, ruff 0.17.3, mypy 2.4.0, coverage 7.17.0).
+- Tests: 124/124 (118 at Phase 5 + 6 property tests), verified 28 Oct 2026 in a fresh venv.
 
 ## v0.7.0 — Phase 4: engines + prediction accuracy
 - **Engine validation:** every toolkit formula audited against a named reference (Black–Scholes–Merton 1973 + put-call parity, Gordon 1959, Markowitz portfolio variance, Sharpe 1966/1994, Sortino, historical CVaR, DuPont identity, exact GBM discretisation, walk-forward evaluation). Correct formulas left unchanged; genuine bugs proven by failing cases first, then fixed: `options.greeks` and Monte Carlo silently returned put values for an unknown kind (now raise `ValueError`), negative trade costs added money in backtests (now rejected), non-positive prices and bad alphas now rejected, flat-volatility regime no longer flips on float noise.

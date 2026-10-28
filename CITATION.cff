@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "Cite this repository"
+title: "Investment Analyst Toolkit"
+authors:
+  - family-names: Khadka
+    given-names: Shirjan
+version: 0.7.0
+date-released: 2026-10-28
+license: MIT
+url: "https://github.com/ShirjanKhadka1/investment-analyst-toolkit"
