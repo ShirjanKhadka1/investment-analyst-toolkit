@@ -1,17 +1,43 @@
+# Phase 7: OS x Python matrix + quality gates.
+# Matrix job (pytest only) runs on Linux/macOS/Windows — the
+# macOS/Windows combinations are CI-only: they were never run
+# locally, and their first GitHub run is the proof. Quality and
+# smoke jobs stay on ubuntu-latest, where they were verified.
+# All CI dependencies are pinned to versions measured 28 Oct 2026.
 name: Tests
 on: [push, pull_request]
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install pytest
+      - run: pip install "pytest==9.2.0"
       - run: python -m pytest tests/ -q
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pytest==9.2.0" "ruff==0.17.3" "mypy==2.4.0" "coverage==7.17.0"
+      - run: ruff check toolkit/ tests/
+      - run: mypy toolkit/
+      - run: coverage run -m pytest tests/ -q
+      - run: coverage report
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - run: python -m toolkit.cli predict
       - run: python -m toolkit.cli option --S 100 --K 100 --T 1 --r 0.05 --sigma 0.2
