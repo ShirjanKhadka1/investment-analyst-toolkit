@@ -98,7 +98,7 @@ def cvar(returns, alpha=0.05):
     if not returns:
         raise ValueError("no returns")
     ordered = sorted(returns)
-    k = max(1, int(math.ceil(alpha * len(ordered))))
+    k = max(1, math.ceil(alpha * len(ordered)))
     return _mean(ordered[:k])
 
 
@@ -149,7 +149,7 @@ def _safe(fn, *args):
     a reason — it never crashes a whole autonomous run."""
     try:
         return fn(*args)
-    except ValueError as e:
+    except ValueError:
         return None
 
 

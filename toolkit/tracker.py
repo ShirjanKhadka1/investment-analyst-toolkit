@@ -68,7 +68,6 @@ def score_pending(ledger_path, symbol, actual_close, actual_date, mae_threshold=
             rec["action"] = "demote model in next auto-selection (inverse-MAE re-weighting); review in accuracy report"
         scored.append(rec)
     if scored:
-        scored_ids = {id(r) for r in scored}
         # Rewrite: pending records for this symbol are replaced by scored versions.
         # We identify them by (symbol, predicted_at, forecast) — unique per run.
         remaining = []

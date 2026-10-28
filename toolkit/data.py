@@ -201,7 +201,7 @@ def fetch_stooq_prices(symbol):
 def fetch_alpha_vantage_prices(symbol, api_key=None):
     """Alpha Vantage daily prices. Key from env ALPHA_VANTAGE_API_KEY or argument."""
     key = api_key or get_api_key("ALPHA_VANTAGE_API_KEY", "Alpha Vantage", "https://www.alphavantage.co/support/#api-key")
-    data = _get_json(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey=<redacted>&outputsize=compact")
+    data = _get_json(f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&apikey={key}&outputsize=compact")
     series = data.get("Time Series (Daily)") or {}
     if not series:
         raise RuntimeError(f"No Alpha Vantage data for {symbol} (check symbol/key/rate limit)")
@@ -211,7 +211,7 @@ def fetch_alpha_vantage_prices(symbol, api_key=None):
 def fetch_twelvedata_prices(symbol, api_key=None):
     """Twelve Data daily prices. Key from env TWELVEDATA_API_KEY or argument."""
     key = api_key or get_api_key("TWELVEDATA_API_KEY", "Twelve Data", "https://twelvedata.com/")
-    data = _get_json(f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&apikey=<redacted>")
+    data = _get_json(f"https://api.twelvedata.com/time_series?symbol={symbol}&interval=1day&apikey={key}")
     values = data.get("values") or []
     if not values:
         raise RuntimeError(f"No Twelve Data data for {symbol} (check symbol/key/rate limit)")
@@ -221,7 +221,7 @@ def fetch_twelvedata_prices(symbol, api_key=None):
 def fetch_fmp_prices(symbol, api_key=None):
     """Financial Modeling Prep daily prices. Key from env FMP_API_KEY or argument."""
     key = api_key or get_api_key("FMP_API_KEY", "Financial Modeling Prep", "https://site.financialmodelingprep.com/developer/docs")
-    data = _get_json(f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}?apikey=<redacted>")
+    data = _get_json(f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol}?apikey={key}")
     hist = data.get("historical") or []
     if not hist:
         raise RuntimeError(f"No FMP data for {symbol} (check symbol/key/rate limit)")

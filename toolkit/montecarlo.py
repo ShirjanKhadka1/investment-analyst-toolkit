@@ -8,7 +8,6 @@ from __future__ import annotations
 import math
 import random
 
-
 from .checks import require_finite, require_positive
 
 
@@ -59,7 +58,7 @@ def simulated_var(returns_or_paths_end, alpha=0.05):
     if not returns_or_paths_end:
         raise ValueError("no simulated values")
     ordered = sorted(returns_or_paths_end)
-    k = max(0, int(math.floor(alpha * len(ordered))))
+    k = max(0, math.floor(alpha * len(ordered)))
     k = min(k, len(ordered) - 1)
     return -ordered[k] if ordered else 0.0
 

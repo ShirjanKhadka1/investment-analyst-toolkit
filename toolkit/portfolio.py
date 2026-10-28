@@ -14,9 +14,10 @@ Design choices, stated plainly (this is the Job 2 lesson):
 """
 from __future__ import annotations
 
+import itertools
 import math
 
-from .checks import require_non_negative, require_positive, validate_series
+from .checks import require_positive, validate_series
 
 
 def _mean(xs):
@@ -28,7 +29,7 @@ def returns_from_prices(prices):
     if len(prices) < 2:
         raise ValueError("need at least 2 prices")
     out = []
-    for prev, cur in zip(prices, prices[1:]):
+    for prev, cur in itertools.pairwise(prices):
         require_positive("previous price", prev)
         require_positive("price", cur)
         out.append(cur / prev - 1.0)
