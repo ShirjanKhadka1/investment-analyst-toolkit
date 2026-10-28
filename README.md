@@ -91,6 +91,21 @@ definition, a worked example in `examples/`, or a clearer error message.
 See CONTRIBUTING.md. Security issues: do not open a public issue with a
 reproduction that touches real credentials — there are none in this repo by design.
 
+## Limitations
+
+- The scheduled daily workflow is a plan until its first run is observed
+  on GitHub with public output in `reports/daily/` — it is not claimed
+  to have run until that run is seen.
+- There is no live NEPSE feed: NEPSE data comes only from a user-supplied
+  CSV, and any Nepal cost rate is UNKNOWN unless given with a source and
+  an as-of date.
+- All examples use demo data unless a source is cited.
+
+> Research only, not investment advice; never a buy/sell recommendation
+
+See `CONTRIBUTING.md` for how to contribute and `SECURITY.md` for how to
+report a security issue privately.
+
 ## License
 
 MIT.
@@ -131,6 +146,7 @@ Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400}
 ## v0.7.0 — Phase 4: engines + prediction accuracy
 - **Engine validation:** every toolkit formula audited against a named reference (Black–Scholes–Merton 1973 + put-call parity, Gordon 1959, Markowitz portfolio variance, Sharpe 1966/1994, Sortino, historical CVaR, DuPont identity, exact GBM discretisation, walk-forward evaluation). Correct formulas left unchanged; genuine bugs proven by failing cases first, then fixed: `options.greeks` and Monte Carlo silently returned put values for an unknown kind (now raise `ValueError`), negative trade costs added money in backtests (now rejected), non-positive prices and bad alphas now rejected, flat-volatility regime no longer flips on float noise.
 - **Nepal frictions (`toolkit/nepal_frictions.py`):** brokerage, SEBON fee, DP charge, capital gains tax, circuit limits, settlement lag as parameters — every rate UNKNOWN by default, because no rate is stated in the local Nepal guides; a rate is accepted only with a source + as-of date. Cost reports return UNKNOWN (never zero) when any needed rate is unknown, so a backtest can never run cost-free by accident. NEPSE stated; scanner stays CSV-only; no live feed.
+- **Nepal frictions, sourced schedule (Phase 4 patch, 28 Oct 2026 — deploy after Phase 4 verifies):** `sourced_nepal_frictions()` carries the user-supplied schedule — broker slabs 0.36%/0.33%/0.31%/0.27%/0.24% (min Rs 10), SEBON 0.015%, DP Rs 25, CGT 5% at ≤365 days / 3.75% above (gain after fees, sell only; Gazette vol. 76, Additional 40, Part 5, 31 Bhadra 2083), circuit limits +15%/−15% (re-check against a current NEPSE/SEBON notice before relying on them), settlement T+2 standard with a broker-confirmed T+1 override (example: broker 58 — T+1 is not the standard). Dividends at flat 5%: note only, not implemented. Tests: 118/118 (106 at v0.7.0 + 12 patch tests).
 - **Prediction accuracy (`toolkit/accuracy_report.py`, `docs/post-mortem-prediction-failures.md`):** ledger-driven accuracy per model/version with n stated, pending never counted as wins, failures listed with reason + action, zero-scored models render "no scored predictions". Post-mortem written first for the one locally evidenced failure (fixture, n=1, direction wrong, abs error 15.0 — not smoothed). Before/after OOS (walk-forward, existing models, `predictive.py` unchanged): level-shift fixture naive wins (MAE 3.33 vs 10.0/11.06/14.66, `beats_naive: False`); trending fixture linear_trend genuinely wins (MAE 0.0 vs naive 2.0). Two scratch candidates lost to naive and were NOT adopted. No model change shipped that fails the naive test.
 - Tests: 106/106 passed (66 at v0.6.0 + 5 accuracy-report + 35 engine-validation tests), verified 28 Oct 2026 in a fresh venv.
 
