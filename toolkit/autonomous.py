@@ -25,6 +25,7 @@ from .checks import validate_series
 from .forecast import forecast_with_interval
 from .performance import performance_report
 from .predictive import anomaly_flags, auto_select_model, ensemble_forecast, volatility_regime
+from . import archive as archive_mod, tracker as tracker_mod
 from .portfolio import returns_from_prices
 
 
@@ -62,13 +63,20 @@ def run_once(config):
         try:
             fresh = data_mod.fetch_fresh_prices(symbol, fetchers, max_age_days=max_age, today=today)
             closes = [c for _, c in fresh["pairs"]]
+            # Accuracy loop: score yesterday's predictions against today's actual, then record today's prediction.
+            ledger_path = os.path.join(out_dir, "predictions.jsonl")
+            scored = tracker_mod.score_pending(ledger_path, symbol, closes[-1], fresh["pairs"][-1][0])
+            tracker_mod.record_prediction(ledger_path, symbol, 0.0, "placeholder", "x", "x", closes[-1]) if False else None
             validate_series(f"closes for {symbol}", closes, min_length=30)
             selection = auto_select_model(closes, train_size=max(10, len(closes) // 2))
             ens = ensemble_forecast(closes, series_for_weights=closes, train_size=max(10, len(closes) // 2))
             perf = performance_report(returns_from_prices(closes), closes)
             anomalies = anomaly_flags(closes)
             regime = volatility_regime(closes) if len(closes) >= 22 else {"regime": "unknown (too short)", "latest_std": None, "median_std": None}
+            tracker_mod.record_prediction(ledger_path, symbol, ens["forecast"], selection["best_model"], stamp, "next_step", closes[-1])
+            acc = tracker_mod.accuracy_report(ledger_path, symbol)
             body = {"symbol": symbol, "status": "fresh", "provenance": fresh["provenance"],
+                    "scored_this_run": len(scored), "accuracy": acc,
                     "best_model": selection["best_model"], "best_mae": selection["best_mae"],
                     "beats_naive": selection["beats_naive"], "ensemble_forecast": ens["forecast"],
                     "volatility_regime": regime["regime"], "anomalies": anomalies,
@@ -81,6 +89,7 @@ def run_once(config):
         summary["symbols"][symbol] = body
         _write(os.path.join(out_dir, symbol, f"{stamp}.md"), report)
         _write(os.path.join(out_dir, symbol, "latest.md"), report)
+        archive_mod.archive_run(out_dir, symbol, report, body, stamp)
         entry = {"symbol": symbol, "status": body["status"], "run_at": stamp}
         h = _audit_hash(prev_hash, entry)
         with open(audit_path, "a", encoding="utf-8") as f:
