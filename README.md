@@ -76,7 +76,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 124/124 passed (28 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0).
+Tests: 129/129 passed (Phase 9, 28 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 124 at Phase 7 + 5 new tests covering the equal-weight ensemble as a walk-forward candidate.
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 82% total with a
