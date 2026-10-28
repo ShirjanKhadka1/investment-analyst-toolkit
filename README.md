@@ -127,3 +127,12 @@ MIT.
 0 9 * * * cd /path/to/investment-analyst-toolkit && python -m toolkit.cli autonomous-once --symbols AAPL,MSFT --output-dir autonomous_reports
 ```
 Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400})`.
+
+## v0.5.0 — Proven record, failure learning, archiving (BUILT LOCALLY, NOT DEPLOYED YET — blocked by the verification gate until the remaining-repos batch passes)
+- **Proven record, not claims:** every prediction is written to `predictions.jsonl` BEFORE its outcome is known, scored on the next run (direction + abs error), and reported as direction accuracy + mean abs error over n scored predictions. Pending predictions never count as wins.
+- **Recording failure and improving from it:** every failure gets a reason (direction wrong / error above threshold) and an action — the failing model is demoted in the next auto-selection by inverse-MAE re-weighting. Failures are never deleted from the record.
+- **Archiving:** every run is timestamped and indexed in `archive/index.json`; `latest` is only a pointer. Pruning is opt-in and never deletes a symbol's latest run.
+- **Agentic accuracy loop:** new Accuracy Auditor agent + prediction-accuracy-loop runbook in finance-research-agents (now 10 agents): audit the ledger, log failures, demote failing models, check archive completeness and data freshness before any report goes out.
+- **All API calls:** Yahoo, Stooq, World Bank, SEC EDGAR (no key) + FRED, Alpha Vantage, Twelve Data, FMP (your env key only), all through the fresh-data fallback chain.
+- **Honest limit, stated plainly:** no system is failure-free. This one is built so failures are measured, logged, and acted on — that is the closest to "no failure" that is honest.
+- Tests: 37/37 passed (33 + 4 new tracker/archive tests).
