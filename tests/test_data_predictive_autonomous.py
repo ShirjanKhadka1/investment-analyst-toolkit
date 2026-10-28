@@ -1,7 +1,10 @@
-import datetime, os
+import datetime
+
 import pytest
+
 from toolkit import autonomous, data, predictive
 from toolkit.checks import validate_price_pairs, validate_series
+
 
 def test_validate_series_rejects_nan_inf_none_str():
     for bad in ([1, float("nan")], [1, float("inf")], [1, None], [1, "2"], [True, 2]):
@@ -46,9 +49,8 @@ def test_anomaly_flags_spike():
 
 def test_autonomous_run_once_fresh_and_failed_symbol(tmp_path):
     today = datetime.date(2026, 10, 28)
-    import datetime as _dt
-    _start = _dt.date(2026, 9, 19)
-    fresh_pairs = [((_start + _dt.timedelta(days=i)).isoformat(), 100.0 + i * 0.5) for i in range(40)]
+    _start = datetime.date(2026, 9, 19)
+    fresh_pairs = [((_start + datetime.timedelta(days=i)).isoformat(), 100.0 + i * 0.5) for i in range(40)]
     def good(s): return fresh_pairs
     def bad(s): raise RuntimeError("network down")
     cfg = {"symbols": ["GOOD", "BAD"], "output_dir": str(tmp_path), "max_age_days": 7, "today": today,
@@ -67,6 +69,6 @@ def test_autonomous_run_once_fresh_and_failed_symbol(tmp_path):
 
 def test_autonomous_loop_bounded(tmp_path):
     cfg = {"symbols": ["X"], "output_dir": str(tmp_path), "today": datetime.date(2026, 10, 28),
-           "fetchers": [("f", lambda s: [((_dt.date(2026, 9, 19) + _dt.timedelta(days=i)).isoformat(), 100.0 + i) for i in range(40)])],
+           "fetchers": [("f", lambda s: [((datetime.date(2026, 9, 19) + datetime.timedelta(days=i)).isoformat(), 100.0 + i) for i in range(40)])],
            "interval_seconds": 1}
     assert autonomous.run_loop(cfg, max_runs=2, sleep_fn=lambda s: None) == 2
