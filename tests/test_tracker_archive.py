@@ -1,5 +1,6 @@
 from toolkit import archive, tracker
 
+
 def test_prediction_scored_and_failure_logged(tmp_path):
     ledger = str(tmp_path / "pred.jsonl")
     tracker.record_prediction(ledger, "X", 110.0, "trend", "2026-10-27", "next", 100.0)
