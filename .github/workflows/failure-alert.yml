@@ -1,0 +1,76 @@
+# =====================================================================
+# NOT DEPLOYED — PREPARED FILE ONLY (Round 3, 29 Oct 2026).
+# This workflow is NOT live on GitHub. It was prepared locally and has
+# NOT been pushed via the API: the token behind the API helper lacks
+# workflow scope, so an API push of a .github/workflows/ file would fail.
+# The parent deploys it via the GitHub web UI (browser route) and then
+# confirms the file exists on main and the first failure-triggered run.
+# Do NOT describe this workflow as deployed, running, or alerting until
+# the parent confirms that deployment.
+#
+# TARGET (primary copy):
+#   Repo:   ShirjanKhadka1/investment-analyst-toolkit
+#   Branch: main
+#   Path:   .github/workflows/failure-alert.yml
+#   Watches: the "Scheduled update" workflow in the SAME repo
+#            (workflow_run only fires for workflows in the same repo,
+#             on the default branch).
+#
+# SECOND COPY NEEDED (same file, one line changed):
+#   Repo:   ShirjanKhadka1/finance-research-agents
+#   Branch: main
+#   Path:   .github/workflows/failure-alert.yml
+#   Change: workflows: ["Scheduled update"] -> ["Daily health check"]
+#   (The health workflow lives in finance-research-agents; a workflow_run
+#   listener in the toolkit repo cannot see it.)
+#
+# Behaviour: when a watched run completes with conclusion "failure", this
+# workflow opens ONE GitHub issue titled with the failed run's name and
+# number (the run number in the title makes duplicates for the same run
+# visible rather than silently duplicated; a re-run gets a new number and
+# therefore a new issue, which is intended — each failure is triaged).
+# It does NOT send email (Gmail connector not connected — recorded
+# blocker) and does NOT page anyone. It does NOT alert on its own
+# failures: if this workflow itself fails, no issue is opened by it.
+# Research only. No trades, no spend, no recommendations. No secrets.
+# =====================================================================
+
+name: Failure alert
+
+on:
+  workflow_run:
+    workflows: ["Scheduled update"]
+    types: [completed]
+
+permissions:
+  issues: write
+
+jobs:
+  open-issue-on-failure:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open an issue for the failed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_NAME: ${{ github.event.workflow_run.name }}
+          RUN_NUMBER: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          gh issue create \
+            --title "Scheduled run failed: ${RUN_NAME} #${RUN_NUMBER}" \
+            --label "automation-failure" \
+            --body "A scheduled workflow run failed.
+
+          - Workflow: ${RUN_NAME}
+          - Run: ${RUN_URL}
+          - Branch: ${RUN_BRANCH}
+          - Commit: ${RUN_SHA}
+          - Conclusion: failure
+
+          Triage: check the run log, then the generated output
+          (reports/daily/ — a failed symbol keeps its previous latest.md
+          and is labelled STALE_OR_FAILED; stale output is never fresh).
+          Research only. No trades, no spend, no recommendations."
