@@ -5,6 +5,7 @@ run every model through the SAME walk-forward split, rank by MAE, and
 report — never hide — the case where naive wins.
 """
 import pytest
+
 from toolkit import predictive
 
 
