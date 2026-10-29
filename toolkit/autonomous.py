@@ -20,13 +20,18 @@ import hashlib
 import json
 import os
 
+from . import archive as archive_mod
 from . import data as data_mod
+from . import tracker as tracker_mod
 from .checks import validate_series
-from .forecast import forecast_with_interval
 from .performance import performance_report
-from .predictive import anomaly_flags, auto_select_model, ensemble_forecast, volatility_regime
-from . import archive as archive_mod, tracker as tracker_mod
 from .portfolio import returns_from_prices
+from .predictive import (
+    anomaly_flags,
+    auto_select_model,
+    ensemble_forecast,
+    volatility_regime,
+)
 
 
 def _audit_hash(prev, entry):
