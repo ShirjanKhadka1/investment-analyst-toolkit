@@ -138,7 +138,9 @@ def test_level_shift_naive_wins_at_every_horizon():
         assert bh["naive_wins"] is True
         # AR(1) ties naive here; a tie is not a win (strict < rule).
         ar1 = next(r for r in bh["ranking"] if r["model"] == "ar1")
-        assert ar1["mae"] == bh["naive_mae"]
+        # Tie is approximate: AR(1) and naive MAEs agree to float precision,
+        # and exact == fails on some Python versions (3.11 vs 3.12 summation).
+        assert abs(ar1["mae"] - bh["naive_mae"]) < 1e-9
         assert ar1["beats_naive"] is False
 
 
