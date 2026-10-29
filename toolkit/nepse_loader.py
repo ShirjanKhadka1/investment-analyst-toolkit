@@ -31,6 +31,7 @@ intraday trading is UPCOMING, not live.
 """
 
 import csv
+import math
 
 __all__ = ["NepseLoaderError", "load_nepse_user_csv",
            "load_nepse_user_csv_single"]
@@ -54,28 +55,27 @@ def _parse_float(row, field, where):
         value = float(row[field])
     except (KeyError, TypeError, ValueError):
         raise NepseLoaderError(f"{where}: bad or missing {field}")
-    if value != value or value in (float("inf"), float("-inf")):
+    if math.isnan(value) or math.isinf(value):
         raise NepseLoaderError(f"{where}: non-finite {field}")
     return value
 
 
 def _read_rows(path, required):
     try:
-        fh = open(path, newline="", encoding="utf-8-sig")
+        with open(path, newline="", encoding="utf-8-sig") as fh:
+            reader = csv.DictReader(fh)
+            if reader.fieldnames is None or not required.issubset(
+                    {f.strip() for f in reader.fieldnames}):
+                raise NepseLoaderError(
+                    f"{path}: expected columns {', '.join(sorted(required))}")
+            rows = []
+            for n, raw in enumerate(reader, start=2):
+                row = {(k.strip() if k else k):
+                       (v.strip() if isinstance(v, str) else v)
+                       for k, v in raw.items()}
+                rows.append((n, row))
     except OSError as exc:
         raise NepseLoaderError(f"cannot open {path}: {exc}") from exc
-    with fh:
-        reader = csv.DictReader(fh)
-        if reader.fieldnames is None or not required.issubset(
-                {f.strip() for f in reader.fieldnames}):
-            raise NepseLoaderError(
-                f"{path}: expected columns {', '.join(sorted(required))}")
-        rows = []
-        for n, raw in enumerate(reader, start=2):
-            row = {(k.strip() if k else k):
-                   (v.strip() if isinstance(v, str) else v)
-                   for k, v in raw.items()}
-            rows.append((n, row))
     return rows
 
 
