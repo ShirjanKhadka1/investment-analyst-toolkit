@@ -11,9 +11,18 @@ import math
 
 import pytest
 
-from toolkit import (backtest, forecast, montecarlo, nepal_frictions,
-                     options, performance, portfolio, predictive, ratios,
-                     valuation)
+from toolkit import (
+    backtest,
+    forecast,
+    montecarlo,
+    nepal_frictions,
+    options,
+    performance,
+    portfolio,
+    predictive,
+    ratios,
+    valuation,
+)
 from toolkit.nepal_frictions import NepalFrictions, UnknownFrictionError
 
 
