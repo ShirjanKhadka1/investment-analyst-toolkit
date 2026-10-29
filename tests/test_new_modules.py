@@ -1,5 +1,4 @@
 """Tests for Job 3 modules: portfolio, performance, forecast, data (offline parts)."""
-import math
 
 from toolkit import data, forecast, performance, portfolio
 
