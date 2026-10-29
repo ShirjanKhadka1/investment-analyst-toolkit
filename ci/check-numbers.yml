@@ -1,0 +1,18 @@
+# Round 3 numbers check (prepared for the parent browser route).
+# DO NOT claim this workflow is deployed until a run is observed:
+# the API token lacks workflow scope, so this file must be added as
+# .github/workflows/check-numbers.yml via the browser when the PR is opened.
+# It regenerates status.json, then fails if any checked file disagrees.
+name: Check numbers
+on: [push, pull_request]
+jobs:
+  check-numbers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pytest==9.2.0"
+      - run: python scripts/generate_status.py --root . --repo investment-analyst-toolkit
+      - run: python scripts/check_numbers.py --root .
