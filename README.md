@@ -76,7 +76,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 148/148 passed (Phase 10, 29 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 129 at Phase 9 + 19 new tests covering AR(1), Holt, drift, multi-horizon evaluation, empirical intervals, adaptive weighting, and drift flags.
+Tests: 148/148 tests passing (Phase 10, 29 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 129 at Phase 9 + 19 new tests covering AR(1), Holt, drift, multi-horizon evaluation, empirical intervals, adaptive weighting, and drift flags.
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 82% total with a
