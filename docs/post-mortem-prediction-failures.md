@@ -120,3 +120,28 @@ what this slice makes visible, is:
   and update the n for every rate quoted.
 - Revisit this file if a failure pattern repeats across models or
   symbols; a single n = 1 case is a record, not yet a pattern.
+
+## Phase 10 appendix (29 Oct 2026) — new evidenced failures, not smoothed
+
+The Phase 10 evaluation (synthetic fixtures only, `compare_models_walk_forward`
+with `horizons=(1, 3, 5)`, `include_new_models=True`, ensembles on) adds
+these evidenced results. They are fixture results at stated horizons and n,
+not claims about real markets.
+
+- **Level shift 100 → 150, train 15, all horizons: naive wins.**
+  h=1 naive MAE 3.333, h=3 3.846, h=5 4.545. Every non-naive model loses
+  at every horizon (worst: holt at h=5, 19.424). AR(1) ties naive exactly
+  at every horizon (3.333 / 3.846 / 4.545) — a tie is not a win under the
+  strict `<` rule, and is reported as such. The adaptive ensemble does
+  NOT rescue the shift (6.276 / 7.690 / 10.382): adaptive weighting
+  re-weights lagging models, it does not make them fast.
+- **Drift loses the noisy-flat fixture at every horizon** (2.906 vs naive
+  2.900 at h=1; 2.164 vs 1.833 at h=3; 3.668 vs 3.438 at h=5). This is the
+  documented drift failure mode: on a series with no real drift, the mean
+  recent change is noise, and adding it hurts. Drift is kept in the pack
+  as a candidate with this loss on its record, not removed to flatter it.
+- **Trending fixture, +2/step: exact wins, honestly bounded.** linear_trend,
+  drift, holt, and the adaptive ensemble all score MAE 0.000 at h=1/3/5
+  on a perfect trend — because the fixture has no noise. That is a
+  correctness check (the maths reproduces a straight line), not evidence
+  of real-world accuracy, and it is labelled as such wherever quoted.
