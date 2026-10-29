@@ -9,7 +9,7 @@ No network, no key, unless a data function is called explicitly.
 import argparse
 import sys
 
-from . import data, forecast, options, portfolio
+from . import data, forecast, options
 
 
 def main(argv=None):
@@ -34,14 +34,14 @@ def main(argv=None):
     po.add_argument("--kind", default="call")
     args = p.parse_args(argv)
     if args.cmd == "data":
-        import datetime as _dt
         from . import data as _data
         fn = _data.fetch_yahoo_prices if args.source == "yahoo" else (lambda s: _data.fetch_stooq_prices(s.lower() + ".us"))
         pairs = fn(args.symbol)
         fresh = _data.check_freshness(pairs[-1][0], max_age_days=args.max_age_days)
         print({"symbol": args.symbol, "source": args.source, "n_points": len(pairs), "last_date": pairs[-1][0], "last_close": pairs[-1][1], "freshness": fresh})
     elif args.cmd == "predict":
-        from . import predictive as _pred, data as _data
+        from . import data as _data
+        from . import predictive as _pred
         series = _data.load_csv_prices(args.csv) if args.csv else _data.demo_series()
         closes = [c for _, c in series] if args.csv else series
         sel = _pred.auto_select_model(closes, train_size=max(10, len(closes)//2))
