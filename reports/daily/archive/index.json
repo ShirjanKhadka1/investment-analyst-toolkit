@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "AAPL",
+    "run_at": "20261029T023941Z",
+    "report": "reports/daily/archive/AAPL/20261029T023941Z.md",
+    "summary": "reports/daily/archive/AAPL/20261029T023941Z.json"
+  },
+  {
+    "symbol": "MSFT",
+    "run_at": "20261029T023941Z",
+    "report": "reports/daily/archive/MSFT/20261029T023941Z.md",
+    "summary": "reports/daily/archive/MSFT/20261029T023941Z.json"
+  }
+]

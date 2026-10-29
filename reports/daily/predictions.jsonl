@@ -1,0 +1,2 @@
+{"forecast": 343.8544596009111, "last_close": 343.8299865722656, "model": "naive", "predicted_at": "20261029T023941Z", "predicted_for": "next_step", "status": "pending", "symbol": "AAPL"}
+{"forecast": 526.8433920651734, "last_close": 531.010009765625, "model": "naive", "predicted_at": "20261029T023941Z", "predicted_for": "next_step", "status": "pending", "symbol": "MSFT"}

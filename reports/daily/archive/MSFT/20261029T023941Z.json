@@ -1,0 +1,47 @@
+{
+  "symbol": "MSFT",
+  "status": "fresh",
+  "provenance": {
+    "source": "yahoo",
+    "last_date": "2026-10-28",
+    "age_days": 1,
+    "n_points": 251,
+    "stale": false
+  },
+  "scored_this_run": 0,
+  "accuracy": {
+    "n_scored": 0,
+    "direction_accuracy": null,
+    "mean_abs_error": null,
+    "failure_rate": null,
+    "by_model": {}
+  },
+  "best_model": "naive",
+  "best_mae": 6.784525311182415,
+  "beats_naive": false,
+  "ensemble_forecast": 526.8433920651734,
+  "volatility_regime": "low",
+  "anomalies": [
+    {
+      "index": 62,
+      "return": -0.09993149179840488,
+      "z": -4.813680047202934
+    },
+    {
+      "index": 187,
+      "return": 0.15506733300956488,
+      "z": 7.45319721842019
+    }
+  ],
+  "performance": {
+    "label": "",
+    "volatility_regime": null,
+    "annualised_return": 0.033596436615067976,
+    "annualised_volatility": 0.329992773440215,
+    "sharpe": 0.10180961317674027,
+    "sortino": 0.15687007049458,
+    "max_drawdown": 0.34848122144700266,
+    "cvar_5pct": -0.040493287445320034
+  },
+  "disclaimer": "Research only. Not investment advice. No trade is made by this system."
+}
