@@ -49,7 +49,6 @@ import xml.etree.ElementTree as _ET
 
 from .checks import validate_price_pairs
 from .data import (
-    _USER_AGENT,
     _get_json,
     _get_text,
     check_freshness,
