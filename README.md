@@ -1,5 +1,30 @@
 # Investment Analyst Toolkit
 
+Start with the finding, not the promise: on the real-data and example-data
+walk-forward runs recorded in this repo, the naive baseline wins. This
+toolkit is tooling to test forecasts honestly — every model must beat the
+naive benchmark ("tomorrow's close equals today's close") on the same
+walk-forward split, and when it does not, that loss stays in the record.
+
+Two single-symbol AAPL runs, both example periods — not general accuracy
+claims, not statements about AAPL, and not statements about any NEPSE
+security (AAPL is a US equity; there is no live NEPSE feed here):
+
+| Run | Horizon | Naive MAE | Best fitted model MAE | Naive wins? |
+| --- | ---: | ---: | ---: | ---: |
+| Yahoo AAPL, 251 daily closes, 2025-10-29 to 2026-10-28 (docs/real-data-walk-forward-2026-10-29.md) | h = 1 | 3.7660 | 5.5880 (exp_smoothing_0.3) | Yes |
+| Yahoo AAPL, 251 daily closes, 2025-10-29 to 2026-10-28 | h = 3 | 6.9771 | 8.2806 (exp_smoothing_0.3) | Yes |
+| Yahoo AAPL, 251 daily closes, 2025-10-29 to 2026-10-28 | h = 5 | 9.2287 | 10.3993 (moving_average_5) | Yes |
+| Labelled example file, AAPL daily closes, 2024-01-02 to 2025-12-31, 502 bars (docs/r6-example-data-walk-forward-2026-10-29.md) | h = 1 | 2.8474 | 4.5180 (exp_smoothing_0.3) | Yes |
+| Labelled example file, AAPL daily closes, 2024-01-02 to 2025-12-31, 502 bars | h = 3 | 5.6394 | 6.5891 (exp_smoothing_0.3) | Yes |
+| Labelled example file, AAPL daily closes, 2024-01-02 to 2025-12-31, 502 bars | h = 5 | 7.7088 | 7.9284 (exp_smoothing_0.3) | Yes |
+
+MAE is in US dollars per share; `beats_naive` is False for every fitted
+model at every horizon in both runs. MAE grows with horizon for every
+model, including naive. One symbol, one period, one train/test split,
+and the default four-model set only, in each run — that is the whole
+claim, and it is not stretched further.
+
 A small, tested Python toolkit for the calculations an investment / research
 analyst actually does every day — financial ratios, DuPont decomposition,
 valuation multiples, and a transparent DCF helper that forces you to show every
@@ -8,6 +33,39 @@ input. No black boxes, no hidden assumptions.
 > **Educational use.** This is a learning and analysis toolkit, not investment
 > advice, and not a recommendation to buy or sell any security. Every example
 > uses clearly-labelled demo data unless a source is cited.
+
+## Losses, kept in the record
+
+None of these is softened, buried, or deleted. Each one is also in the
+linked record named beside it.
+
+- **Level-shift loss (synthetic fixture): naive wins, adaptive loses.**
+  On the 100 to 150 level-shift fixture, naive wins at every horizon
+  (MAE 3.333 at h = 1, 3.846 at h = 3, 4.545 at h = 5) and every
+  non-naive model loses, including the adaptive ensemble (6.276, 7.690,
+  10.382). Full table in the v0.8.0 section below and in
+  `docs/post-mortem-prediction-failures.md`.
+- **Noisy-flat drift loss (synthetic fixture): drift loses.** On the
+  noisy-flat fixture, drift loses at every horizon (2.906 vs naive
+  2.900 at h = 1; 2.164 vs 1.833 at h = 3; 3.668 vs 3.438 at h = 5):
+  on a series with no real drift, the mean recent change is noise,
+  and adding it hurts. Full table in the v0.8.0 section below and in
+  `docs/post-mortem-prediction-failures.md`.
+- **AAPL real-data naive win.** In the Yahoo AAPL walk-forward above,
+  naive beat every fitted model at h = 1, 3, and 5 (naive MAE 3.7660,
+  6.9771, 9.2287). Full record:
+  `docs/real-data-walk-forward-2026-10-29.md`. The example-file run
+  says the same thing on its own period (naive 2.8474, 5.6394, 7.7088):
+  `docs/r6-example-data-walk-forward-2026-10-29.md`.
+- **Scanner bullish crossover loss (example data, NOT NEPSE).** On the
+  same labelled AAPL example file, the bullish EMA-crossover signal
+  hit 33.3% at 5 bars (1 win, 2 losses, 3 events) against a naive rate
+  of 56.5% — a lift of −23.1 points. At 20 bars it won 2 of 3 yet still
+  averaged −1.87%. The bearish 20-bar lift (+18.6 points) rests on
+  n = 2 with a mean forward return of −6.05% and is noise, not a win
+  to quote alone. Full table, with every event and its baseline, in
+  the scanner repo's backtest section:
+  https://github.com/ShirjanKhadka1/nepali-capital-market-research/blob/main/scanner/README.md
 
 ## Why this exists
 
