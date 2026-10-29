@@ -18,7 +18,7 @@ def test_ensemble_appears_in_ranking_when_enabled():
     names = {row["model"] for row in rep["ranking"]}
     assert "ensemble_equal" in names
     assert len(names) == 5
-    row = [r for r in rep["ranking"] if r["model"] == "ensemble_equal"][0]
+    row = next(r for r in rep["ranking"] if r["model"] == "ensemble_equal")
     assert row["n_test"] == 20
     assert row["mae"] == rep["results"]["ensemble_equal"]["mae"]
     maes = [r["mae"] for r in rep["ranking"]]
