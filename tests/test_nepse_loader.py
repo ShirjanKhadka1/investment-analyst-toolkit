@@ -11,7 +11,6 @@ import os
 
 import pytest
 
-from toolkit import nepse_loader
 from toolkit.nepse_loader import (
     NepseLoaderError,
     load_nepse_user_csv,
