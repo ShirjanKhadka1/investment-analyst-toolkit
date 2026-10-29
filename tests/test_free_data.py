@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from toolkit.free_data import (  # noqa: E402
+from toolkit.free_data import (
     _coingecko_daily_points,
     _parse_ecb_xml,
     default_fetchers,
