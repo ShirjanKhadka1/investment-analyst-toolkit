@@ -76,7 +76,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 129/129 passed (Phase 9, 28 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 124 at Phase 7 + 5 new tests covering the equal-weight ensemble as a walk-forward candidate.
+Tests: 148/148 passed (Phase 10, 29 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 129 at Phase 9 + 19 new tests covering AR(1), Holt, drift, multi-horizon evaluation, empirical intervals, adaptive weighting, and drift flags.
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 82% total with a
@@ -159,6 +159,59 @@ Or in Python: `autonomous.run_loop({"symbols": [...], "interval_seconds": 86400}
 - **Property tests (6 new):** put-call parity across a full parameter grid, discounted-intrinsic bounds (a European put may trade below undiscounted intrinsic when rates are positive — the test was corrected, not the engine), DCF/Gordon monotonicity, portfolio volatility bounds.
 - **CI:** OS × Python matrix (Linux/macOS/Windows × 3.10/3.11/3.12) with pinned pytest 9.2.0; quality job (ruff, mypy, coverage) and smoke job on ubuntu. macOS/Windows are CI-only until their first GitHub run is observed. CodeQL + Dependabot configs added; their GitHub-side enablement, and secret scanning / push protection, are TO VERIFY after deployment. SBOM.md: runtime dependencies none (stdlib-only); CI deps pinned (pytest 9.2.0, ruff 0.17.3, mypy 2.4.0, coverage 7.17.0).
 - Tests: 124/124 (118 at Phase 5 + 6 property tests), verified 28 Oct 2026 in a fresh venv.
+
+## v0.8.0 — Phase 10: increased predictive capability (honest evaluation)
+
+New forecasters in `toolkit/predictive.py` (all stdlib, all pure functions
+of the training window only — no lookahead, no test-period statistics):
+
+| Model | Maths (one line) |
+| --- | --- |
+| `ar1` | OLS y_t = c + phi·y_{t-1}; |phi| clamped to 0.99 (stationarity guard); iterated for multi-step |
+| `holt` | Double exponential smoothing, level + trend (alpha 0.3, beta 0.1) |
+| `holt_damped` | Holt with trend damping 0.9 — trend that may not persist |
+| `drift` | Last value + horizon × mean recent change |
+| `ensemble_adaptive` | Inverse-recent-MAE weights from internal walk-forward on the training window only; equal-weight fallback when train is too short |
+
+Pre-existing models (`naive`, `moving_average_5`, `linear_trend`,
+`exp_smoothing_0.3`, `ensemble_equal`) are unchanged, and the default
+`compare_models_walk_forward()` call still returns exactly those four
+models at h=1 — new models are opt-in via `include_new_models=True`,
+with horizons via `horizons=(1, 3, 5)` and the adaptive ensemble via
+`include_adaptive=True`, so no existing ranking changes silently.
+
+Multi-horizon walk-forward results (MAE, synthetic fixtures only — not
+market data; `*` = beats naive at that horizon; naive MAE in brackets):
+
+| Fixture (train) | h | Winner(s) | Losers vs naive |
+| --- | ---: | --- | --- |
+| Trending, +2/step (20) | 1 | linear_trend, drift, holt, ensemble_adaptive = 0.000 (naive 2.000) | moving_average_5, exp_smoothing_0.3 |
+| Trending, +2/step (20) | 3 | linear_trend, drift, holt, ensemble_adaptive = 0.000 (naive 6.000) | moving_average_5, exp_smoothing_0.3 |
+| Trending, +2/step (20) | 5 | linear_trend, drift, holt, ensemble_adaptive = 0.000 (naive 10.000) | moving_average_5, exp_smoothing_0.3 |
+| Level shift 100→150 (15) | 1 | naive = 3.333 (ar1 ties at 3.333, a tie is not a win) | all other models, incl. ensemble_adaptive (6.276) |
+| Level shift 100→150 (15) | 3 | naive = 3.846 (ar1 ties) | all other models, incl. ensemble_adaptive (7.690) |
+| Level shift 100→150 (15) | 5 | naive = 4.545 (ar1 ties) | all other models, incl. ensemble_adaptive (10.382) |
+| Noisy flat, deterministic pattern (20) | 1 | ar1 = 1.855 (naive 2.900) | drift (2.906) only |
+| Noisy flat, deterministic pattern (20) | 3 | moving_average_5 = 1.422 (naive 1.833) | drift (2.164) only |
+| Noisy flat, deterministic pattern (20) | 5 | ar1 = 1.834 (naive 3.438) | drift (3.668) only |
+
+Reading this table honestly: no model is "accurate in general". Naive
+wins the level shift at every horizon; drift loses the noisy-flat
+fixture at every horizon (its documented overshoot failure mode); the
+adaptive ensemble does not rescue the shift. Wins above are wins on
+that fixture, at that horizon, at that n — nothing more.
+
+Also added: prediction intervals from walk-forward residuals inside
+the training window (`prediction_interval()`: empirical quantiles with
+>= 5 residuals, normal-approx fallback otherwise, method + n always
+stated — never a guaranteed range), and drift flags
+(`drift_flag()` / `walk_forward_drift()`: recent MAE >= 1.5× early MAE
+over >= 3 errors each, flagged in words, never a silent model switch).
+
+Version decision: bumped to **v0.8.0** because the new capability is
+user-facing (new models, horizons, intervals, adaptive weighting) and
+all 148 tests pass. Research only; not investment advice; no buy/sell/
+hold recommendation; NEPSE stays CSV-only.
 
 ## v0.7.0 — Phase 4: engines + prediction accuracy
 - **Engine validation:** every toolkit formula audited against a named reference (Black–Scholes–Merton 1973 + put-call parity, Gordon 1959, Markowitz portfolio variance, Sharpe 1966/1994, Sortino, historical CVaR, DuPont identity, exact GBM discretisation, walk-forward evaluation). Correct formulas left unchanged; genuine bugs proven by failing cases first, then fixed: `options.greeks` and Monte Carlo silently returned put values for an unknown kind (now raise `ValueError`), negative trade costs added money in backtests (now rejected), non-positive prices and bad alphas now rejected, flat-volatility regime no longer flips on float noise.
