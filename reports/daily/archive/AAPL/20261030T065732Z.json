@@ -1,0 +1,62 @@
+{
+  "symbol": "AAPL",
+  "status": "fresh",
+  "provenance": {
+    "source": "yahoo",
+    "last_date": "2026-10-29",
+    "age_days": 1,
+    "n_points": 251,
+    "stale": false
+  },
+  "scored_this_run": 1,
+  "accuracy": {
+    "n_scored": 2,
+    "direction_accuracy": 0.5,
+    "mean_abs_error": 2.540008544921875,
+    "failure_rate": 0.5,
+    "by_model": {
+      "naive": {
+        "n": 2,
+        "failures": 1
+      }
+    }
+  },
+  "best_model": "naive",
+  "best_mae": 3.7969844757564486,
+  "beats_naive": false,
+  "ensemble_forecast": 346.2689320914981,
+  "volatility_regime": "low",
+  "anomalies": [
+    {
+      "index": 71,
+      "return": -0.049981811301894274,
+      "z": -3.366166843200177
+    },
+    {
+      "index": 162,
+      "return": -0.06117781321571136,
+      "z": -4.103656777491713
+    },
+    {
+      "index": 167,
+      "return": 0.0484068203126522,
+      "z": 3.1147739446803873
+    },
+    {
+      "index": 187,
+      "return": -0.07353864245054431,
+      "z": -4.917874853761933
+    }
+  ],
+  "performance": {
+    "label": "",
+    "volatility_regime": null,
+    "annualised_return": 0.2824241622288448,
+    "annualised_volatility": 0.24099450336731076,
+    "sharpe": 1.1719112190637362,
+    "sortino": 1.6931621879672163,
+    "max_drawdown": 0.13822983759432042,
+    "cvar_5pct": -0.03474187259979059
+  },
+  "disclaimer": "Research only. Not investment advice. No trade is made by this system."
+}
