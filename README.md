@@ -134,10 +134,10 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 195/195 tests passing (Phase 11, 29 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 148 at Phase 10 + 47 new tests covering the free-data adapters/wrappers, portfolio guards and efficient frontier, Monte Carlo happy paths, ratios guards, predictive validation/fallback branches, checks guards, stubbed-transport data-layer fetchers, and CLI commands.
+Tests: 198/198 tests passing (Phase 11 + Round 3, 30 Oct 2026, fresh venv, Python 3.12, pytest 9.2.0): 195 at Phase 11 + 3 Round 3 loader tests, on top of 148 at Phase 10 + 47 new tests covering the free-data adapters/wrappers, portfolio guards and efficient frontier, Monte Carlo happy paths, ratios guards, predictive validation/fallback branches, checks guards, stubbed-transport data-layer fetchers, and CLI commands.
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
-this is a guardrail, not full type safety), coverage 95% total with a
+this is a guardrail, not full type safety), coverage 93% total with a
 `fail_under=80` gate left unchanged (the remaining misses are mostly
 defensive/unreachable branches, e.g. predictive.py 342-343, 348-349, 572;
 free_data.py, portfolio.py, montecarlo.py, ratios.py and checks.py are
