@@ -27,11 +27,29 @@ def _synthetic_path():
     return os.path.normpath(SYNTHETIC)
 
 
-def test_synthetic_multi_symbol_loads():
-    if not os.path.exists(_synthetic_path()):
-        pytest.skip("scanner repo example not adjacent in this checkout")
+def test_synthetic_multi_symbol_loads(tmp_path):
+    # Self-contained: use the scanner repo example when it is adjacent,
+    # otherwise write the same synthetic fixture locally. A test that
+    # skips in a single-repo CI checkout made the suite count differ
+    # between local (198) and CI (197) runs, failing the number check.
+    if os.path.exists(_synthetic_path()):
+        path = _synthetic_path()
+    else:
+        path = str(tmp_path / "nepse_user_supplied_SYNTHETIC.csv")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("symbol,sector,date,close,high,low,volume\n")
+            for i, close in enumerate(
+                    [100.00, 101.00, 102.50, 101.50, 103.00], start=1):
+                f.write(
+                    f"SYNTHETIC-A,S,2026-01-0{i},{close},{close + 1},"
+                    f"{close - 1},100\n")
+            for i, close in enumerate(
+                    [50.00, 51.00, 52.00, 51.50, 53.00], start=1):
+                f.write(
+                    f"SYNTHETIC-B,S,2026-01-0{i},{close},{close + 1},"
+                    f"{close - 1},100\n")
     groups, source = load_nepse_user_csv(
-        _synthetic_path(), "SYNTHETIC example file, invented for testing")
+        path, "SYNTHETIC example file, invented for testing")
     assert set(groups) == {"SYNTHETIC-A", "SYNTHETIC-B"}
     assert groups["SYNTHETIC-A"]["closes"] == [
         100.00, 101.00, 102.50, 101.50, 103.00]
