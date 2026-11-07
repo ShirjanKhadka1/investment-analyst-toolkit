@@ -90,3 +90,56 @@ source repo, the commit, and "ideas only, no code copied".
 - Predictions stay probabilistic and walk-forward honest: seed stated,
   in-sample/out-of-sample stated, naive baseline compared where a
   forecast is made.
+
+## 3. Phase 1 engines 1.1–1.2 (2026-11-07)
+
+### Engine 1.1 — point-in-time store (`toolkit/pit_store.py`)
+
+- Original code for this toolkit; no outside source. Every record
+  carries `as_of` / `published_at`; reads return only records
+  published on or before the query date. Tests:
+  `tests/test_pit_store.py` (17 tests, synthetic fixtures only),
+  including a leak test that a naive store ignoring `published_at`
+  fails.
+
+### Engine 1.2 — NEPSE Time Machine upgrade (`toolkit/timemachine.py`)
+
+- Named-setup detection (`detect_setups`, `detect_setup`) and the
+  five setup rules: reimplemented locally from the same rules as
+  `scanner/setups.py` (nepali-capital-market-research, MIT — which
+  adapted day-trader-skill's scanner rule table, MIT, commit
+  3d0f4ef) and `toolkit/terminal.py`. No scanner code imported and
+  no scanner code copied; this module never imports the scanner repo.
+- `replay_setup` / `honest_verdict` / `check_exit_liquidity` /
+  `simulate_nepse`: original code for this toolkit, built on the
+  existing `simulate` / `replay_history` (day-trader-skill
+  trader-timemachine, MIT, commit 3d0f4ef — see section 2) and on
+  `toolkit/nepal_frictions.sourced_nepal_frictions()` (user-supplied
+  rate-schedule screenshot, 28 Oct 2026). Circuit ±15% is the
+  user-supplied figure from that schedule, labelled wherever it
+  appears; no rate was taken from memory. Tests:
+  `tests/test_timemachine_nepse.py` (27 tests, synthetic fixtures
+  only), including the README worked-example numbers pinned to the
+  shipped synthetic `demo.csv`.
+
+### One-command terminal (`toolkit/terminal.py`, `tests/test_terminal.py`, `demo.csv`)
+
+- From the Round 2 CLI draft (`~/workspace/github-repos/
+  round2-drafts/terminal/`, written for this programme, 2026-11-07):
+  the draft was re-verified from a fresh clone of live `main`
+  (its 20 tests pass, including end-to-end subprocess runs) before
+  being deployed. Three minimal lint fixes were applied on deploy
+  so the repo stays ruff-clean (ruff 0.17.3): `subprocess.run`
+  gained an explicit `check=False` in the test helper,
+  `load_bars` now opens the CSV with a context manager, and the
+  CLI's broad `except Exception` carries an inline `noqa: BLE001`
+  with its reason recorded in `ruff.toml`. No behaviour changed.
+  Attribution inside the module header is unchanged (indicators:
+  FinceptTerminal defaults table, ideas only, AGPL-3.0, commit
+  7716ee8; Time Machine / risk gate: day-trader-skill, MIT, commit
+  3d0f4ef; setups: reimplemented from `scanner/setups.py`, MIT).
+- `toolkit/terminal.py` is intentionally NOT imported by
+  `toolkit/__init__.py`: importing it there makes
+  `python -m toolkit.terminal` emit a `RuntimeWarning`
+  (`'toolkit.terminal' found in sys.modules...`). It is imported
+  directly (`from toolkit.terminal import ...`) wherever needed.
