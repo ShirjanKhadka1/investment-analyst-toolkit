@@ -6,6 +6,13 @@ Time-Machine odds summary, and a risk-gate verdict on a hypothetical
 exit plan. Zero dependencies (standard library only), no network, no
 keys, no live trading, no orders.
 
+``python -m toolkit.terminal research <SYMBOL>`` (engine 1.9) writes a
+one-page HTML research report instead: thesis, bull/bear, peers and
+sector comps, risks, cited sources — from caller-supplied CSVs
+(``--bars``, ``--fundamentals``, ``--peers``). See
+``toolkit/report.py``; if no data exists for the symbol, the report
+says so plainly instead of inventing figures.
+
 Research and education only: not investment advice, never a
 buy/sell/hold recommendation. Every section carries its honesty
 label in the printed output.
@@ -60,7 +67,7 @@ import datetime
 import math
 import sys
 
-from . import indicators, position_plan, timemachine
+from . import indicators, position_plan, report, timemachine
 
 __all__ = [
     "SETUP_DEFINITIONS",
@@ -595,9 +602,77 @@ def _build_parser():
     return parser
 
 
+def _build_research_parser():
+    parser = argparse.ArgumentParser(
+        prog="python -m toolkit.terminal research",
+        description="One-page HTML research report for a symbol, from "
+                    "caller-supplied CSVs. Research and education only — "
+                    "not investment advice.")
+    parser.add_argument("symbol", help="symbol the report is about "
+                        "(e.g. a NEPSE ticker)")
+    parser.add_argument("--bars", default=None,
+                        help="CSV of daily bars: date,close "
+                             "(see toolkit.report.bars_from_csv)")
+    parser.add_argument("--fundamentals", default=None,
+                        help="CSV of fundamentals rows: "
+                             "field,value,source,period")
+    parser.add_argument("--peers", default=None,
+                        help="CSV of peer rows: symbol,metric,value,source")
+    parser.add_argument("--sector", default=None,
+                        help="sector label for the report header")
+    parser.add_argument("--exchange", default="NEPSE",
+                        help="exchange label (default: NEPSE)")
+    parser.add_argument("--as-of", default=None,
+                        help="as-of date YYYY-MM-DD (default: today)")
+    parser.add_argument("--out", default=None,
+                        help="where to write the HTML report "
+                             "(default: reports/<SYMBOL>-research.html)")
+    parser.add_argument("--stdout", action="store_true",
+                        help="print the HTML to stdout instead of writing "
+                             "a file")
+    return parser
+
+
+def _research_main(argv):
+    """``research <SYMBOL>`` entry point. Returns an exit code."""
+    args = _build_research_parser().parse_args(argv)
+    try:
+        bars = report.bars_from_csv(args.bars) if args.bars else None
+        fundamentals = (report.fundamentals_from_csv(args.fundamentals)
+                        if args.fundamentals else None)
+        peers = (report.peers_from_csv(args.peers)
+                 if args.peers else None)
+        built = report.build_report(
+            args.symbol, bars=bars, fundamentals=fundamentals,
+            peers=peers, sector=args.sector, exchange=args.exchange,
+            as_of=args.as_of)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    if args.stdout:
+        sys.stdout.write(report.render_html(built))
+        return 0
+    out = args.out or f"reports/{built['symbol']}-research.html"
+    try:
+        report.write_report_html(built, out)
+    except OSError as exc:
+        print(f"error: cannot write {out}: {exc.strerror or exc}",
+              file=sys.stderr)
+        return 2
+    print(f"Research report for {built['symbol']}: {out}")
+    print(f"Status: {built['status']} (as of {built['as_of']})")
+    print(f"Thesis: {built['thesis']}")
+    print(_LABEL_NOT_ADVICE)
+    return 0
+
+
 def main(argv=None):
     """CLI entry point. Returns an exit code; never raises on bad input
     (bad input prints ``error: ...`` to stderr and returns 2)."""
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "research":
+        return _research_main(argv[1:])
     args = _build_parser().parse_args(argv)
     try:
         bars = load_bars(args.csv)
