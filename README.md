@@ -362,6 +362,34 @@ with them: it is the MCP front door to the toolkit's own tested
 functions. Tests: `tests/test_mcp_server.py` (19 tests, protocol
 level, offline).
 
+## Data layer and autonomy (Phase 2)
+
+`toolkit/connectors.py` is the provider-contract data layer (design
+adapted from OpenBB's provider contract, qf-lib's prefetching/caching
+wrapper and augur's evidence time-semantics — no code copied from any
+of them; see `toolkit/SOURCES_MERGE_2026-11-07.md`): one standard
+interface per source, core never touches a vendor API. Priority order:
+caller-supplied CSVs first (the only NEPSE path — there is no
+documented free public NEPSE OHLCV API, and no live feed is
+invented), then Yahoo Finance, Stooq (fallback only), CoinGecko for
+crypto, ECB reference rates and the World Bank API. Each connector has
+a timeout, bounded retries (transient failures only, max 3 attempts
+with backoff — a 403/429 is never retried), an on-disk cache with a
+per-source TTL, and a freshness SLA (daily bars and FX: 1 day;
+World Bank annual: 1 year). `scripts/data_health.py` writes
+`data_health.json` with per-source FRESH/STALE/UNAVAILABLE/UNKNOWN
+status, last-fetch time, age and cache hits; stale data is flagged,
+never published silently. The terminal dashboard shows it as section
+5 (`--data-health data_health.json`). `scripts/refresh_derived.py`
+refreshes `data/derived/*.json` (indicator snapshot, screening
+matches, Time-Machine odds) from the repo's CSVs with `as_of`
+provenance and a stale flag. Both scripts exit non-zero with a clear
+error on failure, so a scheduled run can alert on it. Tests:
+`tests/test_connectors.py` (38 tests), `tests/test_data_health.py`
+(17 tests, including fixtures cut from real responses fetched
+2026-11-07 — see `tests/fixtures/SOURCES.md`), and
+`tests/test_refresh_derived.py` (8 tests), all offline.
+
 ## Tests
 
 ```bash
@@ -372,10 +400,10 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 436/436 tests passing (Phase 1 engines 1.3–1.10, 2026-11-07, fresh clone, Python 3.12, pytest 9.2.0): 401 before + 35 new tests — research report pipeline (16) and MCP server (19).
+Tests: 505/505 tests passing (Phase 2 data layer, 2026-11-07, fresh clone, Python 3.12, pytest 9.2.0): 436 before + 69 new tests — connectors (38), data health (17), derived refresh (8) and terminal health section (6).
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
-this is a guardrail, not full type safety), coverage 88% total with a
+this is a guardrail, not full type safety), coverage 91% total with a
 `fail_under=80` gate left unchanged (the remaining misses are mostly
 defensive/unreachable branches, e.g. predictive.py 342-343, 348-349, 572
 plus new-engine edge branches; quant.py 93%, predictive.py 95%;
