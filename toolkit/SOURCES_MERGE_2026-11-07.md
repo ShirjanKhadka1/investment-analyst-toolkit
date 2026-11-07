@@ -245,3 +245,35 @@ source repo, the commit, and "ideas only, no code copied".
   needs, the servers above are the existing options.
 - Rejected: any live-data fetch, any order-execution tool, any
   API-key requirement (programme rules).
+
+## Phase 2 (2026-11-07) — data-layer architecture: design only, NO code copied
+
+`toolkit/connectors.py` (provider contract, on-disk cache, bounded
+retries, freshness SLAs), `scripts/data_health.py` and
+`scripts/refresh_derived.py` are original code for this toolkit. The
+architecture adapts three design patterns, each from its own
+teardown (see `~/workspace/github-repos/ops/teardown/`); no code,
+text, or schemas were copied from any of them:
+
+- OpenBB (Apache-2.0 — NOT AGPL, corrected in Phase 0a; root LICENSE
+  verified first-hand): the provider contract — one standardised
+  model per endpoint, one connector per source, core never touches a
+  vendor API. Adapted as a design only.
+- qf-lib (Apache-2.0): the data-provider abstraction with a
+  prefetching/caching wrapper, and CSV as a first-class source.
+  Adapted as a design only (this toolkit's `DiskCache` + CSV-first
+  chain); no qf-lib provider implementation was used — Bloomberg /
+  Haver / Portara / IB are keyed/paid and rejected.
+- augur (MIT): evidence time-semantics (business date vs fetch time
+  on every item) and the missing-data abstention rule (mark missing,
+  abstain with a reason, never silent zero-fill). Adopted as
+  conventions in the connector provenance and the health report.
+
+Rejected from all three: any live payload shape as a stable contract
+(OpenBB #7813 shows provider payloads break parsers — vendor
+payloads are validated here before publication); any keyed/paid
+source; any undocumented endpoint (including NEPSE's internal token
+flow). NEPSE stays CSV-only: the scanner repo owns NEPSE CSV loading
+(`nepali-capital-market-research/scanner/data.py: load_csv`), and
+this toolkit's CSV connector accepts that loader behind the same
+interface instead of copying it.
