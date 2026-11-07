@@ -1,0 +1,8 @@
+# Dev dependencies (Phase 4). Pinned to the versions measured 28 Oct 2026
+# and used by CI (.github/workflows/test.yml, quality job) so local runs
+# and CI run identical versions. The toolkit is zero-dependency at
+# runtime (stdlib only); nothing here is a runtime dependency.
+pytest==9.2.0
+ruff==0.17.3
+mypy==2.4.0
+coverage==7.17.0
