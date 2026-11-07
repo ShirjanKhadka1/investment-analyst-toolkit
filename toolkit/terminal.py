@@ -64,6 +64,7 @@ from __future__ import annotations
 import argparse
 import csv
 import datetime
+import json
 import math
 import sys
 
@@ -335,10 +336,47 @@ def _default_plan(entry, atr_value, risk_reward=2.0):
     return stop, target, basis
 
 
+def _format_health_section(data_health):
+    """Render the data-health section. ``data_health`` is a dict as
+    written by scripts/data_health.py, or None when no health check
+    was run — in which case the dashboard says so plainly instead of
+    implying the data was checked."""
+    lines = []
+    lines.append("")
+    lines.append("5. Data health")
+    if data_health is None:
+        lines.append("   Not checked in this run (run "
+                     "scripts/data_health.py). Stale data is never "
+                     "published as fresh — but this dashboard cannot "
+                     "prove its inputs are fresh either.")
+        return lines
+    generated_at = data_health.get("generated_at", "UNKNOWN")
+    overall = data_health.get("overall", "UNKNOWN")
+    lines.append(f"   Overall: {overall} (as of {generated_at})")
+    bad = False
+    for source in data_health.get("sources", []) or []:
+        status = source.get("status", "UNKNOWN")
+        if status in ("STALE", "UNAVAILABLE"):
+            bad = True
+        last = source.get("last_data_date")
+        age = source.get("age_days")
+        sla = source.get("sla_label", "?")
+        line = (f"   {status:11s} {source.get('name', '?'):11s} "
+                f"last data {last}  age {age}d (SLA {sla})")
+        if source.get("error"):
+            line += f" — {source['error']}"
+        lines.append(line)
+    if bad:
+        lines.append("   WARNING: a source above is STALE or UNAVAILABLE. "
+                     "Do not treat this dashboard as fresh until the "
+                     "health check is FRESH again.")
+    return lines
+
+
 def build_dashboard(bars, symbol="DEMO", seed=19, n_sims=10000,
                     horizon=20, entry=None, stop=None, target=None,
                     risk_reward=2.0, budget=10000.0,
-                    entry_window_ok=False):
+                    entry_window_ok=False, data_health=None):
     """Build the dashboard text for loaded bars. Pure function of its
     inputs (fixed seed, no clock, no network) — same input, same text.
     Raises ValueError on a bad user-supplied plan (bad --stop/--target);
@@ -553,6 +591,7 @@ def build_dashboard(bars, symbol="DEMO", seed=19, n_sims=10000,
         lines.append(f"   Fingerprint: {gate['fingerprint'][:16]}… "
                      "(valid only for this exact plan on "
                      f"{gate['date']})")
+    lines.extend(_format_health_section(data_health))
     lines.append("")
     lines.append(_LABEL_NOT_ADVICE)
     lines.append("No live trading, no orders, no network, no keys. "
@@ -599,6 +638,10 @@ def _build_parser():
                         help="assert the plan's entry window is actually "
                              "open (default: not confirmed, so the risk "
                              "gate BLOCKs on entry_window)")
+    parser.add_argument("--data-health", default=None,
+                        help="data_health.json from "
+                             "scripts/data_health.py, shown as section 5 "
+                             "(default: not checked in this run)")
     return parser
 
 
@@ -679,12 +722,22 @@ def main(argv=None):
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    data_health = None
+    if args.data_health:
+        try:
+            with open(args.data_health, encoding="utf-8") as handle:
+                data_health = json.load(handle)
+        except (OSError, ValueError) as exc:
+            print(f"error: cannot read data-health file "
+                  f"{args.data_health}: {exc}", file=sys.stderr)
+            return 2
     try:
         text = build_dashboard(
             bars, symbol=args.symbol, seed=args.seed, n_sims=args.n_sims,
             horizon=args.horizon, entry=args.entry, stop=args.stop,
             target=args.target, risk_reward=args.risk_reward,
-            budget=args.budget, entry_window_ok=args.entry_window_ok)
+            budget=args.budget, entry_window_ok=args.entry_window_ok,
+            data_health=data_health)
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
