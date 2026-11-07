@@ -144,6 +144,33 @@ source repo, the commit, and "ideas only, no code copied".
   (`'toolkit.terminal' found in sys.modules...`). It is imported
   directly (`from toolkit.terminal import ...`) wherever needed.
 
+## Phase 1 engines 1.3–1.5 (2026-11-07)
+
+### TradingAgents — patterns adapted, NO code copied
+
+- Repo: https://github.com/TauricResearch/TradingAgents
+- Licence: **Apache-2.0**
+- What was taken, as patterns only, reimplemented from scratch in
+  this toolkit's own zero-dependency style: the multi-agent role
+  split (analysts → bull/bear debate → trader → three-way risk
+  debate → portfolio manager), the decision-memory loop (log every
+  call before its outcome, settle against realised return and alpha
+  vs a regional benchmark, feed a one-paragraph reflection into the
+  next run), and the point-in-time discipline (decisions scored from
+  the first close *after* the analysis date). No TradingAgents code,
+  text, branding, or model names were copied; its five-tier Buy /
+  Overweight / Hold / Underweight / Sell rating was NOT adopted —
+  this programme stays research-only and never issues a rating.
+- Where it landed: `toolkit/rules_mode.py` (Engine 1.3, the
+  deterministic no-LLM rules mode backing the nine NEPSE agents),
+  `toolkit/decision_log.py` (Engine 1.4, decision log + settlement
+  + scoreboard + reflections), and the Portfolio Manager agent's
+  reflections section in finance-research-agents.
+- Rejected from the same source: the paper's backtest return/Sharpe
+  figures (not this programme's results, never quoted as such),
+  any live-data vendor chain (NEPSE stays CSV-only), and any
+  execution step (no orders anywhere in this programme).
+
 ## 3. Phase 1 engines 1.6–1.7 — quant library + predictive layer (2026-11-07)
 
 - Modules: `toolkit/quant.py` (new), `toolkit/predictive.py` (extended),
