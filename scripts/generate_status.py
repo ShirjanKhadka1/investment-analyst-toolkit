@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Round 3 status generator (pytest repos). Counts real test results,
 never a typed constant.
 
@@ -23,7 +22,7 @@ def run(cmd, cwd, env=None):
     e = dict(os.environ)
     if env:
         e.update(env)
-    return subprocess.run(cmd, cwd=cwd, env=e, capture_output=True, text=True)
+    return subprocess.run(cmd, check=False, cwd=cwd, env=e, capture_output=True, text=True)
 
 
 def pytest_counts(root, test_dir, extra_env=None):
@@ -61,7 +60,7 @@ def main():
         proj = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
         status["version"] = proj["project"]["version"]
         status["coverage_fail_under"] = proj["tool"]["coverage"]["report"]["fail_under"]
-    except Exception as exc:
+    except (OSError, KeyError, ValueError) as exc:
         status["version"] = None
         status["version_note"] = f"TO VERIFY: could not read pyproject.toml ({exc})"
 
@@ -70,8 +69,8 @@ def main():
     status["tests_passed"] = passed
     status["tests_total"] = total
     if True:
-        cov = run([sys.executable, "-m", "coverage", "run", "-m", "pytest", args.test_dir, "-q"],
-                  cwd=root, env={"PYTHONPATH": str(root)})
+        run([sys.executable, "-m", "coverage", "run", "-m", "pytest", args.test_dir, "-q"],
+            cwd=root, env={"PYTHONPATH": str(root)})
         rep = run([sys.executable, "-m", "coverage", "report"], cwd=root)
         m = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", rep.stdout)
         if m:
