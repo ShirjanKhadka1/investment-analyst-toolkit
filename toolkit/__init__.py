@@ -1,4 +1,10 @@
-"""Investment Analyst Toolkit: explicit, tested finance calculations."""
+"""Investment Analyst Toolkit: explicit, tested finance calculations.
+
+Note: toolkit.mcp_server is intentionally NOT imported here — it is a
+``python -m`` entry point, and eagerly importing it would make
+``python -m toolkit.mcp_server`` emit a RuntimeWarning. Import it
+directly (``from toolkit import mcp_server``) when needed.
+"""
 
 from . import (
     archive,
@@ -9,7 +15,6 @@ from . import (
     decision_log,
     forecast,
     indicators,
-    mcp_server,
     montecarlo,
     nepal_frictions,
     options,
@@ -28,4 +33,4 @@ from . import (
     valuation,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "data", "decision_log", "forecast", "indicators", "mcp_server", "montecarlo", "nepal_frictions", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "timemachine", "tracker", "valuation"]
+__all__ = ["archive", "autonomous", "backtest", "checks", "data", "decision_log", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "timemachine", "tracker", "valuation"]
