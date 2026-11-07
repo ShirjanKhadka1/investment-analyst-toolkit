@@ -573,3 +573,424 @@ def volatility_regime(series, window=20):
     med = sorted(windows)[len(windows) // 2]
     return {"regime": "high" if windows[-1] > med * (1.0 + 1e-9) else "low",
             "latest_std": windows[-1], "median_std": med}
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 engine 1.7 — predictive layer: walk-forward validation ONLY.
+# Every function below refits per fold on data available at the origin
+# and scores out of sample. A model that does not beat the baselines
+# out of sample is labelled "no edge" — the bad result is published,
+# never hidden. No function here fits on the full series and reports
+# in-sample fit as a forecast.
+# ---------------------------------------------------------------------------
+
+def walk_forward_validate(series, model_fn_h, train_size, horizon=1, window=None):
+    """Walk-forward validation of one (train, horizon) forecaster.
+
+    Origins t run from train_size to len(series) - horizon inclusive.
+    At each origin the model receives ONLY the training slice:
+    expanding windows use series[:t]; rolling windows (window=int)
+    use the last `window` points, series[max(0, t - window):t].
+    The model is refit at every fold — there is no single fit reused
+    across folds. Returns {"folds": [(origin, forecast, actual)],
+    "mae", "rmse", "n_test", "horizon", "window"} where window is
+    None for expanding.
+    """
+    series = validate_series("series", series, min_length=10)
+    if not 0 < train_size < len(series):
+        raise ValueError("train_size must leave a non-empty test set")
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    if train_size > len(series) - horizon:
+        raise ValueError("train_size leaves no complete horizon window in the test set")
+    if window is not None and window < 1:
+        raise ValueError("window must be >= 1")
+    folds = []
+    for t in range(train_size, len(series) - horizon + 1):
+        train = series[:t] if window is None else series[max(0, t - window):t]
+        folds.append((t, model_fn_h(train, horizon), series[t + horizon - 1]))
+    mae = _mean([abs(a - f) for _, f, a in folds]) if folds else 0.0
+    rmse = math.sqrt(_mean([(a - f) ** 2 for _, f, a in folds])) if folds else 0.0
+    return {"folds": folds, "mae": mae, "rmse": rmse, "n_test": len(folds),
+            "horizon": horizon, "window": window}
+
+
+def strategy_backtest(series, model_fn_h, train_size, horizon=1):
+    """Model-driven strategy vs buy-and-hold, out of sample only.
+
+    At each origin t (train = series[:t], last known price series[t-1])
+    the model forecasts horizon steps ahead; if the forecast is above
+    the last known price the strategy holds the series for that step,
+    otherwise it holds cash (0 return). Origins advance by `horizon`
+    so multi-step holding periods never overlap. Buy-and-hold holds
+    throughout the same test window. Returns are compounded per step, so the
+    totals are comparable over the identical window. A strategy that
+    trails buy-and-hold has not earned its complexity — that is the
+    verdict, not a tuning prompt.
+    """
+    series = validate_series("series", series, min_length=10)
+    if any(p <= 0 for p in series):
+        raise ValueError("series prices must all be positive for strategy_backtest")
+    if not 0 < train_size < len(series):
+        raise ValueError("train_size must leave a non-empty test set")
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    if train_size > len(series) - horizon:
+        raise ValueError("train_size leaves no complete horizon window in the test set")
+    model_growth, bh_growth = 1.0, 1.0
+    rows = []
+    # Non-overlapping steps: origins advance by `horizon`, so a
+    # multi-step holding period is never double-counted.
+    for t in range(train_size, len(series) - horizon + 1, horizon):
+        forecast = model_fn_h(series[:t], horizon)
+        step_return = series[t + horizon - 1] / series[t - 1] - 1.0
+        held = forecast > series[t - 1]
+        model_growth *= (1.0 + step_return) if held else 1.0
+        bh_growth *= (1.0 + step_return)
+        rows.append({"origin": t, "forecast": forecast, "held": held,
+                     "step_return": step_return})
+    return {"model_return": model_growth - 1.0,
+            "buy_and_hold_return": bh_growth - 1.0,
+            "beats_buy_and_hold": (model_growth - 1.0) > (bh_growth - 1.0),
+            "n_steps": len(rows), "horizon": horizon, "rows": rows}
+
+
+def walk_forward_report(series, train_size, horizons=(1,), window=None,
+                        index_series=None, include_new_models=True,
+                        include_ensemble=True, include_adaptive=True):
+    """Walk-forward report: every model vs naive, buy-and-hold, index.
+
+    For each horizon and each model: out-of-sample MAE/RMSE, whether it
+    beats naive on MAE, the model-driven strategy return vs the
+    buy-and-hold return over the same test window, and vs the index
+    buy-and-hold return when index_series is supplied (same indices;
+    when omitted, the index baseline IS the series buy-and-hold and is
+    labelled as such). Verdict: "edge" only when the model beats ALL
+    THREE baselines; otherwise "no edge". The verdict is per
+    (model, horizon); a model can have an edge at h=1 and none at h=5.
+    Baselines are beaten or not — there is no partial credit.
+    """
+    series = validate_series("series", series, min_length=10)
+    if not 0 < train_size < len(series):
+        raise ValueError("train_size must leave a non-empty test set")
+    horizons = tuple(horizons)
+    if not horizons or any(not isinstance(h, int) or h < 1 for h in horizons):
+        raise ValueError("horizons must be a non-empty tuple of positive ints")
+    if index_series is not None:
+        index_series = validate_series("index_series", index_series, min_length=10)
+        if len(index_series) != len(series):
+            raise ValueError("index_series must have the same length as series")
+        if any(p <= 0 for p in index_series):
+            raise ValueError("index_series prices must all be positive")
+    models_h = _horizon_models(include_new_models=include_new_models,
+                               include_ensemble=include_ensemble,
+                               include_adaptive=include_adaptive)
+    index_label = ("index buy-and-hold (separate index series supplied)"
+                   if index_series is not None else
+                   "index baseline = buy-and-hold of the series itself "
+                   "(no separate index supplied)")
+    by_horizon = {}
+    for h in horizons:
+        res_h = _walk_forward_horizon(series, models_h, train_size, h)
+        naive_mae = res_h["naive"]["mae"]
+        # Index buy-and-hold over the same test window.
+        ref = index_series if index_series is not None else series
+        index_return = ref[-1] / ref[train_size - 1] - 1.0
+        rows = []
+        for name, fn in models_h.items():
+            strat = strategy_backtest(series, fn, train_size, horizon=h)
+            beats_naive = res_h[name]["mae"] < naive_mae
+            beats_bh = strat["beats_buy_and_hold"]
+            beats_index = strat["model_return"] > index_return
+            verdict = "edge" if (beats_naive and beats_bh and beats_index) else "no edge"
+            rows.append({"model": name, "mae": res_h[name]["mae"],
+                         "rmse": res_h[name]["rmse"], "n_test": res_h[name]["n_test"],
+                         "beats_naive": beats_naive,
+                         "strategy_return": strat["model_return"],
+                         "buy_and_hold_return": strat["buy_and_hold_return"],
+                         "index_return": index_return,
+                         "beats_buy_and_hold": beats_bh,
+                         "beats_index": beats_index,
+                         "verdict": verdict})
+        rows.sort(key=lambda r: r["mae"])
+        by_horizon[h] = {"rows": rows, "naive_mae": naive_mae,
+                         "index_return": index_return, "index_label": index_label,
+                         "n_edge": sum(1 for r in rows if r["verdict"] == "edge")}
+    return {"train_size": train_size, "horizons": list(horizons),
+            "window": window, "by_horizon": by_horizon,
+            "index_label": index_label,
+            "note": "Walk-forward only: every metric is out of sample. "
+                    "'no edge' means the model failed at least one baseline "
+                    "and is reported, not hidden."}
+
+
+# --- Calibration: Platt scaling on out-of-sample scores + Brier score ---
+
+def brier_score(probabilities, outcomes):
+    """Brier score: mean squared error of forecast probabilities.
+
+    probabilities in [0, 1]; outcomes in {0, 1}. Lower is better;
+    0 is perfect, 0.25 is the score of always forecasting 0.5.
+    """
+    probs = validate_series("probabilities", probabilities, min_length=1)
+    outs = validate_series("outcomes", outcomes, min_length=1)
+    if len(probs) != len(outs):
+        raise ValueError("probabilities and outcomes must have the same length")
+    if any(p < 0.0 or p > 1.0 for p in probs):
+        raise ValueError("probabilities must be in [0, 1]")
+    if any(o not in (0.0, 1.0) for o in outs):
+        raise ValueError("outcomes must be 0 or 1")
+    return _mean([(p - o) ** 2 for p, o in zip(probs, outs)])
+
+
+def _sigmoid(x):
+    if x >= 0:
+        return 1.0 / (1.0 + math.exp(-x))
+    ex = math.exp(x)
+    return ex / (1.0 + ex)
+
+
+def platt_calibrate(scores, outcomes, iterations=100):
+    """Platt scaling: fit p = sigmoid(a * score + b) on out-of-sample data.
+
+    scores are the model's raw out-of-sample scores (any scale);
+    outcomes are 0/1. Fitted by Newton iterations on the logistic
+    log-loss (2x2 Hessian, solved directly). Returns {"a", "b",
+    "brier_before" (raw scores clipped to [0, 1] as probabilities),
+    "brier_after" (calibrated probabilities), "method", "n"}.
+    Calibration is fitted on OUT-OF-SAMPLE folds only — fitting it on
+    the training data would overstate calibration. If the Newton step
+    fails (singular Hessian, e.g. a constant score), a and b fall back
+    to the base-rate-only fit and the method label says so.
+    """
+    scores = validate_series("scores", scores, min_length=4)
+    outs = validate_series("outcomes", outcomes, min_length=4)
+    if len(scores) != len(outs):
+        raise ValueError("scores and outcomes must have the same length")
+    if any(o not in (0.0, 1.0) for o in outs):
+        raise ValueError("outcomes must be 0 or 1")
+    raw_probs = [min(1.0, max(0.0, s)) for s in scores]
+    brier_before = brier_score(raw_probs, outs)
+    # Base-rate fallback: a = 0, b = logit(base rate), clipped.
+    base = _mean(outs)
+    base = min(0.999, max(0.001, base))
+    a, b = 0.0, math.log(base / (1.0 - base))
+    method = "Platt scaling (logistic fit on out-of-sample scores)"
+    for _ in range(iterations):
+        grad_a = grad_b = haa = hab = hbb = 0.0
+        for s, o in zip(scores, outs):
+            p = _sigmoid(a * s + b)
+            err = p - o
+            grad_a += err * s
+            grad_b += err
+            w = p * (1.0 - p)
+            haa += w * s * s
+            hab += w * s
+            hbb += w
+        det = haa * hbb - hab * hab
+        if abs(det) < 1e-12:
+            method = ("Platt scaling fallback: base-rate only "
+                      "(singular Hessian — constant or degenerate scores)")
+            a, b = 0.0, math.log(base / (1.0 - base))
+            break
+        step_a = (hbb * grad_a - hab * grad_b) / det
+        step_b = (haa * grad_b - hab * grad_a) / det
+        a -= step_a
+        b -= step_b
+        if abs(step_a) < 1e-10 and abs(step_b) < 1e-10:
+            break
+    calibrated = [calibrated_probability(s, a, b) for s in scores]
+    return {"a": a, "b": b, "brier_before": brier_before,
+            "brier_after": brier_score(calibrated, outs),
+            "method": method, "n": len(scores)}
+
+
+def calibrated_probability(score, a, b):
+    """Calibrated probability for one raw score: sigmoid(a * score + b)."""
+    score = float(score)
+    a = float(a)
+    b = float(b)
+    return _sigmoid(a * score + b)
+
+
+# --- Model cards, regime detection, retraining schedule ---
+
+_FAILURE_MODES = {
+    "naive": "Assumes no change; fails on any sustained trend or level shift.",
+    "moving_average_5": "Lags turning points by construction; fails after level shifts.",
+    "linear_trend": "Extrapolates the whole-window trend; fails when the trend breaks.",
+    "exp_smoothing_0.3": "Single level, no trend; fails on trending series.",
+    "ar1": "Assumes a stable AR(1); fails on regime shifts and non-stationarity.",
+    "holt": "Undamped trend extrapolates forever; fails when the trend reverses.",
+    "holt_damped": "Damped trend; fails when a genuine trend persists longer than assumed.",
+    "drift": "Extrapolates the recent mean change; overshoots after a level shift.",
+    "ensemble_equal": "Averages members, so it inherits every member's failure mode.",
+    "ensemble_adaptive": "Weights chase recent MAE; fails when the recent winner stops winning.",
+}
+
+
+def model_card(name, series, train_size, horizon=1, window=None):
+    """A model card: data window, out-of-sample metrics, failure modes.
+
+    name must be a model in _horizon_models() (all candidates). The
+    metrics come from walk_forward_validate() plus strategy_backtest()
+    on the same split, so the card is out-of-sample by construction.
+    The verdict is "edge" only if the model beats naive on MAE and
+    beats buy-and-hold on strategy return, else "no edge". Failure
+    modes are stated, not discovered — a card that lists no failure
+    mode is a card that has not been written honestly.
+    """
+    series = validate_series("series", series, min_length=10)
+    models_h = _horizon_models(include_new_models=True, include_ensemble=True,
+                               include_adaptive=True)
+    if name not in models_h:
+        raise ValueError(f"unknown model {name!r}; known models: {sorted(models_h)}")
+    fn = models_h[name]
+    wf = walk_forward_validate(series, fn, train_size, horizon=horizon, window=window)
+    naive = walk_forward_validate(series, models_h["naive"], train_size,
+                                  horizon=horizon, window=window)
+    strat = strategy_backtest(series, fn, train_size, horizon=horizon)
+    verdict = ("edge" if wf["mae"] < naive["mae"] and strat["beats_buy_and_hold"]
+               else "no edge")
+    return {
+        "model": name,
+        "data_window": {"n_total": len(series), "n_train": train_size,
+                        "n_test": wf["n_test"], "horizon": horizon,
+                        "window": window if window is not None else "expanding"},
+        "metrics": {"mae": wf["mae"], "rmse": wf["rmse"],
+                    "naive_mae": naive["mae"], "beats_naive": wf["mae"] < naive["mae"],
+                    "strategy_return": strat["model_return"],
+                    "buy_and_hold_return": strat["buy_and_hold_return"],
+                    "beats_buy_and_hold": strat["beats_buy_and_hold"]},
+        "verdict": verdict,
+        "failure_modes": _FAILURE_MODES.get(name, "Failure modes not documented."),
+        "note": "Out-of-sample only. Past walk-forward MAE is not a "
+                "guarantee of future accuracy.",
+    }
+
+
+def detect_regime(series, window=20):
+    """Regime detection — a stated heuristic, labelled as one.
+
+    Volatility regime comes from volatility_regime(): the latest
+    rolling return std vs the median rolling std of the same series
+    ('high' when the latest exceeds the median). Trend is the last
+    price vs its window mean ('up' / 'down' / 'flat' within 1e-9).
+    The label is a description of the recent window, NOT a prediction:
+    a 'high' regime does not promise high volatility tomorrow. The
+    falsifier is stated in the result: if high-regime windows do not
+    show larger realised moves than low-regime windows out of sample,
+    the label carries no predictive content.
+    """
+    series = validate_series("series", series, min_length=window + 2)
+    vol = volatility_regime(series, window=window)
+    mean = _mean(series[-window:])
+    last = series[-1]
+    if last > mean * (1.0 + 1e-9):
+        trend = "up"
+    elif last < mean * (1.0 - 1e-9):
+        trend = "down"
+    else:
+        trend = "flat"
+    return {"volatility_regime": vol["regime"], "latest_std": vol["latest_std"],
+            "median_std": vol["median_std"], "trend": trend,
+            "label": f"{vol['regime']}-volatility/{trend}-trend",
+            "method": "heuristic: latest rolling return std vs the median "
+                      "rolling std of the same series; trend is last price "
+                      "vs its window mean",
+            "is_prediction": False,
+            "falsifier": "If high-regime windows do not show larger "
+                         "realised moves than low-regime windows out of "
+                         "sample, the label carries no predictive content."}
+
+
+def retraining_schedule():
+    """Scheduled retraining: cadence and triggers, as data (not prose).
+
+    The schedule is a policy statement, not an automation: nothing in
+    this module retrains anything by itself. A model is refit at every
+    walk-forward fold (see walk_forward_validate); this schedule says
+    when a deployed model card should be regenerated from new data.
+    """
+    return {
+        "cadence": "Regenerate each model card when new data arrives "
+                   "(daily bars: at least weekly; monthly data: monthly).",
+        "refit_per_fold": True,
+        "triggers": [
+            ("drift_flag() on walk-forward errors returns drift=True "
+             "(recent MAE >= 1.5x early MAE)"),
+            "detect_regime() label changes from the previous card",
+            "at least 20 new observations since the last card",
+            "any input-data revision (a restated bar changes history)",
+        ],
+        "on_trigger": "Re-run walk_forward_report() on the extended "
+                      "series, regenerate the model card, and publish the "
+                      "new verdict even if it is 'no edge'.",
+        "never": "Never extend the training window past the decision "
+                 "date to 'improve' a card — that is look-ahead.",
+    }
+
+
+def walk_forward_from_store(store, model_fn_h, train_size, horizon=1):
+    """Walk-forward validation reading through the point-in-time store.
+
+    store: a pit_store.PointInTimeStore. Dates come from
+    store.as_of_dates(); at origin t the model trains on the closes
+    visible on dates[t] (bars_as_of — only bars published on or
+    before that date), and is scored on the realised close at
+    dates[t + horizon]. Scoring uses realised values after the fact,
+    which is legitimate; training never sees a bar published after
+    the origin date, so look-ahead is impossible by construction.
+    Returns {"folds": [(origin_date, forecast, actual)], "mae",
+    "rmse", "n_test", "horizon"}.
+    """
+    dates = store.as_of_dates()
+    if len(dates) < 10:
+        raise ValueError(f"store needs at least 10 as_of dates, got {len(dates)}")
+    if not 0 < train_size < len(dates):
+        raise ValueError("train_size must leave a non-empty test set")
+    if horizon < 1:
+        raise ValueError("horizon must be >= 1")
+    if train_size > len(dates) - horizon:
+        raise ValueError("train_size leaves no complete horizon window in the test set")
+    realised = {d: c for d, c in store.closes_as_of("9999-12-31")}
+    folds = []
+    for t in range(train_size - 1, len(dates) - horizon):
+        train = [c for _, c in store.closes_as_of(dates[t])]
+        if len(train) < 2:
+            raise ValueError(f"too few visible closes at origin {dates[t]}")
+        actual = realised[dates[t + horizon]]
+        folds.append((dates[t], model_fn_h(train, horizon), actual))
+    mae = _mean([abs(a - f) for _, f, a in folds]) if folds else 0.0
+    rmse = math.sqrt(_mean([(a - f) ** 2 for _, f, a in folds])) if folds else 0.0
+    return {"folds": folds, "mae": mae, "rmse": rmse, "n_test": len(folds),
+            "horizon": horizon}
+
+
+# --- Experiment tracking (qlib workflow/recorder, without mlflow) ---
+
+def record_experiment(name, report, path):
+    """Append one JSON line recording a walk-forward report.
+
+    qlib's workflow/recorder idea, reimplemented as a plain JSONL
+    append — no mlflow, no server, no dependency (the mlflow recorder
+    is rejected in the qlib teardown for fragility). One line per
+    experiment: name, date, train_size, horizons, and the per-model
+    verdicts. The file is append-only history: re-running an
+    experiment adds a line, it never rewrites the past. Returns the
+    record dict that was written.
+    """
+    import datetime
+    import json
+
+    if not isinstance(report, dict) or "by_horizon" not in report:
+        raise ValueError("report must be a walk_forward_report() result dict")
+    verdicts = {}
+    for h, block in report["by_horizon"].items():
+        verdicts[str(h)] = {row["model"]: row["verdict"] for row in block["rows"]}
+    record = {"name": name, "date": datetime.date.today().isoformat(),
+              "train_size": report["train_size"],
+              "horizons": report["horizons"], "verdicts": verdicts}
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record
