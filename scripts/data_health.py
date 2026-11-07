@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Data-health report: per-source freshness SLA status as JSON.
 
 Usage:
