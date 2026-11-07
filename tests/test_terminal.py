@@ -6,13 +6,14 @@ End-to-end tests run the CLI as a subprocess, exactly as a user
 would: ``python -m toolkit.terminal demo.csv``.
 """
 
+import json
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from toolkit.terminal import evaluate_setups, load_bars
+from toolkit.terminal import build_dashboard, evaluate_setups, load_bars
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEMO_CSV = REPO_ROOT / "demo.csv"
@@ -220,3 +221,75 @@ def test_evaluate_setups_reports_too_few_bars():
     results = evaluate_setups([100.0, 101.0, 102.0])
     assert results["breakout_20d"][0] is False
     assert "too few closes" in results["breakout_20d"][1]
+
+
+# --- data-health section (Phase 2) -----------------------------------------
+
+def _health(overall="FRESH", sources=None):
+    return {
+        "generated_at": "2026-11-07T12:00:00+00:00",
+        "generated_by": "scripts/data_health.py",
+        "overall": overall,
+        "sources": sources if sources is not None else [
+            {"name": "yahoo", "status": "FRESH", "last_data_date": "2026-11-06",
+             "age_days": 1, "sla_label": "1 day", "error": None},
+            {"name": "coingecko", "status": "FRESH", "last_data_date": "2026-11-07",
+             "age_days": 0, "sla_label": "1 day", "error": None},
+            {"name": "nepse_csv", "status": "UNKNOWN", "last_data_date": None,
+             "age_days": None, "sla_label": "1 day", "error": None},
+        ],
+    }
+
+
+def test_dashboard_without_health_says_not_checked():
+    bars = load_bars(str(DEMO_CSV))
+    text = build_dashboard(bars)
+    assert "5. Data health" in text
+    assert "Not checked in this run" in text
+    assert "scripts/data_health.py" in text
+
+
+def test_dashboard_with_health_shows_per_source_status():
+    bars = load_bars(str(DEMO_CSV))
+    text = build_dashboard(bars, data_health=_health())
+    assert "5. Data health" in text
+    assert "Overall: FRESH" in text
+    assert "FRESH       yahoo" in text
+    assert "last data 2026-11-06" in text
+    assert "UNKNOWN     nepse_csv" in text
+
+
+def test_dashboard_with_stale_source_warns_plainly():
+    bars = load_bars(str(DEMO_CSV))
+    stale = _health(overall="DEGRADED", sources=[
+        {"name": "yahoo", "status": "STALE", "last_data_date": "2026-10-01",
+         "age_days": 37, "sla_label": "1 day", "error": None},
+    ])
+    text = build_dashboard(bars, data_health=stale)
+    assert "STALE       yahoo" in text
+    assert "WARNING: a source above is STALE or UNAVAILABLE" in text
+    assert "Do not treat this dashboard as fresh" in text
+
+
+def test_cli_data_health_flag_shows_section(tmp_path):
+    health_path = tmp_path / "health.json"
+    health_path.write_text(json.dumps(_health()), encoding="utf-8")
+    proc = _run(str(DEMO_CSV), "--data-health", str(health_path))
+    assert proc.returncode == 0, proc.stderr
+    assert "5. Data health" in proc.stdout
+    assert "Overall: FRESH" in proc.stdout
+
+
+def test_cli_missing_data_health_file_exits_nonzero(tmp_path):
+    proc = _run(str(DEMO_CSV), "--data-health", str(tmp_path / "nope.json"))
+    assert proc.returncode == 2
+    assert "error: cannot read data-health file" in proc.stderr
+    assert "Traceback" not in proc.stderr
+
+
+def test_cli_malformed_data_health_file_exits_nonzero(tmp_path):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    proc = _run(str(DEMO_CSV), "--data-health", str(bad))
+    assert proc.returncode == 2
+    assert "error: cannot read data-health file" in proc.stderr
