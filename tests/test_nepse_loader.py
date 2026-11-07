@@ -38,16 +38,12 @@ def test_synthetic_multi_symbol_loads(tmp_path):
         path = str(tmp_path / "nepse_user_supplied_SYNTHETIC.csv")
         with open(path, "w", encoding="utf-8") as f:
             f.write("symbol,sector,date,close,high,low,volume\n")
-            for i, close in enumerate(
-                    [100.00, 101.00, 102.50, 101.50, 103.00], start=1):
-                f.write(
-                    f"SYNTHETIC-A,S,2026-01-0{i},{close},{close + 1},"
-                    f"{close - 1},100\n")
-            for i, close in enumerate(
-                    [50.00, 51.00, 52.00, 51.50, 53.00], start=1):
-                f.write(
-                    f"SYNTHETIC-B,S,2026-01-0{i},{close},{close + 1},"
-                    f"{close - 1},100\n")
+            f.writelines(f"SYNTHETIC-A,S,2026-01-0{i},{close},{close + 1},"
+                    f"{close - 1},100\n" for i, close in enumerate(
+                    [100.00, 101.00, 102.50, 101.50, 103.00], start=1))
+            f.writelines(f"SYNTHETIC-B,S,2026-01-0{i},{close},{close + 1},"
+                    f"{close - 1},100\n" for i, close in enumerate(
+                    [50.00, 51.00, 52.00, 51.50, 53.00], start=1))
     groups, source = load_nepse_user_csv(
         path, "SYNTHETIC example file, invented for testing")
     assert set(groups) == {"SYNTHETIC-A", "SYNTHETIC-B"}
