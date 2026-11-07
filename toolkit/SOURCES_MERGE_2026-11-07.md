@@ -208,3 +208,40 @@ source repo, the commit, and "ideas only, no code copied".
 - qlib RL agents, mlflow recorder: REJECTED (see above).
 - Any live-trading / execution path from any source: REJECTED by
   programme rule.
+
+## Phase 1 engines 1.9–1.10 (2026-11-07)
+
+### Engine 1.9 — research report pipeline (original code, no outside source)
+
+- `toolkit/report.py` + `tests/test_report.py` (16 tests) + the
+  `research` subcommand in `toolkit/terminal.py` are original code
+  for this toolkit. The bars loader mirrors the tolerance of
+  `toolkit.terminal.load_bars` (comment lines, case-insensitive
+  headers); the figures reuse `toolkit/indicators.py` (FinceptTerminal
+  defaults table, ideas only, AGPL-3.0 — see that module). No new
+  outside source was used.
+
+### Engine 1.10 — MCP server (original code; prior art checked, none copied)
+
+- `toolkit/mcp_server.py` + `tests/test_mcp_server.py` (19 tests) are
+  original code for this toolkit: a stdlib-only JSON-RPC-over-stdio
+  server implementing the MCP basics (`initialize`, `tools/list`,
+  `tools/call`, `ping`) over this toolkit's own tested functions.
+- Prior-art check (web search, 2026-11-07): NEPSE MCP servers already
+  exist, so this server is NOT the first and does not claim to be:
+  - `razaanstha/nepse-mcp-server` — "NEPSE Stock Data MCP Server",
+    TypeScript, live NEPSE data via the ShareBazaar API
+    (https://sharebazaar.vercel.app/api/zaan), 20+ tools.
+  - `nlethetech/nepse-quant-terminal`, `apps/mcp/server.py` — FastMCP
+    server over a quant terminal's control plane (market snapshots,
+    signals, OSINT search, and an order lifecycle with operator
+    confirmation for live trade intents).
+  - Lipi (https://www.lipi.com.np/mcp-documentation) — remote MCP
+    server for Lipi books, including a `get_nepse_index` tool.
+- Nothing was copied from any of them: no code, no tool schemas, no
+  data. The difference is deliberate — this server fetches nothing
+  and executes nothing; every tool computes offline from
+  caller-supplied arguments. If live NEPSE data is what a caller
+  needs, the servers above are the existing options.
+- Rejected: any live-data fetch, any order-execution tool, any
+  API-key requirement (programme rules).
