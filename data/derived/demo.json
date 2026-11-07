@@ -1,0 +1,65 @@
+{
+  "dataset": "demo",
+  "source_csv": "demo.csv",
+  "generated_at": "2026-11-07T11:44:49+00:00",
+  "generated_by": "scripts/refresh_derived.py",
+  "as_of": "2026-11-06",
+  "n_bars": 80,
+  "last_close": 1284.91,
+  "stale": false,
+  "sla_label": "1 day",
+  "age_days": 1,
+  "stale_note": "",
+  "indicators_last": {
+    "rsi_14": 88.23245407730212,
+    "macd": 53.32169680737866,
+    "macd_signal": 41.824344954511034,
+    "macd_histogram": 11.497351852867624,
+    "bollinger_upper": 1312.4979308897296,
+    "bollinger_middle": 1166.0795,
+    "bollinger_lower": 1019.6610691102704,
+    "atr_14": 16.788529024830613,
+    "sma_20": 1166.0795,
+    "ema_20": 1186.72775821423,
+    "adx_14": 50.74288407700433,
+    "stochastic_k": 98.98767164478302,
+    "stochastic_d": 98.69370451600798,
+    "vwap": 1046.6019246877054
+  },
+  "setups_matched": [
+    "breakout_20d",
+    "bull_flag"
+  ],
+  "setups_detail": {
+    "breakout_20d": "close 1284.91 above 20-day high 1274.72 (+0.80%)",
+    "bull_flag": "run +12.07% (1101.74 -> 1234.73), last-5 range 3.24%",
+    "reclaim_ma20": "close already above MA20 on the prior bar (1274.72 vs 1156.63)",
+    "oversold": "RSI-14 88.2 (not below 30)",
+    "oversold_bounce": "RSI-14 not below 30 in the last 5 sessions"
+  },
+  "hypothetical_plan": {
+    "entry": 1284.91,
+    "stop": 1259.72,
+    "target": 1335.29,
+    "reward_risk": 2.0
+  },
+  "timemachine": {
+    "n_sims": 1000,
+    "seed": 19,
+    "horizon": 20,
+    "n_windows": 61,
+    "target_first": 0.578,
+    "stop_first": 0.386,
+    "neither": 0.036,
+    "break_even": 0.3333333333333343,
+    "verdict": "Strongly toward target",
+    "median_close": 1334.1551253853067,
+    "close_p5": 1244.3390138567481,
+    "close_p95": 1358.068764519526,
+    "average_R": 0.8026558846032652,
+    "replay_target_first": 0.6885245901639344,
+    "replay_stop_first": 0.3114754098360656,
+    "replay_neither": 0.0,
+    "replay_n_windows": 61
+  }
+}
