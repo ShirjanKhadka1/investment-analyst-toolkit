@@ -123,6 +123,154 @@ python examples/demo_company.py
 | `toolkit/ratios.py` | Profitability, liquidity, leverage, efficiency ratios; DuPont ROE |
 | `toolkit/valuation.py` | DCF (single-stage terminal value), EV/EBITDA and P/E multiples, Gordon growth |
 | `toolkit/checks.py` | Input validation: non-negative where required, rates in range, growth < discount rate |
+| `toolkit/pit_store.py` | Point-in-time store: bars + fundamentals with `as_of` / `published_at`; reads return only what was published by the query date (Engine 1.1) |
+| `toolkit/timemachine.py` | Seeded Monte-Carlo + historical replay, named-setup replay, honest verdict, NEPSE upgrade with circuit limits, exit-liquidity guard and sourced frictions (Engine 1.2) |
+| `toolkit/terminal.py` | One-command research terminal: `python -m toolkit.terminal demo.csv` |
+
+## One-command terminal
+
+```bash
+python -m toolkit.terminal demo.csv
+```
+
+Reads a CSV of daily OHLCV bars and prints a research dashboard to
+stdout — no network, no keys, no live trading, no orders. The shipped
+`demo.csv` is a **synthetic** example (80 weekday bars, 2026-07-20 to
+2026-11-06, NEPSE-style prices in NPR, symbol DEMO; generated
+2026-11-07 from a seeded random walk — see the `#` provenance lines
+at the top of the file, which the CLI skips when reading). Bring your
+own file the same way: header `date,open,high,low,close,volume`
+(only `date` and `close` are required; `open`/`high`/`low` default
+to the close, `volume` is optional and VWAP is skipped without it).
+
+What it prints, in four sections:
+
+1. **Indicator snapshot** — RSI(14), MACD 12/26/9, Bollinger 20/2
+   (with %B), ATR(14), SMA20/EMA20 trend, ADX(14), Stochastic,
+   VWAP. Values that need more history than the file holds print as
+   `n/a (needs N bars)` instead of being invented.
+2. **Screening** — the five named scanner setups (`breakout_20d`,
+   `bull_flag`, `reclaim_ma20`, `oversold`, `oversold_bounce`),
+   reimplemented here from `scanner/setups.py` so the toolkit stays
+   self-contained. Each setup prints its rule and whether the past
+   closes satisfy it. On the demo file, 2 of 5 match
+   (`breakout_20d`, `bull_flag`).
+3. **Time-Machine odds** — a seeded Monte-Carlo replay (seed 19,
+   10,000 replays, 20-day horizon) of a hypothetical exit plan plus
+   a deterministic historical replay of the same rule. Default plan:
+   entry = last close, stop = entry − 1.5 × ATR(14), target at
+   reward:risk 2 (override with `--stop`/`--target`,
+   `--risk-reward`, `--horizon`, `--n-sims`, `--seed`).
+4. **Risk gate** — the 16-check PASS/BLOCK checklist on that
+   hypothetical plan (sized from the example research budget).
+   It BLOCKs by default because the entry window is not confirmed;
+   pass `--entry-window-ok` only when the plan's entry window is
+   actually open.
+
+### What it will NOT do
+
+- It is **research and education only — not investment advice,
+  never a buy/sell/hold recommendation**. A setup match means the
+  past closes satisfy a stated rule, not that anything should be
+  bought. A PASS is not a yes.
+- The Time-Machine output is a **simulation, not a prediction**:
+  resampled history is not the future, and a target-first share
+  above break-even is a property of the past sample, not a
+  probability of profit.
+- It places no orders, talks to no broker, fetches nothing, and
+  stores nothing. A bad CSV (missing file, missing columns,
+  non-numeric prices, no data rows) exits non-zero with a one-line
+  `error: ...` message and never a traceback; a short-but-valid
+  file still prints, with the sections it cannot run replaced by a
+  short note.
+
+See `tests/test_terminal.py` for the coverage (end-to-end run,
+malformed / empty / missing files, determinism, honesty labels,
+short-file degradation).
+
+## Point-in-time store (Engine 1.1)
+
+`toolkit/pit_store.py` — every record carries `as_of` (the date the
+data describes) and `published_at` (when it became available).
+`bars_as_of(date)` and `fundamentals_as_of(date)` return only
+records with `published_at <= date`, one per `as_of` (the latest
+published revision). A backtest that reads through this store cannot
+see data that was not yet published on its decision date, so
+look-ahead is impossible by construction. Revisions are kept, never
+overwritten; a query before anything was published returns an empty
+list, never an invented row. `bars_for_timemachine(date)` feeds the
+visible bars straight into `timemachine.simulate` /
+`replay_history`. Zero dependencies, offline tests with synthetic
+fixtures only.
+
+## NEPSE Time Machine upgrade (Engine 1.2)
+
+`toolkit/timemachine.py` keeps its existing `simulate` /
+`replay_history` API and adds:
+
+- **Named-setup replay** — `replay_setup(prices, setup, entry, stop,
+  target)`: the deterministic replay restricted to past windows
+  where one of the five named setups (`breakout_20d`, `bull_flag`,
+  `reclaim_ma20`, `oversold`, `oversold_bounce`) had fired at the
+  window's start, evaluated on closes visible then — never on later
+  bars. The rules are reimplemented locally; this module does not
+  import the scanner repo. A caller-supplied setup function is also
+  accepted (`setup_fn=`).
+- **Honest verdict** — every setup replay and NEPSE simulation
+  carries `honest_verdict`: `"edge"`, `"coin flip"` or
+  `"insufficient data"`. Thresholds, stated: fewer than 20 windows
+  is `"insufficient data"`; otherwise `"edge"` only when the
+  target-first share is at least 10 percentage points from
+  break-even; anything in between is `"coin flip"`. "Edge"
+  describes the past sample only — every result still states
+  "simulation, not a prediction".
+- **NEPSE simulation** — `simulate_nepse(...)`: the seeded
+  Monte-Carlo with daily moves clipped to the ±15% circuit limit
+  (user-supplied, 28 Oct 2026), an exit-liquidity guard that
+  BLOCKs a position above 10% of typical daily volume instead of
+  simulating it, and real trading frictions from
+  `sourced_nepal_frictions()` (broker slabs 0.36%/0.33%/0.31%/
+  0.27%/0.24%, SEBON 0.015%, DP Rs 25, CGT 5% ≤365d / 3.75%
+  >365d — user-supplied rate-schedule screenshot, 28 Oct 2026;
+  settlement T+2 as standard). `average_R` is reported net of
+  those frictions, with `average_R_gross` kept for comparison.
+
+### Worked example (synthetic demo data — reproduced by tests)
+
+On the shipped synthetic `demo.csv`, hypothetical plan entry
+1284.91, stop 1259.72, target 1335.29 (the terminal's default plan),
+100 shares, typical daily volume 30,000, seed 19, 10,000 replays,
+20-day horizon:
+
+```python
+from toolkit.terminal import load_bars
+from toolkit import timemachine
+
+bars = load_bars("demo.csv")
+ohlc = [{"open": b["open"], "high": b["high"], "low": b["low"],
+         "close": b["close"]} for b in bars]
+res = timemachine.simulate_nepse(ohlc, 1284.91, 1259.72, 1335.29,
+                                 shares=100,
+                                 typical_daily_volume=30_000)
+# target_first 57.5%, stop_first 39.0%, neither 3.5%
+# break-even 33.3%, honest_verdict "edge", 61 windows
+# average_R gross 0.79, net of frictions 0.37
+# median final close 1334.07 (p5 1244.46, p95 1359.89)
+# buy charges at entry Rs 468.29
+rep = timemachine.replay_setup(ohlc, "breakout_20d",
+                               1284.91, 1259.72, 1335.29)
+# 11 setup windows of 61; target_first 72.7% — yet the honest
+# verdict is "insufficient data" (fewer than 20 setup windows).
+# bull_flag fired on 0 windows: no shares are reported at all.
+```
+
+Frictions cut the average realised R from 0.79 to 0.37 on this
+example — that drag is the point of modelling them. And the
+`breakout_20d` replay shows the verdict doing its job: a
+72.7% target-first record on 11 windows is not an edge, it is too
+little data to call. The numbers above are pinned by
+`tests/test_timemachine_nepse.py`, so the README cannot drift
+from the code.
 
 ## Tests
 
@@ -134,14 +282,16 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 250/250 tests passing (Merge 2026-11-07, fresh venv, Python 3.12, pytest 9.2.0): 198 before + 52 new tests covering the three merge modules — technical indicators (RSI/MACD/Bollinger/ATR/Stochastic/ADX/Keltner/Ichimoku/VWAP), seeded Monte-Carlo + historical replay of a hypothetical exit plan, and R-based hypothetical-position planning with the 16-check risk gate.
+Tests: 314/314 tests passing (Phase 1 engines 1.1–1.2, 2026-11-07, fresh clone, Python 3.12, pytest 9.2.0): 250 before + 64 new tests — point-in-time store (17), NEPSE Time Machine upgrade incl. named-setup replay, honest verdict, circuit limits, exit-liquidity guard and sourced frictions (27), and the one-command terminal (20).
 Quality gates (Phase 7): `ruff check` clean, `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
-this is a guardrail, not full type safety), coverage 94% total with a
+this is a guardrail, not full type safety), coverage 88% total with a
 `fail_under=80` gate left unchanged (the remaining misses are mostly
 defensive/unreachable branches, e.g. predictive.py 342-343, 348-349, 572;
 free_data.py, portfolio.py, montecarlo.py, ratios.py and checks.py are
-at 100%). CI runs pytest on Linux/macOS/Windows
+at 100%; `toolkit/terminal.py` measures 38% only because its tests run
+it as a subprocess, which coverage.py does not attribute to this run).
+CI runs pytest on Linux/macOS/Windows
 × Python 3.10/3.11/3.12; the macOS/Windows combinations are CI-only
 until their first GitHub run is observed.
 
