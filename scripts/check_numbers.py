@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Round 3 number check: fail if any checked file carries a count that
 disagrees with status.json.
 
@@ -71,11 +70,11 @@ def main():
         want = status.get(field)
         if want is not None and found != want:
             errors.append(f"file count {desc}: disk={found} status.json {field}={want}")
-    if REQUIRE_GREEN and status.get("tests_passed") is not None:
-        if status["tests_passed"] != status.get("tests_total"):
-            errors.append(
-                f"suite not green in status.json: "
-                f"{status['tests_passed']}/{status.get('tests_total')}")
+    if (REQUIRE_GREEN and status.get("tests_passed") is not None
+            and status["tests_passed"] != status.get("tests_total")):
+        errors.append(
+            f"suite not green in status.json: "
+            f"{status['tests_passed']}/{status.get('tests_total')}")
     for rel in PROSE_FILES:
         path = root / rel
         if not path.exists():
