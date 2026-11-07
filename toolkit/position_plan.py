@@ -24,7 +24,8 @@ from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal
 
 from .checks import require_non_negative, require_positive
 
-__all__ = ["DEFAULT_RESEARCH_CONFIG", "plan_exit", "risk_gate", "size_position"]
+__all__ = ["DEFAULT_RESEARCH_CONFIG", "EXTRA_GATE_CHECKS", "extended_risk_gate",
+           "plan_exit", "risk_gate", "size_position"]
 
 MIN_RISK_PCT = 0.0005  # 0.05% of entry price — below this, refuse.
 _CENT = Decimal("0.01")
@@ -49,6 +50,11 @@ DEFAULT_RESEARCH_CONFIG = {
     "allow_margin": False,
     "allow_short": False,
     "blocked_symbols": [],
+    # Engine 1.5 per-idea limits (extended gate only; the original
+    # 16-check risk_gate() never reads these).
+    "max_loss_per_idea_usd": 150.0,
+    "max_sector_pct": 0.30,
+    "max_participation": 0.10,
 }
 
 # The 16 risk-gate checks, in order. Names are stable: a fingerprint
@@ -70,6 +76,15 @@ GATE_CHECKS = (
     "duplicate",
     "daily_order_limit",
     "paper_mode",
+)
+
+# Engine 1.5: the three extra per-idea checks. They live in
+# extended_risk_gate() only — risk_gate() stays exactly 16 checks so
+# its fingerprint and its existing tests never change meaning.
+EXTRA_GATE_CHECKS = (
+    "max_loss_per_idea",
+    "sector_concentration",
+    "exit_liquidity",
 )
 
 
@@ -376,4 +391,112 @@ def risk_gate(plan, config=None):
         "passed": len(GATE_CHECKS) - len(failed),
         "failed": len(failed),
         "failed_checks": failed,
+    }
+
+
+def extended_risk_gate(plan, config=None, context=None):
+    """The 16-check gate PLUS three per-idea limits — research only.
+
+    ``plan`` / ``config`` are exactly as for risk_gate(); ``context``
+    supplies what the extra checks need: ``portfolio_value`` and
+    ``sector_exposure_usd`` (existing exposure to the plan's sector,
+    excluding this plan), ``sector`` (the plan's sector), and
+    ``typical_daily_volume`` (shares/day for the exit-liquidity
+    check, which reuses timemachine.check_exit_liquidity).
+
+    The three extra checks, fail-closed when their context is missing:
+    1. ``max_loss_per_idea`` — this plan's max loss must be at most
+       ``config["max_loss_per_idea_usd"]`` (a per-idea cap, tighter
+       than the per-trade cap when the config says so).
+    2. ``sector_concentration`` — (existing sector exposure + this
+       plan's cost) / portfolio value must be at most
+       ``config["max_sector_pct"]``.
+    3. ``exit_liquidity`` — shares must be at most
+       ``config["max_participation"]`` of typical daily volume.
+
+    Output mirrors risk_gate() but with 19 checks: ``verdict`` is
+    PASS only when all 19 pass; ``base_gate`` holds the original
+    16-check result unchanged (same fingerprint); ``checks`` holds
+    all 19. A PASS is not a recommendation — same labelling as the
+    base gate, and nothing here is an order.
+    """
+    base = risk_gate(plan, config=config)
+    cfg = dict(DEFAULT_RESEARCH_CONFIG)
+    if config is not None:
+        if not isinstance(config, dict):
+            raise ValueError("config must be a dict")
+        cfg.update(config)
+    ctx = dict(context or {})
+    checks = dict(base["checks"])
+
+    shares = _plan_number(plan, "shares")
+    risk = _plan_number(plan, "risk_per_share")
+    max_loss = _plan_number(plan, "max_loss")
+    if max_loss is None and shares is not None and risk is not None:
+        max_loss = shares * risk
+    cap = cfg.get("max_loss_per_idea_usd")
+    checks["max_loss_per_idea"] = {
+        "pass": bool(_is_number(max_loss) and _is_number(cap)
+                     and max_loss <= cap),
+        "reason": (f"max loss per idea {max_loss} must be at most {cap}"
+                   if _is_number(max_loss) and _is_number(cap)
+                   else "max loss per idea cannot be checked — max_loss "
+                        "or the per-idea cap is missing"),
+    }
+
+    portfolio_value = ctx.get("portfolio_value")
+    sector_exposure = ctx.get("sector_exposure_usd", 0.0)
+    entry = _plan_number(plan, "entry")
+    position_cost = (shares * entry if shares is not None
+                     and entry is not None else None)
+    sector_ok = False
+    sector_reason = ""
+    if _is_number(portfolio_value) and portfolio_value > 0 \
+            and _is_number(sector_exposure) and position_cost is not None:
+        after = (float(sector_exposure) + position_cost) / float(portfolio_value)
+        sector_ok = after <= cfg["max_sector_pct"]
+        sector_reason = (f"sector {ctx.get('sector', 'UNKNOWN')} exposure "
+                         f"after this plan would be {after:.1%} of the "
+                         f"hypothetical portfolio; cap is "
+                         f"{cfg['max_sector_pct']:.0%}")
+    else:
+        sector_reason = ("sector concentration cannot be checked — "
+                         "portfolio_value, sector_exposure_usd or the "
+                         "plan's position cost is missing")
+    checks["sector_concentration"] = {"pass": bool(sector_ok),
+                                      "reason": sector_reason}
+
+    volume = ctx.get("typical_daily_volume")
+    liq_ok = False
+    liq_reason = ""
+    if shares is not None and _is_number(volume):
+        from .timemachine import check_exit_liquidity
+
+        try:
+            result = check_exit_liquidity(
+                int(shares), volume,
+                max_participation=cfg.get("max_participation", 0.10))
+            liq_ok = not result["blocked"]
+            liq_reason = result["reason"]
+        except ValueError as exc:
+            liq_reason = f"exit-liquidity check refused: {exc}"
+    else:
+        liq_reason = ("exit liquidity cannot be checked — shares or "
+                      "typical_daily_volume is missing")
+    checks["exit_liquidity"] = {"pass": bool(liq_ok), "reason": liq_reason}
+
+    all_checks = tuple(GATE_CHECKS) + tuple(EXTRA_GATE_CHECKS)
+    failed = [name for name in all_checks if not checks[name]["pass"]]
+    return {
+        "verdict": "PASS" if not failed else "BLOCK",
+        "date": base["date"],
+        "fingerprint": base["fingerprint"],
+        "fingerprint_note": base["fingerprint_note"],
+        "base_gate": base,
+        "checks": {name: checks[name] for name in all_checks},
+        "passed": len(all_checks) - len(failed),
+        "failed": len(failed),
+        "failed_checks": failed,
+        "note": ("a PASS is not a recommendation — it only means this "
+                 "hypothetical plan passed these 19 stated checks"),
     }
