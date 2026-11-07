@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Generate MODELS.md from a live walk-forward run — never hand-typed.
 
 Usage: python3 scripts/generate_models_table.py [--root REPO_ROOT]
