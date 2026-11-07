@@ -6,11 +6,13 @@ from . import (
     backtest,
     checks,
     data,
+    decision_log,
     forecast,
     indicators,
     montecarlo,
     nepal_frictions,
     options,
+    paper_ledger,
     performance,
     pit_store,
     portfolio,
@@ -18,9 +20,10 @@ from . import (
     predictive,
     quant,
     ratios,
+    rules_mode,
     timemachine,
     tracker,
     valuation,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "data", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "timemachine", "tracker", "valuation"]
+__all__ = ["archive", "autonomous", "backtest", "checks", "data", "decision_log", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "rules_mode", "timemachine", "tracker", "valuation"]
