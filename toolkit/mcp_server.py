@@ -54,7 +54,7 @@ __all__ = ["TOOLS", "handle_request", "main", "serve"]
 
 PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "investment-analyst-toolkit-mcp"
-SERVER_VERSION = "0.8.0"
+SERVER_VERSION = "0.9.0"
 
 _PARSE_ERROR = -32700
 _INVALID_REQUEST = -32600
