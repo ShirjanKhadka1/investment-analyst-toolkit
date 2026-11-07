@@ -1,0 +1,6 @@
+# SYNTHETIC fixture for the research demo only — not real market data.
+field,value,source,period
+revenue_npr_m,1250.0,Synthetic demo fixture, FY 2081/82
+net_income_npr_m,180.0,Synthetic demo fixture, FY 2081/82
+book_value_per_share_npr,240.0,Synthetic demo fixture, FY 2081/82
+npl_pct,1.8,
