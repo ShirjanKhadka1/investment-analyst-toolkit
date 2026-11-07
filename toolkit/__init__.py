@@ -12,6 +12,7 @@ from . import (
     nepal_frictions,
     options,
     performance,
+    pit_store,
     portfolio,
     position_plan,
     predictive,
@@ -21,4 +22,4 @@ from . import (
     valuation,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "data", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "performance", "portfolio", "position_plan", "predictive", "ratios", "timemachine", "tracker", "valuation"]
+__all__ = ["archive", "autonomous", "backtest", "checks", "data", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "performance", "pit_store", "portfolio", "position_plan", "predictive", "ratios", "timemachine", "tracker", "valuation"]
