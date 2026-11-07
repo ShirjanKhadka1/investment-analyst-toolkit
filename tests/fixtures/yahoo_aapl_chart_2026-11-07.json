@@ -1,0 +1,130 @@
+{
+  "chart": {
+    "result": [
+      {
+        "meta": {
+          "currency": "USD",
+          "symbol": "AAPL",
+          "exchangeName": "NMS",
+          "fullExchangeName": "NasdaqGS",
+          "instrumentType": "EQUITY",
+          "firstTradeDate": 345479400,
+          "regularMarketTime": 1793998801,
+          "hasPrePostMarketData": true,
+          "gmtoffset": -18000,
+          "timezone": "EST",
+          "exchangeTimezoneName": "America/New_York",
+          "regularMarketPrice": 342.37,
+          "regularMarketChangePercent": -0.523,
+          "fulldayPrice": 342.37,
+          "fulldayChange": -1.52,
+          "fulldayChangePercent": -0.442,
+          "fiftyTwoWeekHigh": 355.38,
+          "fiftyTwoWeekLow": 243.42,
+          "regularMarketDayHigh": 345.79,
+          "regularMarketDayLow": 338.3,
+          "regularMarketVolume": 43750861,
+          "longName": "Apple Inc.",
+          "shortName": "Apple Inc.",
+          "chartPreviousClose": 344.63,
+          "priceHint": 2,
+          "currentTradingPeriod": {
+            "pre": {
+              "timezone": "EST",
+              "start": 1793955600,
+              "end": 1793975400,
+              "gmtoffset": -18000
+            },
+            "regular": {
+              "timezone": "EST",
+              "start": 1793975400,
+              "end": 1793998800,
+              "gmtoffset": -18000
+            },
+            "post": {
+              "timezone": "EST",
+              "start": 1793998800,
+              "end": 1794013200,
+              "gmtoffset": -18000
+            }
+          },
+          "dataGranularity": "1d",
+          "range": "5d",
+          "validRanges": [
+            "1d",
+            "5d",
+            "1mo",
+            "3mo",
+            "6mo",
+            "1y",
+            "2y",
+            "5y",
+            "10y",
+            "ytd",
+            "max"
+          ]
+        },
+        "timestamp": [
+          1793629800,
+          1793716200,
+          1793802600,
+          1793889000,
+          1793975400
+        ],
+        "indicators": {
+          "quote": [
+            {
+              "volume": [
+                64757700,
+                63160000,
+                89637700,
+                75678900,
+                44676300
+              ],
+              "high": [
+                343.79998779296875,
+                334.5,
+                354.5,
+                355.3800048828125,
+                345.7900085449219
+              ],
+              "open": [
+                342.6700134277344,
+                325.5799865722656,
+                341.57000732421875,
+                353.8900146484375,
+                338.7300109863281
+              ],
+              "low": [
+                335.82000732421875,
+                325.3299865722656,
+                340.989990234375,
+                342.05999755859375,
+                338.29998779296875
+              ],
+              "close": [
+                338.32000732421875,
+                331.8999938964844,
+                349.510009765625,
+                344.1700134277344,
+                342.3699951171875
+              ]
+            }
+          ],
+          "adjclose": [
+            {
+              "adjclose": [
+                338.32000732421875,
+                331.8999938964844,
+                349.510009765625,
+                344.1700134277344,
+                342.3699951171875
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "error": null
+  }
+}
