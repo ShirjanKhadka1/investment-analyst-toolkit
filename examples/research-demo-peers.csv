@@ -1,0 +1,5 @@
+# SYNTHETIC fixture for the research demo only — not real market data.
+symbol,metric,value,source
+PEER1,pe_ratio,12.5,Synthetic demo fixture
+PEER2,pe_ratio,9.0,
+PEER1,price_to_book,1.4,Synthetic demo fixture
