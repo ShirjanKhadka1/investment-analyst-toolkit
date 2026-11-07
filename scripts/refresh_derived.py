@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Refresh derived datasets from the CSVs already in the repo.
 
 Usage:
