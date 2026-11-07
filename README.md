@@ -61,7 +61,7 @@ Honest comparison against the projects this toolkit learned from. Star counts ar
 | [FinceptTerminal](https://github.com/Fincept-Corporation/FinceptTerminal) (AGPL-3.0) | Breadth and execution: a full Bloomberg-style terminal with 201 data connectors, 22 live broker adapters and algo/RL trading. | Stdlib-only, no keys, no paid tiers, no execution at all; every number reproducible from a CSV. Ideas/formulas only — no Fincept code copied (AGPL). |
 | [TradingAgents](https://github.com/TauricResearch/TradingAgents) (Apache-2.0, 121,074 stars) | LLM debate depth: a multi-agent trading-firm simulation (bull/bear debate, three-way risk committee) ending in a 5-tier Buy–Sell rating, backed by a paper. | Deterministic and keyless: a no-LLM rules mode, walk-forward testing against a naive baseline, and a decision log settled against realised returns. Needs no LLM API key and makes no LLM calls per decision. |
 | [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill) (MIT, v2.0.0) | Agent-pack workflow: 11 skills, each one SKILL.md + one stdlib tool, with the Time Machine, exit math and 16-check risk gate this toolkit adapts. | A Python library + terminal instead of an agent pack, with NEPSE-aware frictions (sourced broker/SEBON/DP/CGT schedule, ±15% circuit limits, T+2). US day-trading specifics (PDT, NYSE holidays) are not carried over. |
-| [OpenBB](https://github.com/OpenBB/OpenBB) (Apache-2.0, 75,185 stars) | Data breadth: one call fans out to 19 providers behind a standard provider contract, consumable from Python, REST, Excel or MCP. | Zero-dependency and CSV-first: no provider to break, a point-in-time store built in, and a freshness SLA with stale data flagged, never published silently. |
+| [OpenBB](https://github.com/openbq-org/OpenBB) (Apache-2.0, 75,185 stars) | Data breadth: one call fans out to 19 providers behind a standard provider contract, consumable from Python, REST, Excel or MCP. | Zero-dependency and CSV-first: no provider to break, a point-in-time store built in, and a freshness SLA with stale data flagged, never published silently. |
 | [qlib](https://github.com/microsoft/qlib) (MIT, 50,086 stars) | ML depth: Alpha158 factors, a model zoo (LightGBM, LSTM, Transformers) and an experiment recorder, from Microsoft Research. | Model-light by design: stdlib-only walk-forward evaluation where the naive baseline usually wins — and that loss stays in the record. No heavy dependencies, no training runs. |
 
 ## Architecture
@@ -492,6 +492,27 @@ until their first GitHub run is observed.
 Generated counts: see `status.json` (produced by `scripts/generate_status.py`,
 checked by `scripts/check_numbers.py` — the check fails if any number above
 disagrees with `status.json`).
+
+### Quality gates (Phase 4)
+
+```bash
+pip install -r requirements-dev.txt   # pinned dev tools, identical to CI
+python scripts/qa.py                  # every gate in order; stops at the first failure
+```
+
+`scripts/qa.py` runs lint (`ruff check`), typecheck (`mypy`), the full
+test suite with coverage (`fail_under=80`), the look-ahead gate (suites
+plus a leaking-store mutation check in a scratch copy), the licence
+check (`LICENSES.md` attribution + no AGPL content), the secret scan
+(tree + git history), the link check (internal links must resolve;
+external links best-effort), the README-claim check (numbers regenerated
+from the scripts that produce them), and the fresh-clone install test
+(clone + `python -m toolkit.terminal demo.csv` in under 60 seconds).
+Run one gate with `python scripts/qa.py --only <gate>` (`--list` shows
+the names). The same gates run in CI via the quality job in
+`.github/workflows/test.yml`; the Phase 4 update to that workflow is
+staged for deployment via the browser route and is not live until its
+first run is observed.
 
 ## Limitations
 
