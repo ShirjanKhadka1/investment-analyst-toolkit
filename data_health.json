@@ -1,0 +1,77 @@
+{
+  "generated_at": "2026-11-07T11:44:49+00:00",
+  "generated_by": "scripts/data_health.py",
+  "overall": "PARTIAL",
+  "sources": [
+    {
+      "name": "yahoo",
+      "label": "Yahoo Finance chart API",
+      "kind": "stock_daily",
+      "sla_seconds": 86400,
+      "sla_label": "1 day",
+      "status": "FRESH",
+      "last_fetch": "2026-11-07T11:44:49+00:00",
+      "last_data_date": "2026-11-06",
+      "age_days": 1,
+      "cache_hits": 0,
+      "error": null,
+      "note": ""
+    },
+    {
+      "name": "coingecko",
+      "label": "CoinGecko keyless public API",
+      "kind": "crypto_daily",
+      "sla_seconds": 86400,
+      "sla_label": "1 day",
+      "status": "FRESH",
+      "last_fetch": "2026-11-07T11:44:49+00:00",
+      "last_data_date": "2026-11-07",
+      "age_days": 0,
+      "cache_hits": 0,
+      "error": null,
+      "note": ""
+    },
+    {
+      "name": "ecb",
+      "label": "ECB euro reference rates",
+      "kind": "fx_reference",
+      "sla_seconds": 86400,
+      "sla_label": "1 day",
+      "status": "FRESH",
+      "last_fetch": "2026-11-07T11:44:49+00:00",
+      "last_data_date": "2026-11-06",
+      "age_days": 1,
+      "cache_hits": 0,
+      "error": null,
+      "note": ""
+    },
+    {
+      "name": "worldbank",
+      "label": "World Bank API v2",
+      "kind": "macro_annual",
+      "sla_seconds": 31536000,
+      "sla_label": "365 days",
+      "status": "FRESH",
+      "last_fetch": "2026-11-07T11:44:49+00:00",
+      "last_data_date": "2025",
+      "age_days": 311,
+      "cache_hits": 0,
+      "error": null,
+      "note": ""
+    },
+    {
+      "name": "nepse_csv",
+      "label": "User-supplied NEPSE CSV (data/*.csv)",
+      "kind": "nepse_csv_daily",
+      "sla_seconds": 86400,
+      "sla_label": "1 day",
+      "status": "UNKNOWN",
+      "last_fetch": null,
+      "last_data_date": null,
+      "age_days": null,
+      "cache_hits": 0,
+      "error": null,
+      "note": "no user-supplied NEPSE CSV under data/ yet; NEPSE stays CSV-only"
+    }
+  ]
+}
