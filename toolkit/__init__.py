@@ -7,15 +7,18 @@ from . import (
     checks,
     data,
     forecast,
+    indicators,
     montecarlo,
     nepal_frictions,
     options,
     performance,
     portfolio,
+    position_plan,
     predictive,
     ratios,
+    timemachine,
     tracker,
     valuation,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "data", "forecast", "montecarlo", "nepal_frictions", "options", "performance", "portfolio", "predictive", "ratios", "tracker", "valuation"]
+__all__ = ["archive", "autonomous", "backtest", "checks", "data", "forecast", "indicators", "montecarlo", "nepal_frictions", "options", "performance", "portfolio", "position_plan", "predictive", "ratios", "timemachine", "tracker", "valuation"]
