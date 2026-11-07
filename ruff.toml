@@ -6,4 +6,7 @@
 # toolkit/terminal.py main() catches broad Exception (BLE001) so a
 # bad CSV can never surface a traceback from the CLI — every failure
 # is a one-line `error: ...` message and exit code 2.
+# A second intentional inline noqa exists (2026-11-07, Phase 4):
+# scripts/qa.py main() catches broad Exception (BLE001) so a crashing
+# gate is reported as a FAIL with its name, never as a traceback.
 [lint]
