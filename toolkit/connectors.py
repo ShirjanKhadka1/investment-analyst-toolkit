@@ -82,6 +82,7 @@ from .free_data import (
 __all__ = [
     "CACHE_TTL_SECONDS",
     "FRESHNESS_SLA_SECONDS",
+    "TRADING_WEEKDAYS",
     "Connector",
     "ConnectorUnavailable",
     "DiskCache",
@@ -97,16 +98,36 @@ __all__ = [
 _DAY = 86400
 
 # Freshness SLA per series kind, in seconds. Daily bars and FX fixings
-# must be at most 1 day old; World Bank annual indicators at most 1
-# year old (a year-only date is read as 31 Dec of that year — see
+# must be at most 1 trading day old; World Bank annual indicators at most
+# 1 year old (a year-only date is read as 31 Dec of that year — see
 # evaluate_freshness). A series older than its SLA is STALE: flagged,
 # never published as fresh.
+#
+# The SLA is judged in TRADING days, not calendar days: markets publish
+# no new data on their non-trading days, so a calendar-day SLA goes red
+# every weekend (Friday data is 2 calendar days old on Sunday, 3 on
+# Monday morning) even when nothing is wrong. Trading days per kind:
+# US stocks and ECB fixings Mon–Fri; NEPSE Sun–Thu (Nepal's trading
+# week); crypto and annual macro trade/publish every day, so their age
+# stays calendar days. Exchange holidays are not modelled — a long
+# holiday weekend can still read STALE, which is a false alarm to
+# triage, not a silent pass.
 FRESHNESS_SLA_SECONDS = {
     "stock_daily": 1 * _DAY,
     "crypto_daily": 1 * _DAY,
     "fx_reference": 1 * _DAY,
     "macro_annual": 365 * _DAY,
     "nepse_csv_daily": 1 * _DAY,
+}
+
+# Trading weekdays per series kind (Monday=0 … Sunday=6), used by
+# evaluate_freshness to count age in trading days.
+TRADING_WEEKDAYS = {
+    "stock_daily": {0, 1, 2, 3, 4},
+    "crypto_daily": {0, 1, 2, 3, 4, 5, 6},
+    "fx_reference": {0, 1, 2, 3, 4},
+    "macro_annual": {0, 1, 2, 3, 4, 5, 6},
+    "nepse_csv_daily": {6, 0, 1, 2, 3},
 }
 
 # On-disk cache TTL per source, in seconds. A TTL is shorter than the
@@ -378,12 +399,32 @@ def _parse_business_date(value):
     return _dt.date.fromisoformat(text)
 
 
-def evaluate_freshness(last_date, sla_seconds, today=None):
+def _trading_days_between(last, today, weekdays):
+    """Trading days strictly after ``last`` up to and including
+    ``today`` — the number of days on which new data was expected
+    but has not arrived. A Friday last-date checked on Sunday is 0
+    (no trading day passed); checked on Monday it is 1."""
+    count = 0
+    day = last + _dt.timedelta(days=1)
+    while day <= today:
+        if day.weekday() in weekdays:
+            count += 1
+        day += _dt.timedelta(days=1)
+    return count
+
+
+def evaluate_freshness(last_date, sla_seconds, today=None, kind=None):
     """Judge a series by its last business date against an SLA.
 
-    Returns {last_date, age_days, sla_seconds, status} where status
-    is FRESH (age within the SLA) or STALE. A future date or an
-    unparsable date raises ValueError instead of being called fresh.
+    Returns {last_date, age_days, age_trading_days, sla_seconds,
+    status} where status is FRESH (age within the SLA) or STALE.
+    ``age_days`` is the calendar age (reported as-is); the status
+    is judged on ``age_trading_days`` — trading days after the last
+    date on which new data was expected (see TRADING_WEEKDAYS) —
+    so a Friday series is not STALE on a Sunday. ``kind`` selects
+    the trading calendar; with no kind, Mon–Fri is assumed. A
+    future date or an unparsable date raises ValueError instead of
+    being called fresh.
     """
     today = today or _dt.date.today()
     try:
@@ -396,10 +437,13 @@ def evaluate_freshness(last_date, sla_seconds, today=None):
     if age_days < 0:
         raise ValueError(
             f"last_date {last_date} is in the future vs {today.isoformat()}")
-    age_seconds = age_days * _DAY
+    weekdays = TRADING_WEEKDAYS.get(kind, {0, 1, 2, 3, 4}) if kind else {0, 1, 2, 3, 4}
+    age_trading_days = _trading_days_between(last, today, weekdays)
+    age_seconds = age_trading_days * _DAY
     return {
         "last_date": str(last_date),
         "age_days": age_days,
+        "age_trading_days": age_trading_days,
         "sla_seconds": sla_seconds,
         "status": "FRESH" if age_seconds <= sla_seconds else "STALE",
     }
