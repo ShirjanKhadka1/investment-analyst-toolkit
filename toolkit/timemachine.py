@@ -61,6 +61,7 @@ import math
 import random
 
 from .checks import require_finite, require_positive, validate_series
+from .market_profiles import get_profile
 from .nepal_frictions import (
     UnknownFrictionError,
     realised_gain_after_fees,
@@ -79,6 +80,7 @@ __all__ = [
     "replay_setup",
     "simulate",
     "simulate_nepse",
+    "simulate_with_profile",
 ]
 
 DEFAULT_SEED = 19
@@ -766,7 +768,7 @@ def replay_setup(prices, setup, entry, stop, target, horizon=20, *,
 
 def simulate_nepse(prices, entry, stop, target, *, shares=100,
                    typical_daily_volume=None, frictions=None,
-                   n_sims=10000, seed=19, horizon=20):
+                   n_sims=10000, seed=19, horizon=20, profile=None):
     """Seeded Monte-Carlo for a NEPSE hypothetical exit plan.
 
     The plain ``simulate`` plus NEPSE reality, all labelled:
@@ -792,7 +794,20 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
     labels, ``shares`` and the liquidity check. Raises ValueError
     on a bad plan and UnknownFrictionError when a needed rate is
     UNKNOWN. Every result states "simulation, not a prediction".
+
+    ``profile`` (a market key or MarketProfile, default None) routes
+    the run through ``simulate_with_profile`` instead: with the
+    NEPSE profile the result is identical to this function; with any
+    other profile the market's own limits, fees and settlement apply.
+    Pass ``profile`` or ``frictions``, not both.
     """
+    if profile is not None:
+        if frictions is not None:
+            raise ValueError("pass profile or frictions, not both")
+        return simulate_with_profile(
+            prices, entry, stop, target, profile=profile, shares=shares,
+            typical_daily_volume=typical_daily_volume, n_sims=n_sims,
+            seed=seed, horizon=horizon)
     entry, stop, target = _validate_plan(entry, stop, target)
     if isinstance(n_sims, bool) or not isinstance(n_sims, int) or n_sims < 1:
         raise ValueError(f"n_sims must be a positive integer, got {n_sims!r}")
@@ -868,5 +883,208 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
         "note": ("average_R is net of NEPSE frictions (broker slabs, "
                  "SEBON fee, DP charge, CGT on gains after fees); "
                  "average_R_gross is the same simulation before costs"),
+    })
+    return result
+
+
+# --- Market-profile simulation (Step 1, global-markets) -------------------
+# The NEPSE path above is untouched: simulate_with_profile with the
+# NEPSE profile delegates straight back to simulate_nepse, so the
+# existing behaviour (and its tests) is byte-identical. Every other
+# profile runs the generic path below, which applies ONLY the fees
+# and taxes the profile actually sources; anything UNKNOWN is listed
+# in ``unmodelled_fees`` and never silently set to zero.
+
+def _profile_side_cost(trade_value, side, profile):
+    """(cost, unmodelled) for one side of a trade under a profile.
+
+    Fee entries with a numeric value are applied: a unit containing
+    "fraction" is a rate on the trade value, any other numeric unit
+    is a flat charge in the profile's currency. Entries with a None
+    value are unmodelled (broker- or venue-dependent), never zero.
+    Side rules, by fee name: "intraday" fees apply to same-day trades
+    only, so a multi-day simulation skips them (listed unmodelled);
+    a name containing "sell" applies on the sell side only; a name
+    ending in "_buy" applies on the buy side only.
+    """
+    cost = 0.0
+    unmodelled = []
+    for name, spec in profile.fees.items():
+        value = spec.get("value")
+        if value is None:
+            unmodelled.append(name)
+            continue
+        if "intraday" in name:
+            unmodelled.append(name + " (intraday only)")
+            continue
+        if "sell" in name and side != "sell":
+            continue
+        if name.endswith("_buy") and side != "buy":
+            continue
+        unit = str(spec.get("unit", ""))
+        if "fraction" in unit:
+            cost += float(value) * trade_value
+        else:
+            cost += float(value)
+    return cost, unmodelled
+
+
+def _profile_tax(gain_after_fees, profile):
+    """(tax, unmodelled) on a gain under a profile.
+
+    Only taxes whose key names a gains tax ("cgt" / "stcg") and whose
+    value is sourced are applied, and only on a positive gain. Any
+    other tax entry (or a None value) is unmodelled.
+    """
+    tax = 0.0
+    unmodelled = []
+    if gain_after_fees <= 0:
+        return 0.0, [k for k, v in profile.taxes.items()
+                     if v.get("value") is None]
+    for name, spec in profile.taxes.items():
+        value = spec.get("value")
+        if value is None:
+            unmodelled.append(name)
+            continue
+        if "cgt" in name or "stcg" in name:
+            tax += float(value) * gain_after_fees
+        else:
+            unmodelled.append(name)
+    return tax, unmodelled
+
+
+def _net_realised_r_generic(entry, exit_price, risk, shares, profile,
+                           holding_days):
+    """Realised R net of a profile's sourced fees/taxes, one round trip.
+
+    Returns (net_R, unmodelled): gain after fees, tax on a positive
+    gain only, divided by the risk taken. A fee or tax the profile
+    does not source is listed in ``unmodelled`` — the net figure is
+    explicitly partial, never a silent zero-cost run.
+    """
+    buy_value = entry * shares
+    sell_value = exit_price * shares
+    buy_cost, un_buy = _profile_side_cost(buy_value, "buy", profile)
+    sell_cost, un_sell = _profile_side_cost(sell_value, "sell", profile)
+    gain_after_fees = (sell_value - sell_cost) - (buy_value + buy_cost)
+    tax, un_tax = _profile_tax(gain_after_fees, profile)
+    net_profit = gain_after_fees - tax
+    unmodelled = sorted(set(un_buy + un_sell + un_tax))
+    return net_profit / (risk * shares), unmodelled
+
+
+def simulate_with_profile(prices, entry, stop, target, *, profile,
+                          shares=100, typical_daily_volume=None,
+                          n_sims=10000, seed=19, horizon=20):
+    """Seeded Monte-Carlo for a hypothetical exit plan under a market profile.
+
+    ``profile`` is a market key (``"us"``, ``"india"``, ``"uk"``,
+    ``"crypto"``, ``"fx"``, ``"generic"``, ``"nepse"``) or a
+    MarketProfile. With ``"nepse"`` this delegates to
+    ``simulate_nepse`` unchanged — byte-identical output. For any
+    other market:
+    - daily moves are clipped to the profile's circuit limits when it
+      has them; a market with no per-stock limit runs unclipped;
+    - ``shares`` must be a multiple of the profile's lot size when
+      one is sourced (ValueError otherwise);
+    - ``average_R_net`` applies only the profile's sourced fees and
+      gains taxes; anything unsourced is listed in
+      ``unmodelled_fees`` and the net figure is labelled partial;
+    - settlement lag and note come from the profile.
+
+    Returns the ``simulate`` shape plus ``honest_verdict``,
+    ``market`` / ``market_name``, circuit / settlement labels,
+    ``shares`` and the liquidity check. Raises ValueError on a bad
+    plan or an unknown market, and UnknownFrictionError is never
+    raised here — an unsourced rate is unmodelled, not fatal, because
+    the generic path never asserts a rate it does not have.
+    """
+    if isinstance(profile, str):
+        profile = get_profile(profile)
+    if profile.key == "nepse":
+        return simulate_nepse(
+            prices, entry, stop, target, shares=shares,
+            typical_daily_volume=typical_daily_volume, n_sims=n_sims,
+            seed=seed, horizon=horizon)
+    entry, stop, target = _validate_plan(entry, stop, target)
+    if isinstance(n_sims, bool) or not isinstance(n_sims, int) or n_sims < 1:
+        raise ValueError(f"n_sims must be a positive integer, got {n_sims!r}")
+    if isinstance(seed, bool) or not isinstance(seed, int):
+        raise ValueError(f"seed must be an integer, got {seed!r}")  # noqa: TRY004
+    if isinstance(shares, bool) or not isinstance(shares, int) or shares < 1:
+        raise ValueError(f"shares must be a positive integer, got {shares!r}")
+    if profile.lot_size and shares % profile.lot_size != 0:
+        raise ValueError(
+            f"shares ({shares}) must be a multiple of the {profile.key} "
+            f"lot size ({profile.lot_size})")
+    liquidity = None
+    if typical_daily_volume is not None:
+        liquidity = check_exit_liquidity(shares, typical_daily_volume)
+        if liquidity["blocked"]:
+            return {
+                "method": "simulation, not a prediction",
+                "blocked": True,
+                "block_reason": liquidity["reason"],
+                "liquidity": liquidity,
+                "entry": entry,
+                "stop": stop,
+                "target": target,
+                "shares": shares,
+                "market": profile.key,
+                "market_name": profile.name,
+                "honest_verdict": None,
+                "verdict": "BLOCKED — exit liquidity",
+                "note": ("No simulation was run: the position is too "
+                         "large for typical volume. Reduce shares or "
+                         "supply a larger typical_daily_volume."),
+            }
+    steps = _steps_from_prices(prices)
+    if profile.circuit_limit_up is not None and profile.circuit_limit_down is not None:
+        steps = _clip_steps_to_circuit(
+            steps, profile.circuit_limit_up, profile.circuit_limit_down)
+    run = _simulate_from_steps(steps, entry, stop, target,
+                               n_sims, seed, horizon)
+    risk = entry - stop
+    realised_r_net = []
+    unmodelled_all = set()
+    for exit_price, exit_day in zip(run["exit_prices"], run["exit_days"]):
+        holding = exit_day if exit_day is not None else horizon
+        net_r, unmodelled = _net_realised_r_generic(
+            entry, exit_price, risk, shares, profile, holding)
+        realised_r_net.append(net_r)
+        unmodelled_all.update(unmodelled)
+    average_r_gross = sum(run["realised_r"]) / len(run["realised_r"])
+    average_r_net = sum(realised_r_net) / len(realised_r_net)
+    result = _summarise(run["outcomes"], run["final_closes"],
+                        realised_r_net, seed=seed,
+                        n_sims=n_sims, horizon=horizon,
+                        n_windows=run["n_windows"],
+                        entry=entry, stop=stop, target=target)
+    buy_cost, _ = _profile_side_cost(entry * shares, "buy", profile)
+    result.update({
+        "blocked": False,
+        "shares": shares,
+        "market": profile.key,
+        "market_name": profile.name,
+        "currency": profile.currency,
+        "average_R_gross": average_r_gross,
+        "average_R_net": average_r_net,
+        "honest_verdict": honest_verdict(
+            result["target_first"], result["break_even"],
+            run["n_windows"]),
+        "circuit_limit_up": profile.circuit_limit_up,
+        "circuit_limit_down": profile.circuit_limit_down,
+        "circuit_note": profile.circuit_note,
+        "unmodelled_fees": sorted(unmodelled_all),
+        "buy_charges_at_entry": buy_cost,
+        "settlement_lag_business_days":
+            profile.settlement_lag_business_days,
+        "settlement_note": profile.settlement_note,
+        "liquidity": liquidity,
+        "note": ("average_R is net of the sourced fees/taxes of the "
+                 f"{profile.key} profile only; anything in "
+                 "unmodelled_fees was NOT charged, so the net figure "
+                 "is partial. average_R_gross is the same simulation "
+                 "before costs."),
     })
     return result

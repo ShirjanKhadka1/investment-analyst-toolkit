@@ -121,13 +121,16 @@ FRESHNESS_SLA_SECONDS = {
 }
 
 # Trading weekdays per series kind (Monday=0 … Sunday=6), used by
-# evaluate_freshness to count age in trading days.
+# evaluate_freshness to count age in trading days. Derived from the
+# market profiles (toolkit/market_profiles.py KIND_PROFILES) so the
+# calendar has exactly one source of truth; the values are identical
+# to the literal table this replaced.
+from .market_profiles import KIND_PROFILES as _KIND_PROFILES
+from .market_profiles import get_profile as _get_profile
+
 TRADING_WEEKDAYS = {
-    "stock_daily": {0, 1, 2, 3, 4},
-    "crypto_daily": {0, 1, 2, 3, 4, 5, 6},
-    "fx_reference": {0, 1, 2, 3, 4},
-    "macro_annual": {0, 1, 2, 3, 4, 5, 6},
-    "nepse_csv_daily": {6, 0, 1, 2, 3},
+    kind: set(_get_profile(market).trading_weekdays)
+    for kind, market in _KIND_PROFILES.items()
 }
 
 # On-disk cache TTL per source, in seconds. A TTL is shorter than the
