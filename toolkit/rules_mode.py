@@ -19,17 +19,25 @@ from __future__ import annotations
 import math
 
 __all__ = [
+    "GLOBAL_TEAM",
     "RULES_MODE_VERSION",
     "broker_flow_read",
     "corporate_action_flags",
+    "crypto_check",
+    "earnings_check",
+    "etf_index_check",
+    "fx_macro_check",
+    "list_global_personas",
     "macro_checklist",
+    "run_global_rules_team",
     "run_rules_team",
     "sector_fundamentals_check",
     "sentiment_score",
     "technical_read",
+    "us_fundamentals_check",
 ]
 
-RULES_MODE_VERSION = "1.3.0"
+RULES_MODE_VERSION = "1.4.0"  # 1.4.0 adds the market-agnostic global team.
 
 # --- Sentiment lexicons (keyword fallback, design only) -----------------
 # English words and Nepali words (Devanagari + common Romanised forms).
@@ -301,4 +309,287 @@ def run_rules_team(symbol, exchange, inputs):
         inputs.get("actions") or [])
     sections["note"] = ("rules-mode output: a structured read of supplied "
                         "inputs, not a recommendation, not a prediction")
+    return sections
+
+
+# --- Market-agnostic global team (1.4.0) ----------------------------------
+# Same structure as the NEPSE team above: pure, deterministic rules over
+# caller-supplied inputs; nothing fetched, nothing guessed, UNKNOWN for
+# anything not supplied. These five personas cover the markets the
+# NEPSE team does not: US large-cap fundamentals (EDGAR XBRL metrics),
+# ETF/index, FX/macro, crypto, and earnings. The NEPSE functions above
+# are untouched. Thresholds are rules-of-thumb discussion prompts, not
+# pass/fail verdicts and not advice.
+
+def _metric_rows(names, metrics):
+    """One row per named metric: value or UNKNOWN, never filled in."""
+    rows = []
+    for name in names:
+        value = metrics.get(name)
+        rows.append({"metric": name,
+                     "value": value if value is not None else "UNKNOWN",
+                     "sourced": value is not None})
+    return rows
+
+
+def _flag_rows(metrics, flags):
+    """Discussion-prompt flags: (metric, threshold, direction, text)."""
+    out = []
+    for name, threshold, direction, text in flags:
+        value = metrics.get(name)
+        if value is None:
+            continue
+        triggered = (value > threshold if direction == "above"
+                     else value < threshold)
+        if triggered:
+            out.append({"metric": name, "value": value,
+                        "threshold": threshold, "flag": text})
+    return out
+
+
+def us_fundamentals_check(metrics):
+    """US large-cap fundamentals over caller-supplied XBRL metrics.
+
+    ``metrics`` maps EDGAR-sourced figures to numbers — e.g. from
+    ``toolkit.edgar.get_fundamentals`` (Revenues, NetIncomeLoss) plus
+    derived ratios the caller computed (revenue_growth_pct,
+    net_margin_pct, free_cash_flow_margin_pct, debt_to_equity,
+    interest_coverage, return_on_invested_capital_pct). A missing
+    metric is UNKNOWN, never filled in. Flags are discussion prompts.
+    """
+    names = ("revenue_growth_pct", "net_margin_pct",
+             "free_cash_flow_margin_pct", "debt_to_equity",
+             "interest_coverage", "return_on_invested_capital_pct")
+    flags = (("debt_to_equity", 2.0, "above",
+              "debt/equity above 2.0x — ask why"),
+             ("interest_coverage", 1.5, "below",
+              "interest coverage below 1.5x — ask why"),
+             ("revenue_growth_pct", 0.0, "below",
+              "revenue declining year on year — ask why"),
+             ("net_margin_pct", 0.0, "below",
+              "net margin negative — ask why"))
+    return {"persona": "us_large_cap_fundamentals", "status": "checked",
+            "metrics": _metric_rows(names, metrics),
+            "flags": _flag_rows(metrics, flags),
+            "note": "flags are discussion prompts, not verdicts; "
+                    "every metric needs its EDGAR source + period"}
+
+
+def etf_index_check(metrics):
+    """ETF/index read over caller-supplied fund metrics.
+
+    ``metrics``: expense_ratio_pct, tracking_error_pct,
+    assets_under_management_usd, premium_discount_pct (ETF price vs
+    NAV), index_return_1y_pct, etf_return_1y_pct. Missing is UNKNOWN.
+    """
+    names = ("expense_ratio_pct", "tracking_error_pct",
+             "assets_under_management_usd", "premium_discount_pct",
+             "index_return_1y_pct", "etf_return_1y_pct")
+    flags = (("expense_ratio_pct", 0.50, "above",
+              "expense ratio above 0.50% — high for a broad index ETF, ask why"),
+             ("tracking_error_pct", 1.0, "above",
+              "tracking error above 1% — ask why the fund trails its index"))
+    rows = _metric_rows(names, metrics)
+    premium = metrics.get("premium_discount_pct")
+    if premium is not None and abs(premium) > 0.5:
+        extra = {"metric": "premium_discount_pct", "value": premium,
+                 "threshold": 0.5,
+                 "flag": "premium/discount beyond ±0.5% — ask why"}
+    else:
+        extra = None
+    out_flags = _flag_rows(metrics, flags)
+    if extra is not None:
+        out_flags.append(extra)
+    gap = None
+    if (metrics.get("index_return_1y_pct") is not None
+            and metrics.get("etf_return_1y_pct") is not None):
+        gap = (metrics["etf_return_1y_pct"]
+               - metrics["index_return_1y_pct"])
+    return {"persona": "etf_index", "status": "checked",
+            "metrics": rows, "flags": out_flags,
+            "etf_minus_index_1y_pct": gap,
+            "note": "flags are discussion prompts, not verdicts; "
+                    "tracking error and premium/discount describe the "
+                    "past year only"}
+
+
+def fx_macro_check(inputs):
+    """FX/macro read over caller-supplied central-bank and price data.
+
+    ``inputs``: base_currency, quote_currency,
+    policy_rate_base_pct, policy_rate_quote_pct,
+    inflation_base_pct, inflation_quote_pct,
+    pair_change_1y_pct, pair_volatility_annualised_pct. Missing is
+    UNKNOWN. The rate differential is computed only when both policy
+    rates are supplied.
+    """
+    names = ("policy_rate_base_pct", "policy_rate_quote_pct",
+             "inflation_base_pct", "inflation_quote_pct",
+             "pair_change_1y_pct", "pair_volatility_annualised_pct")
+    differential = None
+    if (inputs.get("policy_rate_base_pct") is not None
+            and inputs.get("policy_rate_quote_pct") is not None):
+        differential = (inputs["policy_rate_base_pct"]
+                        - inputs["policy_rate_quote_pct"])
+    flags = []
+    move = inputs.get("pair_change_1y_pct")
+    if move is not None and abs(move) > 20.0:
+        flags.append({"metric": "pair_change_1y_pct", "value": move,
+                      "threshold": 20.0,
+                      "flag": "pair moved more than 20% in a year — ask why"})
+    return {"persona": "fx_macro", "status": "checked",
+            "pair": (f"{inputs.get('base_currency', 'UNKNOWN')}/"
+                     f"{inputs.get('quote_currency', 'UNKNOWN')}"),
+            "rows": _metric_rows(names, inputs),
+            "rate_differential_bps": (differential * 100.0
+                                      if differential is not None else None),
+            "flags": flags,
+            "note": "a rate differential is one input among many — "
+                    "it predicts nothing about the next move"}
+
+
+def crypto_check(metrics):
+    """Crypto read over caller-supplied market metrics.
+
+    ``metrics``: price_usd, market_cap_usd, volume_24h_usd,
+    all_time_high_usd, mean_200d_usd, realised_vol_30d_daily_pct,
+    circulating_supply, max_supply. Missing is UNKNOWN. Drawdown,
+    volume/market-cap and price-vs-200d mean are computed only when
+    their inputs are supplied.
+    """
+    names = ("price_usd", "market_cap_usd", "volume_24h_usd",
+             "all_time_high_usd", "mean_200d_usd",
+             "realised_vol_30d_daily_pct", "circulating_supply",
+             "max_supply")
+    computed = {}
+    if (metrics.get("price_usd") is not None
+            and metrics.get("all_time_high_usd")):
+        computed["drawdown_from_ath_pct"] = (
+            metrics["price_usd"] / metrics["all_time_high_usd"] - 1.0) * 100.0
+    if (metrics.get("volume_24h_usd") is not None
+            and metrics.get("market_cap_usd")):
+        computed["volume_to_mcap_pct"] = (
+            metrics["volume_24h_usd"] / metrics["market_cap_usd"]) * 100.0
+    if (metrics.get("price_usd") is not None
+            and metrics.get("mean_200d_usd")):
+        computed["price_vs_mean_200d_pct"] = (
+            metrics["price_usd"] / metrics["mean_200d_usd"] - 1.0) * 100.0
+    flags = []
+    if computed.get("drawdown_from_ath_pct") is not None \
+            and computed["drawdown_from_ath_pct"] < -50.0:
+        flags.append({"metric": "drawdown_from_ath_pct",
+                      "value": computed["drawdown_from_ath_pct"],
+                      "threshold": -50.0,
+                      "flag": "more than 50% below all-time high — ask why"})
+    if metrics.get("realised_vol_30d_daily_pct") is not None \
+            and metrics["realised_vol_30d_daily_pct"] > 5.0:
+        flags.append({"metric": "realised_vol_30d_daily_pct",
+                      "value": metrics["realised_vol_30d_daily_pct"],
+                      "threshold": 5.0,
+                      "flag": "average daily move above 5% — very high volatility"})
+    if (metrics.get("circulating_supply") is not None
+            and metrics.get("max_supply")):
+        share = metrics["circulating_supply"] / metrics["max_supply"]
+        computed["circulating_share_of_max_supply"] = share
+        if share < 0.5:
+            flags.append({"metric": "circulating_supply",
+                          "value": share, "threshold": 0.5,
+                          "flag": "less than half of max supply circulating "
+                                  "— future issuance dilutes holders, ask why"})
+    return {"persona": "crypto", "status": "checked",
+            "metrics": _metric_rows(names, metrics),
+            "computed": computed, "flags": flags,
+            "note": "flags are discussion prompts, not verdicts; "
+                    "crypto volatility cuts both ways and this read "
+                    "predicts nothing"}
+
+
+def earnings_check(events):
+    """Earnings read over caller-supplied reported/expected figures.
+
+    ``events`` is a list of dicts with ``date`` and optionally
+    ``reported_eps``, ``expected_eps``, ``reported_revenue``,
+    ``expected_revenue``, ``guidance`` ("raised"/"maintained"/
+    "lowered"). Surprise is computed only when both reported and
+    expected are supplied; otherwise it is UNKNOWN, never assumed.
+    """
+    out = []
+    for event in events:
+        row = {"date": event.get("date", "UNKNOWN"),
+               "guidance": event.get("guidance", "UNKNOWN")}
+        for reported_key, expected_key, name in (
+                ("reported_eps", "expected_eps", "eps_surprise_pct"),
+                ("reported_revenue", "expected_revenue",
+                 "revenue_surprise_pct")):
+            reported = event.get(reported_key)
+            expected = event.get(expected_key)
+            if reported is not None and expected not in (None, 0):
+                row[name] = (reported - expected) / abs(expected) * 100.0
+            else:
+                row[name] = "UNKNOWN"
+        flags = []
+        for name in ("eps_surprise_pct", "revenue_surprise_pct"):
+            value = row[name]
+            if value != "UNKNOWN" and abs(value) > 10.0:
+                flags.append({"metric": name, "value": value,
+                              "threshold": 10.0,
+                              "flag": f"{name} beyond ±10% — large surprise, ask why"})
+        if event.get("guidance") == "lowered":
+            flags.append({"metric": "guidance", "value": "lowered",
+                          "threshold": None,
+                          "flag": "guidance lowered — ask why"})
+        row["flags"] = flags
+        out.append(row)
+    return {"persona": "earnings", "events": out, "n_events": len(out),
+            "note": "surprises describe reported quarters only; "
+                    "a beat says nothing about the next quarter"}
+
+
+# Registry: persona key -> rules function, mirroring the NEPSE team's
+# shape so the same runner and the same tests cover both teams.
+GLOBAL_TEAM = {
+    "us_large_cap_fundamentals": us_fundamentals_check,
+    "etf_index": etf_index_check,
+    "fx_macro": fx_macro_check,
+    "crypto": crypto_check,
+    "earnings": earnings_check,
+}
+
+
+def list_global_personas():
+    """Persona keys of the market-agnostic global team, in order."""
+    return list(GLOBAL_TEAM)
+
+
+def run_global_rules_team(symbol, market, inputs):
+    """Run the global rules-mode team over supplied inputs, one dict out.
+
+    ``market`` is a market-profile key (e.g. "us", "crypto", "fx").
+    ``inputs`` may carry ``closes``, ``fundamentals_metrics``,
+    ``etf_metrics``, ``fx_inputs``, ``crypto_metrics`` and
+    ``earnings_events``; any missing key yields that section as
+    UNKNOWN. Technicals and sentiment reuse the market-agnostic
+    functions shared with the NEPSE team.
+    """
+    if not symbol or not market:
+        raise ValueError("run_global_rules_team needs a symbol and a market")
+    sections = {"symbol": symbol, "market": market,
+                "rules_mode_version": RULES_MODE_VERSION,
+                "llm": "none — deterministic rules mode, zero API keys"}
+    closes = inputs.get("closes")
+    sections["technical"] = (technical_read(closes) if closes else
+                             {"status": "UNKNOWN",
+                              "reason": "no closes supplied"})
+    sections["us_fundamentals"] = us_fundamentals_check(
+        inputs.get("fundamentals_metrics") or {})
+    sections["etf_index"] = etf_index_check(
+        inputs.get("etf_metrics") or {})
+    sections["fx_macro"] = fx_macro_check(inputs.get("fx_inputs") or {})
+    sections["crypto"] = crypto_check(inputs.get("crypto_metrics") or {})
+    sections["earnings"] = earnings_check(
+        inputs.get("earnings_events") or [])
+    sections["sentiment"] = sentiment_score(inputs.get("headlines") or [])
+    sections["note"] = ("global rules-mode output: a structured read of "
+                        "supplied inputs, not a recommendation, not a "
+                        "prediction")
     return sections
