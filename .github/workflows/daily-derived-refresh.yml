@@ -82,5 +82,5 @@ jobs:
               bad = [f\"{s['name']} {s['status']}\" + (f\" ({s['error']})\" if s.get('error') else '') for s in report['sources'] if s['status'] in ('STALE', 'UNAVAILABLE')]
               print(f\"error: data health DEGRADED: {'; '.join(bad)}\", file=sys.stderr)
               sys.exit(1)
-          print(f\"data health: {report['overall']})
-          "
+          print(f\"data health: {report['overall']}\")
+          \""
