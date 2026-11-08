@@ -1,0 +1,86 @@
+# =====================================================================
+# NOT DEPLOYED — PREPARED FILE ONLY (Phase 2, 7 Nov 2026).
+# This workflow is NOT live on GitHub. It was prepared locally and
+# has NOT been pushed via the API: the token behind the API helper
+# lacks workflow scope, so an API push of a .github/workflows/ file
+# would fail with 403. The parent deploys it via the GitHub web UI
+# (browser route) and then confirms the file exists on main and the
+# first scheduled run. Do NOT describe this workflow as deployed,
+# running, or alerting until the parent confirms that deployment.
+#
+# TARGET:
+#   Repo:   ShirjanKhadka1/investment-analyst-toolkit
+#   Branch: main
+#   Path:   .github/workflows/daily-derived-refresh.yml
+#
+# Behaviour: every day at 09:15 UTC (15:00 NPT — just after the
+# NEPSE market close) it refreshes the derived datasets
+# (data/derived/*.json: indicator snapshot, screening matches,
+# Time-Machine odds, with as_of provenance and a stale flag) from
+# the repo's CSVs, probes live data health, and commits both outputs
+# to main. A stale CSV is flagged in its dataset file, never
+# published as fresh. A failed refresh or a DEGRADED health report
+# fails the job (the health file is still committed first, so the
+# evidence is never lost) — the existing Failure alert workflow
+# opens a GitHub issue on failure once its watch list is extended
+# (see DEPLOY-NOTE.md). No email alert exists (Gmail connector not
+# connected — recorded blocker). Research only: no trades, no spend,
+# no recommendations. No secrets.
+# =====================================================================
+
+name: Daily derived refresh
+
+on:
+  schedule:
+    # 09:15 UTC = 15:00 NPT, just after the NEPSE market close.
+    # GitHub cron is approximate (may run minutes late); every output
+    # carries its own generated_at timestamp, so a late run is
+    # visible, never hidden.
+    - cron: "15 9 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Refresh derived datasets
+        # Exit 2 on a missing/corrupt CSV or unwritable output.
+        # A stale CSV only warns (its dataset carries stale=true).
+        run: python3 scripts/refresh_derived.py
+      - name: Probe data health
+        id: health
+        # continue-on-error so the health file is committed below
+        # even when a source is down; the final step fails the job.
+        continue-on-error: true
+        run: python3 scripts/data_health.py --probe
+      - name: Commit derived datasets and health report
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/derived data_health.json
+          if git diff --cached --quiet; then
+            echo "No derived changes to commit."
+          else
+            git commit -m "Daily derived refresh + data health ($(date -u +%F))"
+            git push
+          fi
+      - name: Fail the job if health is DEGRADED
+        if: always()
+        run: |
+          python3 -c "
+          import json, sys
+          report = json.load(open('data_health.json'))
+          if report['overall'] == 'DEGRADED':
+              bad = [f\"{s['name']} {s['status']}\" + (f\" ({s['error']})\" if s.get('error') else '') for s in report['sources'] if s['status'] in ('STALE', 'UNAVAILABLE')]
+              print(f\"error: data health DEGRADED: {'; '.join(bad)}\", file=sys.stderr)
+              sys.exit(1)
+          print(f\"data health: {report['overall']})
+          "
