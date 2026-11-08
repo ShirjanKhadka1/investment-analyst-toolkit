@@ -30,10 +30,14 @@ profile's ``*_rules`` fields and ``sources``):
   reported as "first two hours" by most sources and "first hour" by
   one; the bylaws TEXT itself was not obtained, so the window is
   flagged as disputed in the profile.
-- Settlement T+2 (CDSC Settlement Procedure, official); T+3 before
-  Jan 2021 (full cycle moved to T+2 in Magh 2077, per biznessvue
-  citing ShareSansar; an earlier CDSC instruction of Asadh 21, 2074
-  concerned payment timing). Exact transition day unverified.
+- Settlement T+2 (transition date unverified): the CDSC Settlement
+  Procedure (official) states T+2 as the standard, and a CDSC
+  instruction of Asadh 21, 2074 (Jul 2017) put T+2 payment
+  settlement in place — payment vs securities may be different
+  legs, so no pre-2021 lag is published. The dated rule keeps the
+  2021-01-15 boundary from the earlier rule, but the value before
+  it is UNKNOWN (None), not T+3: the T+3-before-Jan-2021 claim was
+  withdrawn 2026-11-08 for lack of an official source.
 Freshness, the Time Machine and the risk gate must use the rule in
 force on EACH BAR'S DATE (``*_on(day)``), never today's rule.
 """
@@ -216,8 +220,6 @@ _NEPSE_SOURCES = {
         "2026-11-08"),
     "settlement": _src(
         "https://cdsc.com.np/cmsettlementprocedure", "2026-11-08"),
-    "settlement_history": _src(
-        "https://www.biznessvue.com/t1-settlement-nepse/", "2026-11-08"),
     "weekday_dispute_mon_fri": _src(
         "https://punji.app/learn/nepse-trading-hours", "2026-09-25"),
 }
@@ -273,11 +275,19 @@ NEPSE = MarketProfile(
     lot_size=None,  # not in the sourced schedule; do not guess.
     settlement_lag_business_days=2,
     settlement_lag_rules=(
-        (datetime.date.min, 3),  # T+3 until the full T+2 cycle.
-        (datetime.date(2021, 1, 15), 2),  # Magh 1, 2077 (see disputes).
+        # Pre-2021 lag is UNKNOWN (None), not T+3: the T+3 claim was
+        # withdrawn 2026-11-08 — no official source supports it.
+        # The 2021-01-15 boundary is retained from the earlier rule;
+        # the exact transition day is unverified.
+        (datetime.date.min, None),
+        (datetime.date(2021, 1, 15), 2),
     ),
-    settlement_note="T+2 as standard (CDSC Settlement Procedure, official, "
-                    "2026-11-08); T+3 before Jan 2021. Broker 58 offers T+1.",
+    settlement_note="T+2 (transition date unverified). CDSC Settlement "
+                    "Procedure (official) states T+2 as the standard; a "
+                    "CDSC instruction of Asadh 21, 2074 put T+2 payment "
+                    "settlement in place — payment vs securities may be "
+                    "different legs, so no pre-2021 lag is published. "
+                    "Broker 58 offers T+1.",
     fees={
         "brokerage_slabs": {
             "value": BROKERAGE_SLABS,
@@ -316,12 +326,15 @@ NEPSE = MarketProfile(
             "from the instrument. Do not state the window as settled."
         ),
         (
-            "Settlement transition: the full T+2 cycle is dated to Magh "
-            "2077 (Jan-Feb 2021, biznessvue citing ShareSansar); the "
-            "rule uses Magh 1, 2077 = 2021-01-15 as the boundary, exact "
-            "day unverified. An earlier CDSC instruction (Asadh 21, "
-            "2074 / Jul 2017) required payment within T+2; it is not "
-            "the full-cycle date."
+            "Settlement transition: the pre-2021 lag was previously "
+            "published as T+3 (biznessvue citing ShareSansar); no "
+            "official source supports it, so the claim was withdrawn "
+            "2026-11-08 and the pre-2021 lag is recorded as unknown, "
+            "not T+3. The rule keeps Magh 1, 2077 = 2021-01-15 as the "
+            "boundary, exact day unverified. An earlier CDSC "
+            "instruction (Asadh 21, 2074 / Jul 2017) required payment "
+            "within T+2; it is the payment leg, not necessarily the "
+            "full-cycle date."
         ),
     ),
 )

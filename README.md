@@ -10,7 +10,17 @@
 python -m toolkit.terminal demo.csv
 ```
 
+`demo.csv` is synthetic sample data, not real market data: a seeded
+random walk (seed 5, start 1000, daily drift +0.12%, volatility
+1.2%), 80 weekday bars 2026-07-20 to 2026-11-06, NEPSE-style prices
+in NPR, symbol DEMO. Generated 2026-11-07; the provenance is in the
+file header, and the worked example below repeats it.
+
 A free terminal that turns any daily-bars CSV into indicators, setups, honest Time-Machine odds and a risk gate — with every number reproducible.
+
+> **NEPSE, native:** sourced frictions, effective-dated rules, the Time Machine and a zero-LLM rules mode — NEPSE is the tested, default market, and NEPSE data is CSV-only by design.
+>
+> **World markets, supported:** US, India, UK, crypto and FX via sourced market profiles, SEC EDGAR fundamentals and keyless public connectors — labelled tested or experimental in [`docs/global-evidence.md`](docs/global-evidence.md).
 
 > **Research and education only — not investment advice, never a buy/sell/hold recommendation.** Every example uses clearly-labelled demo data unless a source is cited. The track-record badge reads n=0 honestly: no research call has been logged and settled yet (see [docs/track-record.md](docs/track-record.md)), and it stays at n=0 until a real call settles.
 
@@ -372,6 +382,14 @@ supplied inputs in one structured dict. No keys, no endpoints, no
 fetching; offline tests with synthetic fixtures only
 (`tests/test_rules_mode.py`, 14 tests).
 
+The companion pack holds 36 agents — 18 NEPSE-side (9-agent NEPSE
+team + 8 sector agents + Nepal Market Researcher) and 18
+market-agnostic — with 12 runbooks and 8 templates. The split is
+counted from the pack's roster by `scripts/count_agents.py` (see
+`docs/agents-roster-counts.json`); the "9 + 8 = 17" framing omits
+Nepal Market Researcher, the general Nepal market researcher, who
+is in neither the team nor the sector set.
+
 ## Decision memory + public scoreboard (Engine 1.4)
 
 `toolkit/decision_log.py` logs every research call *before* its
@@ -548,7 +566,7 @@ MIT.
 - **Lint fix:** `ruff check` is now clean across the whole repo — 7 pre-existing errors in `scripts/check_numbers.py`, `scripts/generate_status.py` and `scripts/generate_models_table.py` fixed (3 shebangs on non-executable files, a nested `if`, a missing `check=False`, a blind `except Exception`, an unused variable). The README's earlier "`ruff check` clean" claim was stale until this fix.
 - Test total at v0.9.0 was 509 (505 at Phase 2 + 4 new demo-asset tests), verified 2026-11-07 in a fresh clone.
 - **2026-11-08 fix:** freshness SLA is now judged in trading days, not calendar days (Friday data no longer reads STALE on a Sunday; NEPSE uses its Sun–Thu week, crypto counts every day), and a repo-root `conftest.py` makes `import toolkit` work under the bare `pytest` binary as well as `python -m pytest` — the two gaps that turned CI red on 8 Nov. Tests stood at 512 (509 + 3 new freshness tests), verified 2026-11-08 in a fresh clone.
-- **2026-11-08, global-markets (PR #9):** NEPSE rules are effective-dated, not single values — trading week Sun–Thu until 5 Apr 2026, Mon–Fri from 6 Apr 2026 (board decision 22 Chaitra 2082); daily price limit 10% before 20 Apr 2026, 15% from, pre-open band 2% → 5% (Fourth Amendment Bylaws, 2082); index breaker three-tier (4/5/6%) before, two-tier (5%/8%) from; settlement T+2 (CDSC procedure, official), T+3 before Jan 2021. Freshness, the Time Machine and the risk gate use the rule in force on each bar's date; the EDGAR fetcher now validates URLs by parsed hostname (CodeQL fix). Tests stood at 577 (560 + 17 new), verified 2026-11-08 in a fresh clone.
+- **2026-11-08, global-markets (PR #9):** NEPSE rules are effective-dated, not single values — trading week Sun–Thu until 5 Apr 2026, Mon–Fri from 6 Apr 2026 (board decision 22 Chaitra 2082); daily price limit 10% before 20 Apr 2026, 15% from, pre-open band 2% → 5% (Fourth Amendment Bylaws, 2082); index breaker three-tier (4/5/6%) before, two-tier (5%/8%) from; settlement T+2 (transition date unverified — the T+3-before-Jan-2021 claim was withdrawn 2026-11-08 for lack of an official source). Freshness, the Time Machine and the risk gate use the rule in force on each bar's date; the EDGAR fetcher now validates URLs by parsed hostname (CodeQL fix). Tests stood at 577 (560 + 17 new), verified 2026-11-08 in a fresh clone.
 
 ## v0.2.0 — Job 3: portfolio, performance, forecast, free API data
 - `toolkit/portfolio.py` — returns, sample + shrunk covariance, equal / inverse-vol / min-variance / max-Sharpe weights, clean long-only weights, efficient frontier. Shrinkage + L2 by default; every portfolio compared to 1/N.
@@ -646,7 +664,7 @@ hold recommendation; NEPSE stays CSV-only.
 ## v0.7.0 — Phase 4: engines + prediction accuracy
 - **Engine validation:** every toolkit formula audited against a named reference (Black–Scholes–Merton 1973 + put-call parity, Gordon 1959, Markowitz portfolio variance, Sharpe 1966/1994, Sortino, historical CVaR, DuPont identity, exact GBM discretisation, walk-forward evaluation). Correct formulas left unchanged; genuine bugs proven by failing cases first, then fixed: `options.greeks` and Monte Carlo silently returned put values for an unknown kind (now raise `ValueError`), negative trade costs added money in backtests (now rejected), non-positive prices and bad alphas now rejected, flat-volatility regime no longer flips on float noise.
 - **Nepal frictions (`toolkit/nepal_frictions.py`):** brokerage, SEBON fee, DP charge, capital gains tax, circuit limits, settlement lag as parameters — every rate UNKNOWN by default, because no rate is stated in the local Nepal guides; a rate is accepted only with a source + as-of date. Cost reports return UNKNOWN (never zero) when any needed rate is unknown, so a backtest can never run cost-free by accident. NEPSE stated; scanner stays CSV-only; no live feed.
-- **Nepal frictions, sourced schedule (Phase 4 patch, 28 Oct 2026 — deploy after Phase 4 verifies):** `sourced_nepal_frictions()` carries the user-supplied schedule — broker slabs 0.36%/0.33%/0.31%/0.27%/0.24% (min Rs 10), SEBON 0.015%, DP Rs 25, CGT 5% at ≤365 days / 3.75% above (gain after fees, sell only; Gazette vol. 76, Additional 40, Part 5, 31 Bhadra 2083), circuit limits ±15% from 20 Apr 2026 (±10% before; Fourth Amendment Bylaws, 2082, SEBON-approved), settlement T+2 standard (CDSC procedure, official; T+3 before Jan 2021) with a broker-confirmed T+1 override (example: broker 58 — T+1 is not the standard). Dividends at flat 5%: note only, not implemented. Tests: 118/118 (106 at v0.7.0 + 12 patch tests).
+- **Nepal frictions, sourced schedule (Phase 4 patch, 28 Oct 2026 — deploy after Phase 4 verifies):** `sourced_nepal_frictions()` carries the user-supplied schedule — broker slabs 0.36%/0.33%/0.31%/0.27%/0.24% (min Rs 10), SEBON 0.015%, DP Rs 25, CGT 5% at ≤365 days / 3.75% above (gain after fees, sell only; Gazette vol. 76, Additional 40, Part 5, 31 Bhadra 2083), circuit limits ±15% from 20 Apr 2026 (±10% before; Fourth Amendment Bylaws, 2082, SEBON-approved), settlement T+2 (transition date unverified; pre-2021 lag unknown, not T+3) with a broker-confirmed T+1 override (example: broker 58 — T+1 is not the standard). Dividends at flat 5%: note only, not implemented. Tests: 118/118 (106 at v0.7.0 + 12 patch tests).
 - **Prediction accuracy (`toolkit/accuracy_report.py`, `docs/post-mortem-prediction-failures.md`):** ledger-driven accuracy per model/version with n stated, pending never counted as wins, failures listed with reason + action, zero-scored models render "no scored predictions". Post-mortem written first for the one locally evidenced failure (fixture, n=1, direction wrong, abs error 15.0 — not smoothed). Before/after OOS (walk-forward, existing models, `predictive.py` unchanged): level-shift fixture naive wins (MAE 3.33 vs 10.0/11.06/14.66, `beats_naive: False`); trending fixture linear_trend genuinely wins (MAE 0.0 vs naive 2.0). Two scratch candidates lost to naive and were NOT adopted. No model change shipped that fails the naive test.
 - Tests: 106/106 passed (66 at v0.6.0 + 5 accuracy-report + 35 engine-validation tests), verified 28 Oct 2026 in a fresh venv.
 
