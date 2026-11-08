@@ -108,10 +108,11 @@ NEPSE_CIRCUIT_SOURCE = (
     "±10% before 2026-04-20, ±15% from; pre-open 2% -> 5% on the "
     "same date (fiscalnepal, 17 Apr 2026; newbusinessage, 20 Apr 2026)")
 NEPSE_SETTLEMENT_NOTE = (
-    "T+2 settlement as standard (CDSC Settlement Procedure, official, "
-    "cdsc.com.np/cmsettlementprocedure, 2026-11-08); T+3 before Jan "
-    "2021. A T+1 override exists only where a specific broker offers "
-    "and confirms it — T+1 is NOT the market standard")
+    "T+2 (transition date unverified). CDSC Settlement Procedure "
+    "(official, cdsc.com.np/cmsettlementprocedure, 2026-11-08) states "
+    "T+2 as the standard; the pre-2017 lag is unknown, not T+3. A T+1 "
+    "override exists only where a specific broker offers and confirms "
+    "it — T+1 is NOT the market standard")
 DEFAULT_MAX_PARTICIPATION = 0.10
 
 

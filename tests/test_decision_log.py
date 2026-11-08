@@ -8,7 +8,8 @@ import pytest
 
 from toolkit import decision_log, paper_ledger, position_plan
 
-CALL = {"date": "2026-11-01", "symbol": "BNT", "thesis": "synthetic fixture",
+CALL = {"date": "2026-11-01", "symbol": "BNT", "exchange": "NEPSE",
+        "thesis": "synthetic fixture",
         "horizon_days": 5, "expected": "up",
         "sources": ["synthetic demo series"], "confidence": 0.7,
         "entry_close": 100.0}
@@ -117,8 +118,8 @@ def test_reflections_roundtrip(tmp_path):
 def _passing_plan():
     plan = position_plan.plan_exit(100, 95, target=110)
     sized = position_plan.size_position(10000, 100, 0.25, 2500, 100, 5)
-    return {**plan, **sized, "symbol": "BNT", "entry_window_ok": True,
-            "date": "2026-11-07"}
+    return {**plan, **sized, "symbol": "BNT", "exchange": "NEPSE",
+            "entry_window_ok": True, "date": "2026-11-07"}
 
 
 def test_extended_gate_pass_and_base_unchanged(tmp_path):
@@ -174,6 +175,7 @@ def test_paper_ledger_roundtrip(tmp_path):
                        "typical_daily_volume": 30000})
     rec = paper_ledger.record_plan(path, plan, gate)
     assert rec["verdict"] == "PASS" and "not a recommendation" in rec["note"]
+    assert rec["exchange"] == "NEPSE"
     assert paper_ledger.plans_for_symbol(path, "BNT")[0]["fingerprint"] == gate["fingerprint"]
     assert paper_ledger.plans_for_symbol(path, "NABIL") == []
     with pytest.raises(ValueError):
@@ -182,14 +184,70 @@ def test_paper_ledger_roundtrip(tmp_path):
         paper_ledger.record_plan(path, {"entry": 1}, gate)
 
 
-def test_exchange_label_defaults_to_nepse_but_is_caller_controlled(tmp_path):
-    """The exchange label defaults to NEPSE (the default market) and
-    is set by the caller for any other market — a global call logged
-    without an exchange is labelled NEPSE, so global work must pass
-    its exchange explicitly. See the conflict sweep in
-    docs/positioning-draft.md (C3)."""
-    rec = _write(tmp_path)
-    assert rec["exchange"] == "NEPSE"
+def test_write_call_requires_exchange(tmp_path):
+    """Round 3: exchange is required for writes — a global call
+    logged without one must never be silently labelled NEPSE."""
+    path = tmp_path / "calls.jsonl"
+    no_exchange = {k: v for k, v in CALL.items() if k != "exchange"}
+    with pytest.raises(ValueError):
+        decision_log.write_call(path, no_exchange)
+    with pytest.raises(ValueError):
+        decision_log.write_call(path, {**CALL, "exchange": ""})
+    with pytest.raises(ValueError):
+        decision_log.write_call(path, {**CALL, "exchange": 123})
     rec = _write(tmp_path, exchange="NYSE", symbol="AAPL")
     assert rec["exchange"] == "NYSE"
-    assert rec["symbol"] == "AAPL"
+    assert decision_log.load_calls(path)[0]["exchange"] == "NYSE"
+
+
+def test_load_calls_defaults_legacy_exchange(tmp_path):
+    """Reads of logs written before the exchange requirement still
+    default a missing exchange to NEPSE — the default lives only
+    on the read path, never on writes."""
+    import json
+
+    path = tmp_path / "legacy.jsonl"
+    legacy = {k: v for k, v in CALL.items() if k != "exchange"}
+    legacy["call_id"] = "legacy0000000001"
+    legacy["status"] = "open"
+    path.write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    loaded = decision_log.load_calls(path)
+    assert loaded[0]["exchange"] == "NEPSE"
+
+
+def test_record_plan_requires_exchange(tmp_path):
+    """Round 3: a plan without an exchange label cannot be recorded."""
+    path = tmp_path / "ledger.jsonl"
+    plan = _passing_plan()
+    gate = position_plan.extended_risk_gate(
+        plan, context={"portfolio_value": 10000, "sector_exposure_usd": 0.0,
+                       "typical_daily_volume": 30000})
+    no_exchange = {k: v for k, v in plan.items() if k != "exchange"}
+    with pytest.raises(ValueError):
+        paper_ledger.record_plan(path, no_exchange, gate)
+    with pytest.raises(ValueError):
+        paper_ledger.record_plan(path, {**plan, "exchange": "  "}, gate)
+    rec = paper_ledger.record_plan(
+        path, {**plan, "exchange": "NYSE", "symbol": "AAPL"}, gate)
+    assert rec["exchange"] == "NYSE"
+
+
+def test_list_plans_defaults_legacy_exchange(tmp_path):
+    """Reads of ledgers written before the exchange requirement
+    still default a missing exchange to NEPSE."""
+    import json
+
+    path = tmp_path / "legacy-ledger.jsonl"
+    plan = _passing_plan()
+    gate = position_plan.extended_risk_gate(
+        plan, context={"portfolio_value": 10000, "sector_exposure_usd": 0.0,
+                       "typical_daily_volume": 30000})
+    legacy = {"schema_version": "1.5.0", "recorded_date": "2026-11-07",
+              "symbol": "BNT",
+              "plan": {k: v for k, v in plan.items() if k != "exchange"},
+              "verdict": "PASS", "fingerprint": gate["fingerprint"],
+              "failed_checks": [], "note": "legacy fixture"}
+    path.write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+    loaded = paper_ledger.list_plans(path)
+    assert loaded[0]["exchange"] == "NEPSE"
+    assert loaded[0]["plan"]["exchange"] == "NEPSE"

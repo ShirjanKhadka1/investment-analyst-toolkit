@@ -8,7 +8,7 @@ the script instead.
 python -m toolkit.terminal demo.csv
 ```
 
-Generated: 2026-11-07. The `demo.csv` file is synthetic
+Generated: 2026-11-08. The `demo.csv` file is synthetic
 example data (see the provenance lines at the top of `demo.csv`).
 
 ```text
@@ -16,6 +16,7 @@ investment-analyst-toolkit — terminal dashboard
 Research and education only — not investment advice, never a buy/sell/hold recommendation.
 
 Symbol: DEMO   Bars: 80   Range: 2026-07-20 to 2026-11-06   Last close: 1284.91
+Exchange (assumed): NEPSE — the demo does not detect the market from the CSV; the risk gate below uses the NEPSE default config.
 
 1. Indicator snapshot
    Indicators describe the past; they cannot prove what a price will do next.

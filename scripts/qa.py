@@ -11,6 +11,8 @@ Stdlib only. Gates run the same commands CI runs (see
   secrets      scripts/qa_secrets.py (tree + git history)
   links        scripts/qa_links.py (internal must resolve; external best-effort)
   readme-claim scripts/qa_readme.py (regenerates status.json, checks numbers)
+  counts       scripts/qa_counts.py (pack numbers in the docs must match
+               a fresh recount of the finance-research-agents roster)
   fresh-clone  scripts/qa_fresh_clone.py (clone + demo under 60 s)
 
 Dev tools come from requirements-dev.txt (pinned versions identical
@@ -116,6 +118,7 @@ GATES = [
     ("secrets", _script_gate("qa_secrets.py")),
     ("links", _script_gate("qa_links.py")),
     ("readme-claim", _script_gate("qa_readme.py")),
+    ("counts", _script_gate("qa_counts.py")),
     ("fresh-clone", _script_gate("qa_fresh_clone.py")),
 ]
 

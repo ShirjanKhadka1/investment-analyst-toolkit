@@ -5,6 +5,15 @@ here has been applied to the README, the site (`docs/index.html`),
 either repo description, or the topics. Applying it needs the user's
 approval.
 
+**Round 3 note (docs-positioning branch, 8 Nov 2026):** the wording
+in (a) is being applied on the branch with the Round 3 edits —
+"36 analyst agents" removed from the site, agent counts reconciled
+by `scripts/count_agents.py` (36 = 18 NEPSE + 18 agnostic),
+settlement written as "T+2 (transition date unverified)". The repo
+descriptions and topics in (a) still need the browser route (API
+token has no settings scope) — the exact texts are in the Round 3
+report. This file stays as the proposal record.
+
 ## Why this revision exists
 
 The user looked at the two repo pages and asked: "free open nepse
@@ -81,20 +90,25 @@ with the two statements, in order:
 ### For the finance-research-agents repo description (replaces the current one)
 
 > Free finance research agent pack and skill library — 36 agents,
-> 12 runbooks. NEPSE: 9-agent NEPSE team + 8 sector agents.
-> World: 18 market-agnostic agents (World Market Researcher,
-> Investment Researcher, Valuation Analyst and 15 more) + a global
-> rules team in the companion toolkit. Research only.
+> 12 runbooks. NEPSE: 18 agents (9-agent team + 8 sector agents +
+> Nepal Market Researcher). World: 18 market-agnostic agents + a
+> global rules team in the companion toolkit. Research only.
 
-(The 36 split 18 NEPSE-specific / 18 market-agnostic — counted from
-the roster table in that repo's README, 8 Nov 2026.)
+(The 36 split 18 NEPSE / 18 market-agnostic — counted from the
+roster by `scripts/count_agents.py` in the toolkit; see
+`docs/agents-roster-counts.json`. The NEPSE side is the 9-agent
+NEPSE team + 8 sector agents + Nepal Market Researcher — the
+"9 + 8 = 17" framing omits Nepal Market Researcher, the general
+Nepal market researcher, who is in neither group.)
 
 ### Proposed topics (add; do not remove the Nepal ones)
 
 Toolkit — add: `global-markets`, `etf`, `forex`, `crypto`,
 `sec-edgar`. Keep: `nepse`, `nepal`, and all existing topics.
+Final: 15 live + 5 = 20 topics (GitHub cap 20 — exactly at the
+cap, nothing trimmed).
 Agents — add: `global-markets`, `etf`, `forex`, `crypto`. Keep all
-existing topics.
+existing topics. Final: 11 live + 4 = 15 topics.
 
 ## What stays exactly as it is
 
@@ -118,7 +132,7 @@ Nothing here is a promise; "existing" means the code is on the
 |---|---|---|---|
 | W1 | Market profiles for US, India, UK, crypto, FX, generic (weekdays, session, limits, lot size, settlement, fees/taxes, each with source URL + as-of) | `toolkit/market_profiles.py` (PROFILES, `get_profile`, `profile_config`) | Existing (PR #9) |
 | W2 | SEC EDGAR fundamentals: ticker to CIK, submissions, XBRL companyfacts/concept, 5 req/s throttle, declared User-Agent, URL allowlist by parsed hostname | `toolkit/edgar.py` | Existing (PR #9; allowlist hardened this round) |
-| W3 | Keyless public connectors: Yahoo Finance chart API, CoinGecko, ECB eurofxref, World Bank API v2 | `toolkit/connectors.py`, `toolkit/free_data.py` | Existing; Yahoo reliability from GitHub runners UNVERIFIED — probe staged at `ops/ready-for-browser/yahoo-ci-probe.yml`, not yet run |
+| W3 | Keyless public connectors: Yahoo Finance chart API, CoinGecko, ECB eurofxref, World Bank API v2 | `toolkit/connectors.py`, `toolkit/free_data.py` | Existing; Yahoo verified from GitHub runners — probe #1, 8 Nov 2026, 3/3 OK (SPY n=251, 7203.T n=243, EURUSD=X n=260, all last 2026-11-06; run 42487106087); probe #2, 8 Nov 2026, 2/2 OK (NIFTYBEES.NS n=250 last 2026-11-08, ISF.L n=254 last 2026-11-06; run 42488973219). The VM timeouts were this machine's shared egress IP, not Yahoo. |
 | W4 | Market-agnostic quant: indicators, portfolio weights, covariance, efficient frontier | `toolkit/indicators.py`, `toolkit/quant.py`, `toolkit/portfolio.py` | Existing (main) |
 | W5 | Walk-forward predictive layer that publishes "no edge" when there is none | `toolkit/predictive.py` + `docs/global-evidence.md` (SPY fixture, 251 bars, naive wins, MAE 4.9124) | Existing (PR #9) |
 | W6 | Global rules-mode team: 5 personas — `us_large_cap_fundamentals`, `etf_index`, `fx_macro`, `crypto`, `earnings` | `toolkit/rules_mode.py` v1.4.0 (`GLOBAL_TEAM`, `list_global_personas`, `run_global_rules_team`) | Existing (PR #9) |
@@ -136,9 +150,13 @@ Nothing here is a promise; "existing" means the code is on the
   verifications. If Yahoo fails from runners, global price data has
   no fallback. Fallback is PROPOSED only (opt-in free-key provider
   via repo secret, or CSV snapshots) — not implemented.
-- **G2 — No India/UK ticker verified end to end.** The profiles
-  exist; only SPY/AAPL have live fixtures. No India/UK ticker is
-  claimed as tested.
+- **G2 — India/UK tickers verified from runners, not yet in a
+  live run.** NIFTYBEES.NS (NSE) and ISF.L (LSE) both answered
+  from a GitHub runner on 8 Nov 2026 (probe #2, 2/2 OK:
+  NIFTYBEES.NS n=250 last 2026-11-08, ISF.L n=254 last
+  2026-11-06). They join the watchlist in Round 3; neither has a
+  live fixture or a walk-forward run yet, so both stay
+  experimental until their first verified run.
 - **G3 — No symbol-to-market auto-detection.** Nothing infers the
   market from a symbol: `7203.T` does not auto-select Japan, `AAPL`
   does not auto-select US. The caller passes the profile/exchange
@@ -173,7 +191,7 @@ repo README/description was checked against the code on the branch.
 | 3 | `docs/index.html` `<title>` | "free, open NEPSE-first research terminal" | Not false — NEPSE is first/default — but beside the description it reads NEPSE-only, which is the question the user asked. | "free, open research terminal: NEPSE native, world markets supported". |
 | 4 | Toolkit README opening (lines 1–14) | No global mention; the worked example is "NEPSE-style prices in NPR" | The engine is market-agnostic, but the opening reads NEPSE-only. | The two-statement README opening in (a). |
 | 5 | This draft, round 1 | "9-agent rules team" | The toolkit's rules mode has 6 sections (`run_rules_team`: technical, fundamentals, sentiment, broker_flow, macro, corporate_actions) mirroring the 9-agent NEPSE team — "9-agent rules team" overstates the toolkit by 3. | "6-section rules mode mirroring the 9-agent NEPSE team, plus 5 global personas". |
-| 6 | Agents README, NEPSE Fees & Tax agent (§ NEPSE sector agents) | "circuit ±15%, settlement T+2 — every figure from the user-supplied Nepal frictions of 28 Oct 2026" | Outdated single values: circuit is ±15% only from 20 Apr 2026 (±10% before); settlement T+2 only from Jan 2021 (T+3 before). | "circuit ±15% from 20 Apr 2026 (±10% before), settlement T+2 (T+3 before Jan 2021) — effective-dated rules, see the toolkit's `market_profiles.py`". |
+| 6 | Agents README, NEPSE Fees & Tax agent (§ NEPSE sector agents) | "circuit ±15%, settlement T+2 — every figure from the user-supplied Nepal frictions of 28 Oct 2026" | Outdated single values: circuit is ±15% only from 20 Apr 2026 (±10% before); settlement T+2 with the transition date unverified (the pre-2021 lag was previously published as T+3 — withdrawn 2026-11-08, no official source). | "circuit ±15% from 20 Apr 2026 (±10% before), settlement T+2 (transition date unverified; pre-2017 lag unknown, not T+3) — effective-dated rules, see the toolkit's `market_profiles.py`". |
 | 7 | Agents README (whole file) | No mention of the 5 global rules-mode personas | The world side of the pack is under-described: only the World Market Researcher agent names it. | Add a section naming the 5 personas (`toolkit/rules_mode.py` v1.4.0) and the `macro-to-company` runbook. |
 | 8 | Agents repo description (live, via API) | "36 agents, 12 runbooks" | True, but says nothing about the scope split — a reader cannot tell it is not NEPSE-only. | The separated agents description in (a): 18 NEPSE / 18 market-agnostic. |
 

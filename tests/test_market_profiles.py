@@ -217,13 +217,20 @@ def test_nepse_preopen_and_breaker_are_effective_dated():
     )
 
 
-def test_nepse_settlement_lag_is_effective_dated():
+def test_nepse_settlement_transition_is_unverified():
     nepse = get_profile("nepse")
-    # T+2 current (CDSC Settlement Procedure, official); T+3 before
-    # the full T+2 cycle (Magh 2077 / Jan 2021).
-    assert nepse.settlement_lag_on("2020-12-31") == 3
-    assert nepse.settlement_lag_on("2021-01-15") == 2
+    # T+2 is the current standard (CDSC Settlement Procedure,
+    # official). The T+3 claim was withdrawn 2026-11-08 for lack of
+    # an official source, and T+2 is treated as in force from the
+    # CDSC instruction of Asadh 21, 2074 (2017-07-05), which put T+2
+    # payment settlement in place — payment leg only. The pre-2017
+    # lag is UNKNOWN (None), not T+3, and no full-cycle transition
+    # date is published.
+    assert nepse.settlement_lag_on("2017-07-04") is None
+    assert nepse.settlement_lag_on("2017-07-05") == 2
     assert nepse.settlement_lag_on("2026-11-08") == 2
+    assert "T+3" not in nepse.settlement_note
+    assert "transition date unverified" in nepse.settlement_note
 
 
 def test_profile_config_on_a_date_carries_the_rules_in_force():

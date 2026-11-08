@@ -1,0 +1,16 @@
+{
+  "source": "live roster",
+  "agents_json_url": "https://raw.githubusercontent.com/ShirjanKhadka1/finance-research-agents/main/agents.json",
+  "status_json_url": "https://raw.githubusercontent.com/ShirjanKhadka1/finance-research-agents/main/ops/status.json",
+  "as_of": "2026-11-08",
+  "agents_total": 36,
+  "agents_nepse": 18,
+  "agents_agnostic": 18,
+  "nepse_team": 9,
+  "nepse_sector": 8,
+  "nepse_other": 1,
+  "runbooks": 12,
+  "templates": 8,
+  "agents_json_entries": 37,
+  "guide_excluded": "agents/WHEN-TO-USE.md"
+}
