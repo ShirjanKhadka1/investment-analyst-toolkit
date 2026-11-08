@@ -406,7 +406,7 @@ is supplied by the caller and every check fails closed when it is
 missing. A PASS from either gate is not a recommendation.
 `toolkit/paper_ledger.py` records hypothetical plans and their gate
 verdicts (fingerprint included) — paper only, no orders, no
-execution. Tests: `tests/test_decision_log.py` (10 tests, covering
+execution. Tests: `tests/test_decision_log.py` (11 tests, covering
 1.4 and 1.5 on synthetic fixtures).
 
 ## Research report pipeline (Engine 1.9)
@@ -467,7 +467,7 @@ refreshes `data/derived/*.json` (indicator snapshot, screening
 matches, Time-Machine odds) from the repo's CSVs with `as_of`
 provenance and a stale flag. Both scripts exit non-zero with a clear
 error on failure, so a scheduled run can alert on it. Tests:
-`tests/test_connectors.py` (41 tests), `tests/test_data_health.py`
+`tests/test_connectors.py` (43 tests), `tests/test_data_health.py`
 (17 tests, including fixtures cut from real responses fetched
 2026-11-07 — see `tests/fixtures/SOURCES.md`), and
 `tests/test_refresh_derived.py` (8 tests), all offline.
@@ -482,7 +482,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 548/548 tests passing (2026-11-08, fresh clone, Python 3.12, pytest 9.2.0): 543 before + 5 new SPY evidence tests.
+Tests: 577/577 tests passing (2026-11-08, fresh clone, Python 3.12, pytest 9.2.0): 548 before + 29 new (12 EDGAR URL-allowlist + 16 effective-dated NEPSE rules + 1 exchange-label).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a
