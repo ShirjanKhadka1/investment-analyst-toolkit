@@ -91,28 +91,50 @@ mapped profile). Fields, logged **before** the outcome is known:
   as a minimum, and 5 trading days always span at least 5 calendar
   days, so the check holds — but the recorded horizon is trading
   days, and the settlement date is the call date + 5 trading days
-  on the ticker's profile calendar.
-- `entry_close` — the first close **after** the call date
-  (point-in-time reference price; same-day prices never leak in).
+  on the ticker's profile calendar (see
+  `toolkit/trading_calendar.py`).
+- `entry_close` — the close of the **decision day**. The daily run
+  happens after the close (`scripts/track_record_daily.py` runs at
+  22:00 UTC), so the decision-day close is known at decision time
+  and is point-in-time safe: the call uses only bars up to and
+  including its decision date. (The generic `decision_log` field
+  is caller-supplied; the track-record engine always supplies the
+  decision-day close.)
+- `rule_id`, `rule_version`, `rule_code_hash` — the pre-registered
+  direction rule that produced the direction
+  (`docs/direction-rules.md`): its id, its version, and the git
+  blob hash of `toolkit/direction_rules.py` at logging time.
+- `confidence` — 0.5, a neutral prior (see
+  `docs/direction-rules.md`): the rules state no probability.
+- `prev_5d_return` — the return over the 5 trading days before the
+  call date, for the naive baseline (None when fewer than 6 closes
+  are visible).
 - `confidence` — the stated probability the direction is right,
   in [0, 1].
 - `sources` — the data sources used (e.g. `yahoo`, `sec-edgar`).
 - `thesis` — one paragraph: what the persona saw.
 
-At most one call per ticker per day, from that ticker's persona. If
-a persona gives no direction on a day (neutral), no call is logged.
-A call is never backfilled, never edited after logging, and never
-deleted. A failed fetch is recorded as a missed day, never filled in.
+At most one call per ticker per 5 trading days, non-overlapping:
+a new call is due only when the previous call's horizon has passed
+(previous decision date + 5 trading days ≤ today). If a rule gives
+no direction on a due day (an exact tie, or too few visible bars),
+no call is logged. A call is never backfilled, never edited after
+logging, and never deleted. A failed fetch is recorded as a missed
+day, never filled in.
 
-**Not yet defined — activation blocker.** The rules team returns
-structured sections with discussion flags, not a direction verdict
-(`toolkit/rules_mode.py`: "flags are discussion prompts, not
-verdicts"). The rule that maps a persona's sections to UP / DOWN /
-neutral does not exist yet anywhere in the codebase. It must be
-specified, implemented in `scripts/track_record_daily.py`, and
-tested — with its exact thresholds written here — before the daily
-workflow is deployed. No direction may be invented by the workflow
-to fill the gap.
+**Direction rules — defined (Round 4).** The direction comes from
+the pre-registered rules in `docs/direction-rules.md`
+(`sma50_trend`, `mom20_sign`), implemented in
+`toolkit/direction_rules.py` and run by
+`scripts/track_record_daily.py`. Each rule has a rule_id, a
+version, and its code hash recorded in every logged call. The
+Round 3 blocker ("no rule maps a persona's sections to a
+direction") is closed by changing the mechanism: direction comes
+from the price rules, not from persona discussion flags — the
+persona recorded on a call is attribution, not the source of the
+direction. The remaining activation blockers are the watchlist
+approval itself and the deployment of the staged workflow; the
+script exists and is tested.
 
 ### Settlement
 
@@ -125,11 +147,36 @@ prices: `realised_return = close_at_horizon / entry_close − 1`.
 - Settlement uses the ticker's own price series. The realised
   return of the ticker's market index over the same window is
   recorded alongside where an index exists (S&P 500 for SPY/AAPL,
-  NIFTY 50 for NIFTYBEES.NS, FTSE 100 for ISF.L, FTSE Global All
-  Cap for VT; none for FX/crypto), with the index source labelled.
-  Settlement against an unnamed index series is refused.
+  NIFTY 50 for NIFTYBEES.NS, FTSE 100 for ISF.L; none for FX/crypto,
+  and none for VT — there is no Yahoo series for the FTSE Global
+  All Cap). Where there is no index, the settlement records
+  `index_return` 0.0 with a labelled `no-index` source — never an
+  invented index return. Settlement against an unnamed index series
+  is refused.
 - A call settles only after its horizon has passed; settling early
   is refused by `decision_log.settle_call`.
+
+### Special-session rule
+
+A session counts as a trading day when the exchange traded and
+published a close — that is, when a bar for that date exists in the
+fetched series. A bar dated on a non-standard day therefore counts,
+and the profile weekday calendar never removes a real bar. A
+calendar trading day with no bar (a missed fetch) never counts: it
+is recorded as a missed day and settlement waits instead of
+silently using the next bar's close. Implemented in
+`toolkit/trading_calendar.py` (`is_trading_day`, with
+`observed_dates` = the fetched bar dates).
+
+Worked example: NIFTYBEES.NS has a Yahoo bar dated 2026-11-08, a
+Sunday — NSE's Diwali Muhurat session (Diwali 2026 fell on Sunday
+8 November 2026; NSE circular NSE/CMTR/76941, 19 Oct 2026). For a
+call decided Friday 2026-11-06, the trading days after are 8 Nov
+(Muhurat session), 9 Nov, 11 Nov (10 Nov is the
+Diwali-Balipratipada holiday — `data/holidays/india.json`), 12 Nov,
+13 Nov — so the call settles **13 November 2026**. Without the 8
+Nov bar it would settle 16 November. `tests/test_track_record.py`
+proves the settlement code follows the rule for that bar.
 
 ### Scoring — two baselines, one interval, one minimum
 
@@ -144,22 +191,30 @@ apples-to-apples):
 - **Buy-and-hold baseline:** always predicts UP (holding the
   ticker). This is the "did the model beat just owning it?" check.
 
-Report, for the model and for each baseline: **n** (settled calls)
-and the **95% Wilson score interval** on the hit rate. With
-p̂ = hits / n and z = 1.96:
+Report, for the model and for each baseline, **per ticker and
+pooled**: **n** (settled calls) and the **95% Wilson score
+interval** on the hit rate. With p̂ = hits / n and z = 1.96:
 
 - centre = (p̂ + z² / (2n)) / (1 + z² / n)
 - half-width = z · √(p̂(1 − p̂) / n + z² / (4n²)) / (1 + z² / n)
 - interval = [centre − half-width, centre + half-width]
 
-**No headline hit rate until at least 30 settled calls.** Below
-n = 30 the page shows n, the Wilson interval and the baselines'
-intervals — but no "hit rate X%" headline figure. The interval is
-shown because it honestly displays the uncertainty; the headline
-percentage is what is withheld. At n ≥ 30 the headline hit rate
-is shown with its interval, for the model and both baselines.
-Losses stay in the record alongside wins; the badge counts settled
-calls only; open calls never count as wins.
+**No headline hit rate until at least 100 settled calls** (pooled
+n ≥ 100). Below that the page shows n and the Wilson intervals —
+but no "hit rate X%" headline figure. A point-estimate percentage
+appears only in the pooled headline, once the 100-call minimum is
+met; per-ticker rates are reported with n and intervals only. The
+interval is shown because it honestly displays the uncertainty;
+the headline percentage is what is withheld. At n ≥ 100 the
+headline hit rate is shown with its interval, for the model and
+both baselines. Losses stay in the record alongside wins; the
+badge counts settled calls only; open calls never count as wins.
+
+**Tickers are correlated, so pooled intervals understate
+uncertainty:** seven tickers moving together are not seven
+independent trials. The pooled interval is a lower bound on the
+uncertainty, not a statement about independent calls — the page
+prints this caveat with the pooled numbers.
 
 ### Where results live
 
@@ -190,4 +245,8 @@ main and never merges anything.
 The staged daily workflow (`ops/ready-for-browser/daily-track-record.yml`)
 is deployed via the browser route (the API token lacks workflow
 scope) and the first daily run starts. Deploying it needs the user's
-approval of this watchlist first.
+approval of this watchlist first. The runner script
+(`scripts/track_record_daily.py`) and the direction rules
+(`docs/direction-rules.md`) already exist and are tested — the
+workflow deployment and the watchlist approval are the remaining
+activation steps.

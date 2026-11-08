@@ -39,6 +39,7 @@ __all__ = [
     "render_scoreboard_md",
     "scoreboard",
     "settle_call",
+    "update_call",
     "write_call",
 ]
 
@@ -144,6 +145,51 @@ def _write_all(path, calls):
     with path.open("w", encoding="utf-8") as fh:
         for call in calls:
             fh.write(json.dumps(call, sort_keys=True, default=str) + "\n")
+
+
+# Fields the daily track-record script may add to a SETTLED call after
+# settlement: the baseline outcomes, computed from the same window.
+# Nothing else may be updated — a call's identity, direction, entry
+# and horizon are immutable once logged.
+_UPDATEABLE = ("naive_expected", "naive_hit", "bnh_hit")
+
+
+def update_call(path, call_id, **fields):
+    """Add baseline outcomes to an already-settled call.
+
+    Only ``naive_expected`` (``"up"``/``"down"``), ``naive_hit`` and
+    ``bnh_hit`` (booleans) may be set, and only on a settled call.
+    Refuses: unknown call_id, an open call, any other field, a bad
+    naive direction. Returns the updated call. A call is never
+    backfilled this way — baselines are scored outcomes, not edits
+    to the prediction.
+    """
+    unknown = sorted(set(fields) - set(_UPDATEABLE))
+    if unknown:
+        raise ValueError(f"only {_UPDATEABLE} may be updated, "
+                         f"not {unknown}")
+    if "naive_expected" in fields \
+            and fields["naive_expected"] not in ("up", "down"):
+        raise ValueError("naive_expected must be 'up' or 'down', got "
+                         f"{fields['naive_expected']!r}")
+    for name in ("naive_hit", "bnh_hit"):
+        if name in fields and not isinstance(fields[name], bool):
+            raise ValueError(f"{name} must be a boolean, "
+                             f"got {fields[name]!r}")
+    calls = load_calls(path)
+    target = None
+    for call in calls:
+        if call.get("call_id") == call_id:
+            target = call
+            break
+    if target is None:
+        raise ValueError(f"no call with call_id {call_id!r} in this log")
+    if target.get("status") != "settled":
+        raise ValueError(f"baselines are scored outcomes — call {call_id} "
+                         "is still open")
+    target.update(fields)
+    _write_all(path, calls)
+    return target
 
 
 def settle_call(path, call_id, realised_close, entry_close,
