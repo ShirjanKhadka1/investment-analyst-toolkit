@@ -7,6 +7,14 @@
 # timed out for SPY, 7203.T, EURUSD=X and BTC-USD while a browser
 # User-Agent returned 200 in ~1s), a runner may behave differently.
 #
+# Round 3 change (8 Nov 2026): the symbol list is a workflow_dispatch
+# INPUT, not hardcoded. Default is the original three symbols
+# (SPY, 7203.T, EURUSD=X); dispatch with any comma-separated list to
+# probe other candidates — e.g. "NIFTYBEES.NS,ISF.L" for the Round 3
+# India/UK watchlist candidates. First probe (8 Nov 2026) from a
+# runner: PROBE 3/3 OK (SPY n=251, 7203.T n=243, EURUSD=X n=260,
+# all last 2026-11-06) — Yahoo answers from runners, unlike this VM.
+#
 # Manual dispatch ONLY (workflow_dispatch, no schedule, no
 # push/pull_request triggers): this is a measurement, not a gate.
 # The job always exits 0 and prints a per-symbol OK/FAIL line with
@@ -14,12 +22,20 @@
 # data, not a broken build. Do NOT turn it into a required check.
 #
 # Deploy: copy this file to .github/workflows/yahoo-ci-probe.yml
-# (browser route — the API token has no workflow scope), then
-# dispatch it from the Actions tab and read the log.
+# (browser route — the API token has no workflow scope). A
+# workflow_dispatch workflow only registers once its file is on the
+# default branch: the file must exist on main to be dispatchable.
+# Then dispatch it from the Actions tab and read the log.
 name: Yahoo CI probe
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Yahoo symbols to probe"
+        required: false
+        default: "SPY,7203.T,EURUSD=X"
+        type: string
 
 permissions:
   contents: read
@@ -33,12 +49,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Probe Yahoo for 3 daily series
+      - name: Probe Yahoo for daily series
+        env:
+          PROBE_SYMBOLS: ${{ inputs.symbols }}
         run: |
           python3 - <<'PYEOF'
+          import os
           from toolkit.connectors import fetch_prices
 
-          SYMBOLS = ["SPY", "7203.T", "EURUSD=X"]
+          SYMBOLS = [s.strip() for s in
+                     os.environ.get("PROBE_SYMBOLS", "SPY,7203.T,EURUSD=X")
+                     .split(",") if s.strip()]
           ok = 0
           for symbol in SYMBOLS:
               try:
