@@ -11,7 +11,11 @@ import sys
 from pathlib import Path
 
 import pytest
-import tomllib
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11: tomllib is stdlib from 3.11
+    tomllib = None
 
 from toolkit import mcp_server
 
@@ -47,6 +51,8 @@ def test_initialize_handshake():
         "investment-analyst-toolkit-mcp"
 
 
+@pytest.mark.skipif(
+    tomllib is None, reason="tomllib is stdlib from Python 3.11")
 def test_server_version_matches_pyproject():
     pyproject = tomllib.loads(
         (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
