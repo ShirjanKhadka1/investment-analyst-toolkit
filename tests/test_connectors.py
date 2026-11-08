@@ -222,16 +222,40 @@ def test_evaluate_freshness_weekend_does_not_go_stale():
         kind="stock_daily")["status"] == "STALE"
 
 
-def test_evaluate_freshness_nepse_trades_sunday():
-    # NEPSE's week is Sun–Thu: Thursday data checked Sunday is 1
-    # trading day old (Sunday is a trading day), so FRESH; Wednesday
-    # data checked Sunday is 2 trading days old (Thu + Sun) — STALE.
-    sunday = datetime.date(2026, 11, 8)
+def test_evaluate_freshness_nepse_week_is_effective_dated():
+    # NEPSE traded Sun-Thu until 2026-04-05, Mon-Fri from 2026-04-06
+    # (board decision 22 Chaitra 2082). A Friday bar after the change
+    # IS a trading day; a Sunday bar after it is NOT.
+    sunday = datetime.date(2026, 4, 12)
+    monday = datetime.date(2026, 4, 13)
+    # Friday data checked Sunday: no trading day passed (Sat+Sun
+    # are not trading days now) — FRESH with age 0.
+    judged = evaluate_freshness(
+        "2026-04-10", 86400, today=sunday, kind="nepse_csv_daily")
+    assert judged["status"] == "FRESH"
+    assert judged["age_trading_days"] == 0
+    # The same Friday data checked Monday: Monday is 1 trading day.
+    judged = evaluate_freshness(
+        "2026-04-10", 86400, today=monday, kind="nepse_csv_daily")
+    assert judged["status"] == "FRESH"
+    assert judged["age_trading_days"] == 1
+    # Thursday data checked Monday: Friday AND Monday passed — STALE.
     assert evaluate_freshness(
-        "2026-11-05", 86400, today=sunday,
+        "2026-04-09", 86400, today=monday,
+        kind="nepse_csv_daily")["status"] == "STALE"
+    # Across the boundary: Thursday 2 Apr checked Sunday 5 Apr —
+    # Sunday WAS a trading day then, so 1 trading day old, FRESH.
+    assert evaluate_freshness(
+        "2026-04-02", 86400, today=datetime.date(2026, 4, 5),
+        kind="nepse_csv_daily")["age_trading_days"] == 1
+    # And the old week is gone for current dates: Thursday 5 Nov
+    # 2026 checked Sunday 8 Nov is 1 trading day old (Friday only),
+    # Wednesday 4 Nov checked Sunday is 2 (Thu + Fri) — STALE.
+    assert evaluate_freshness(
+        "2026-11-05", 86400, today=datetime.date(2026, 11, 8),
         kind="nepse_csv_daily")["status"] == "FRESH"
     assert evaluate_freshness(
-        "2026-11-04", 86400, today=sunday,
+        "2026-11-04", 86400, today=datetime.date(2026, 11, 8),
         kind="nepse_csv_daily")["status"] == "STALE"
 
 
@@ -517,3 +541,55 @@ def test_list_connectors_covers_all_sources_with_terms():
     csv_row = rows[0]
     assert "CSV-only" in csv_row["licence_terms"]
     assert "TO VERIFY" in rows[1]["licence_terms"]
+
+
+# ---------------------------------------------------------------------------
+# Freshness with a holiday calendar (8 Nov 2026)
+# ---------------------------------------------------------------------------
+
+def test_evaluate_freshness_dashain_closure_is_not_stale():
+    from toolkit.holidays import load_holidays
+
+    calendar = load_holidays("nepse")
+    # Last data Fri 16 Oct, checked Mon 26 Oct: without holidays this
+    # is 6 trading days old (Mon 19-Fri 23 + Mon 26) — STALE. With the
+    # Dashain calendar the 19-23 days are holidays, so it is FRESH.
+    without = evaluate_freshness(
+        "2026-10-16", 86400, today=datetime.date(2026, 10, 26),
+        kind="nepse_csv_daily")
+    assert without["status"] == "STALE"
+    assert without["age_trading_days"] == 6
+    with_cal = evaluate_freshness(
+        "2026-10-16", 86400, today=datetime.date(2026, 10, 26),
+        kind="nepse_csv_daily", holidays=calendar)
+    assert with_cal["status"] == "FRESH"
+    assert with_cal["age_trading_days"] == 0
+    assert with_cal["unknown_days"] == 1  # Mon 26 Oct, outside coverage
+
+
+def test_evaluate_freshness_unknown_days_degrade_to_unknown_not_stale():
+    from toolkit.holidays import HolidayCalendar
+
+    # A calendar covering 2-6 Nov 2026 with no holidays listed.
+    calendar = HolidayCalendar(
+        market="nepse", entries=(),
+        covered_ranges=((datetime.date(2026, 11, 2),
+                         datetime.date(2026, 11, 6)),))
+    # Last data Fri 30 Oct, checked Wed 4 Nov: Mon-Wed are covered
+    # and not holidays, so 3 known trading days — genuinely STALE.
+    stale = evaluate_freshness(
+        "2026-10-30", 86400, today=datetime.date(2026, 11, 4),
+        kind="nepse_csv_daily", holidays=calendar)
+    assert stale["status"] == "STALE"
+    assert stale["age_trading_days"] == 3
+    # The same gap over days the calendar does NOT cover: the
+    # verdict depends on unknown days, so UNKNOWN, never STALE.
+    unknown = evaluate_freshness(
+        "2026-10-30", 86400, today=datetime.date(2026, 11, 4),
+        kind="nepse_csv_daily",
+        holidays=HolidayCalendar(market="nepse", entries=(),
+                                 covered_ranges=()))
+    assert unknown["status"] == "UNKNOWN"
+    assert unknown["age_trading_days"] == 0
+    assert unknown["age_trading_days_max"] == 3
+    assert unknown["unknown_days"] == 3

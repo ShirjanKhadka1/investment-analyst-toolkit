@@ -17,22 +17,30 @@ experimental until Step 4 evidence lands.
 single-share orders (odd lots); a round lot of 100 shares is a
 quoting convention, not a minimum.
 
-NEPSE disputes recorded here (not silently resolved):
-- Trading week: this repo has used Sun-Thu since the programme began
-  (user-supplied schedule, 28 Oct 2026). Multiple sources say NEPSE
-  moved to Mon-Fri in April 2026 (board decision 2082 Chaitra 23,
-  after Sunday became a public holiday). The profile keeps Sun-Thu
-  because existing tests pin that behaviour byte-identical; the
-  dispute is flagged and the Mon-Fri evidence is cited. Verify
-  against NEPSE's own calendar before changing it — it changes
-  freshness judgements.
-- Settlement: the user-supplied schedule says T+2; at least one guide
-  says T+3. The profile keeps T+2 (the sourced schedule) and flags
-  the dispute.
+NEPSE rules are effective-dated (verified 8 Nov 2026; see the
+profile's ``*_rules`` fields and ``sources``):
+- Trading week Sun-Thu until 2026-04-05, Mon-Fri from 2026-04-06
+  (NEPSE board decision 22 Chaitra 2082). Hours 11:00-15:00 unchanged.
+- Daily price limit 10% before 2026-04-20, 15% from (Securities
+  Trading Operations (Fourth Amendment) Bylaws, 2082, SEBON-approved);
+  pre-open band 2% -> 5% on the same date.
+- Index circuit breaker: three-tier (4% -> 20-min halt, 5% -> 40-min
+  halt, 6% -> rest of day) before 2026-04-20, two-tier (5% -> 15-min
+  halt, 8% -> suspend rest of day) from. The first-tier window is
+  reported as "first two hours" by most sources and "first hour" by
+  one; the bylaws TEXT itself was not obtained, so the window is
+  flagged as disputed in the profile.
+- Settlement T+2 (CDSC Settlement Procedure, official); T+3 before
+  Jan 2021 (full cycle moved to T+2 in Magh 2077, per biznessvue
+  citing ShareSansar; an earlier CDSC instruction of Asadh 21, 2074
+  concerned payment timing). Exact transition day unverified.
+Freshness, the Time Machine and the risk gate must use the rule in
+force on EACH BAR'S DATE (``*_on(day)``), never today's rule.
 """
 
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass, field
 
 from .nepal_frictions import (
@@ -44,6 +52,31 @@ from .nepal_frictions import (
     DP_CHARGE_FLAT,
     SEBON_FEE_RATE,
 )
+
+
+def _parse_day(value):
+    """A ``datetime.date`` or an ISO ``YYYY-MM-DD`` string -> date."""
+    if isinstance(value, datetime.date):
+        return value
+    return datetime.date.fromisoformat(str(value))
+
+
+def _rule_on(rules, day):
+    """Value of the dated rule in force on ``day``.
+
+    ``rules`` is a tuple of ``(effective_from, value)`` pairs in
+    ascending order, the first effective from ``datetime.date.min``
+    (the rule before any change). Returns the value of the last
+    rule whose effective date is on or before ``day``.
+    """
+    day = _parse_day(day)
+    value = rules[0][1]
+    for effective_from, candidate in rules:
+        if day >= effective_from:
+            value = candidate
+        else:
+            break
+    return value
 
 __all__ = [
     "KIND_PROFILES",
@@ -97,7 +130,58 @@ class MarketProfile:
     status: str = "experimental"
     # Open disputes / caveats about this profile's numbers.
     disputes: tuple[str, ...] = ()
+    # Free-form notes (e.g. related rule changes not modelled).
+    notes: tuple[str, ...] = ()
+    # Effective-dated rules. Each is a tuple of (effective_from,
+    # value) pairs, ascending, first from datetime.date.min. When
+    # None, the single plain field above is the rule for every date.
+    trading_weekdays_rules: tuple | None = None
+    circuit_limit_up_rules: tuple | None = None
+    circuit_limit_down_rules: tuple | None = None
+    preopen_limit: float | None = None
+    preopen_limit_rules: tuple | None = None
+    index_breaker: tuple | None = None
+    index_breaker_rules: tuple | None = None
+    settlement_lag_rules: tuple | None = None
 
+    def trading_weekdays_on(self, day):
+        """Trading weekdays (Mon=0..Sun=6) in force on ``day``."""
+        if self.trading_weekdays_rules is not None:
+            return _rule_on(self.trading_weekdays_rules, day)
+        return self.trading_weekdays
+
+    def circuit_limit_up_on(self, day):
+        """Daily up-limit fraction in force on ``day``."""
+        if self.circuit_limit_up_rules is not None:
+            return _rule_on(self.circuit_limit_up_rules, day)
+        return self.circuit_limit_up
+
+    def circuit_limit_down_on(self, day):
+        """Daily down-limit fraction in force on ``day``."""
+        if self.circuit_limit_down_rules is not None:
+            return _rule_on(self.circuit_limit_down_rules, day)
+        return self.circuit_limit_down
+
+    def preopen_limit_on(self, day):
+        """Pre-open band fraction in force on ``day`` (None = unknown)."""
+        if self.preopen_limit_rules is not None:
+            return _rule_on(self.preopen_limit_rules, day)
+        return self.preopen_limit
+
+    def index_breaker_on(self, day):
+        """Index circuit-breaker tiers in force on ``day``.
+
+        Each tier is ``(trigger_fraction, action)``; None = unknown.
+        """
+        if self.index_breaker_rules is not None:
+            return _rule_on(self.index_breaker_rules, day)
+        return self.index_breaker
+
+    def settlement_lag_on(self, day):
+        """Settlement lag in business days in force on ``day``."""
+        if self.settlement_lag_rules is not None:
+            return _rule_on(self.settlement_lag_rules, day)
+        return self.settlement_lag_business_days
 
 class UnknownMarketError(ValueError):
     """Raised when a market key has no profile."""
@@ -109,35 +193,91 @@ def _src(url, as_of=_AS_OF):
 
 _NEPSE_SOURCES = {
     "trading_weekdays": _src(
+        "https://sharesansar.com/newsdetail/nepal-stock-exchange-opens-monday-to-friday-under-new-government-timings-2026-04-08",
+        "2026-04-08"),
+    "trading_weekdays_2": _src(
+        "https://fiscalnepal.com/2026/04/06/25407", "2026-04-06"),
+    "trading_weekdays_3": _src(
         "https://wilson.com.np/nepse-online-trading/", "2026-10-22"),
     "session": _src(
         "https://wilson.com.np/nepse-online-trading/", "2026-10-22"),
     "fees": _src("user-supplied rate-schedule screenshot, 28 Oct 2026"),
-    "circuit": _src("user-supplied rate-schedule screenshot, 28 Oct 2026"),
-    "settlement": _src("user-supplied rate-schedule screenshot, 28 Oct 2026"),
+    "circuit": _src(
+        "https://www.fiscalnepal.com/2026/04/17/25634/nepse-expands-daily-price-movement-limit-to-15-introduces-new-circuit-breaker-rules/",
+        "2026-04-17"),
+    "circuit_2": _src(
+        "https://www.newbusinessage.com/news/48267/nepse-raises-daily-price-band-to-15--revises-circuit-breaker-rules/",
+        "2026-04-20"),
+    "circuit_3": _src(
+        "https://kharchapatra.com/blog/nepse-settlement-t2-circuit-breaker-nepal",
+        "2026-11-08"),
+    "breaker_old_tiers": _src(
+        "https://nepalytix.com/blog/nepse-should-not-close-for-nine-days-every-dashain",
+        "2026-11-08"),
+    "settlement": _src(
+        "https://cdsc.com.np/cmsettlementprocedure", "2026-11-08"),
+    "settlement_history": _src(
+        "https://www.biznessvue.com/t1-settlement-nepse/", "2026-11-08"),
     "weekday_dispute_mon_fri": _src(
         "https://punji.app/learn/nepse-trading-hours", "2026-09-25"),
-    "weekday_dispute_mon_fri_2": _src(
-        "https://markethours.io/market-holidays/nepse", "2026-11-08"),
-    "settlement_dispute_t3": _src(
-        "https://www.arthneeti.org/nepse-investing-guide.pdf", "2026-11-08"),
 }
 
 NEPSE = MarketProfile(
     key="nepse",
     name="NEPSE (Nepal Stock Exchange)",
     currency="NPR",
-    trading_weekdays=(6, 0, 1, 2, 3),  # Sun-Thu; DISPUTED, see below.
+    trading_weekdays=(0, 1, 2, 3, 4),  # Mon-Fri, current (from 2026-04-06).
+    trading_weekdays_rules=(
+        (datetime.date.min, (6, 0, 1, 2, 3)),  # Sun-Thu until 2026-04-05.
+        (datetime.date(2026, 4, 6), (0, 1, 2, 3, 4)),
+    ),
     session_open="11:00",
     session_close="15:00",
     timezone="Asia/Kathmandu",
-    holidays_source="https://nepalstock.com.np (NEPSE notices; not hard-coded)",
+    holidays_source="https://nepalstock.com.np (NEPSE notices); repo copy: "
+                    "data/holidays/nepse.json — Dashain 2083 only, "
+                    "coverage incomplete",
     circuit_limit_up=CIRCUIT_LIMIT,
     circuit_limit_down=CIRCUIT_LIMIT,
-    circuit_note="±15% of the previous close in a day (user-supplied, 28 Oct 2026).",
+    circuit_limit_up_rules=(
+        (datetime.date.min, 0.10),  # 10% until 2026-04-19.
+        (datetime.date(2026, 4, 20), 0.15),
+    ),
+    circuit_limit_down_rules=(
+        (datetime.date.min, 0.10),
+        (datetime.date(2026, 4, 20), 0.15),
+    ),
+    circuit_note="±15% of the previous close in a day from 2026-04-20; "
+                 "±10% before (Fourth Amendment Bylaws, 2082, "
+                 "SEBON-approved).",
+    preopen_limit=0.05,
+    preopen_limit_rules=(
+        (datetime.date.min, 0.02),  # 2% until 2026-04-19.
+        (datetime.date(2026, 4, 20), 0.05),
+    ),
+    index_breaker=(
+        (0.05, "15-minute halt if within first two hours"),
+        (0.08, "suspend rest of day"),
+    ),
+    index_breaker_rules=(
+        (datetime.date.min, (
+            (0.04, "20-minute halt"),
+            (0.05, "40-minute halt after reopening"),
+            (0.06, "suspend rest of day"),
+        )),
+        (datetime.date(2026, 4, 20), (
+            (0.05, "15-minute halt if within first two hours"),
+            (0.08, "suspend rest of day"),
+        )),
+    ),
     lot_size=None,  # not in the sourced schedule; do not guess.
     settlement_lag_business_days=2,
-    settlement_note="T+2 as standard (user-supplied, 28 Oct 2026); broker 58 offers T+1.",
+    settlement_lag_rules=(
+        (datetime.date.min, 3),  # T+3 until the full T+2 cycle.
+        (datetime.date(2021, 1, 15), 2),  # Magh 1, 2077 (see disputes).
+    ),
+    settlement_note="T+2 as standard (CDSC Settlement Procedure, official, "
+                    "2026-11-08); T+3 before Jan 2021. Broker 58 offers T+1.",
     fees={
         "brokerage_slabs": {
             "value": BROKERAGE_SLABS,
@@ -160,17 +300,28 @@ NEPSE = MarketProfile(
     },
     sources=_NEPSE_SOURCES,
     status="tested",
+    notes=(
+        ("Same amendment (Fourth Amendment Bylaws, 2082, from 2026-04-20) "
+         "also widened the order-placement range from 2% to 3% (Merolagani "
+         "infographic of the amendment, 2026-04-20); not modelled — the "
+         "exact base the 3% applies to is not stated in the reports seen."),
+    ),
     disputes=(
         (
-            "Trading week: Sun-Thu here (user-supplied schedule, 28 Oct 2026), "
-            "but several sources say NEPSE moved to Mon-Fri in April 2026 "
-            "(board decision 2082 Chaitra 23; punji.app 2026-09-25, "
-            "markethours.io 2026-11-08). Verify against NEPSE's own calendar "
-            "before changing — it changes freshness judgements."
+            "Index breaker, first-tier window: most reports say the 5% "
+            "halt applies 'within the first two hours' (fiscalnepal, "
+            "newbusinessage, kharchapatra, wilson); one report says "
+            "'first hour'. The bylaws TEXT itself was not obtained, so "
+            "the two-tier numbers are from corroborated reports, not "
+            "from the instrument. Do not state the window as settled."
         ),
         (
-            "Settlement: T+2 here (user-supplied schedule); at least one guide "
-            "says T+3 (arthneeti.org NEPSE guide). Verify before relying on it."
+            "Settlement transition: the full T+2 cycle is dated to Magh "
+            "2077 (Jan-Feb 2021, biznessvue citing ShareSansar); the "
+            "rule uses Magh 1, 2077 = 2021-01-15 as the boundary, exact "
+            "day unverified. An earlier CDSC instruction (Asadh 21, "
+            "2074 / Jul 2017) required payment within T+2; it is not "
+            "the full-cycle date."
         ),
     ),
 )
@@ -428,7 +579,7 @@ def default_profile():
     return NEPSE
 
 
-def profile_config(profile, base=None):
+def profile_config(profile, base=None, on=None):
     """Derive a risk-gate config from a profile.
 
     The gate's 16 checks never change; only the config values they
@@ -437,6 +588,13 @@ def profile_config(profile, base=None):
     values are whatever currency the config is in). NEPSE derives
     exactly DEFAULT_RESEARCH_CONFIG, so the default path is
     byte-identical.
+
+    ``on`` is a date (or ISO string) the config applies to: when
+    given, the config also carries the trading rules in force on
+    that date — trading weekdays, circuit limits, pre-open band,
+    index-breaker tiers and settlement lag — so a plan dated before
+    a rule change is judged by the old rule, not today's. When
+    ``on`` is None, only currency/market are set (unchanged).
     """
     from .position_plan import DEFAULT_RESEARCH_CONFIG
 
@@ -445,4 +603,11 @@ def profile_config(profile, base=None):
     cfg = dict(DEFAULT_RESEARCH_CONFIG if base is None else base)
     cfg["currency"] = profile.currency
     cfg["market"] = profile.key
+    if on is not None:
+        cfg["trading_weekdays"] = profile.trading_weekdays_on(on)
+        cfg["circuit_limit_up"] = profile.circuit_limit_up_on(on)
+        cfg["circuit_limit_down"] = profile.circuit_limit_down_on(on)
+        cfg["preopen_limit"] = profile.preopen_limit_on(on)
+        cfg["index_breaker"] = profile.index_breaker_on(on)
+        cfg["settlement_lag_business_days"] = profile.settlement_lag_on(on)
     return cfg

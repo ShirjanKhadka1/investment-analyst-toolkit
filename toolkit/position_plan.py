@@ -274,19 +274,22 @@ def risk_gate(plan, config=None, profile=None):
         # one in the toolkit.
         raise ValueError("plan must be a dict")  # noqa: TRY004
     cfg = dict(DEFAULT_RESEARCH_CONFIG)
+    date_str = plan.get("date")
+    if date_str is None:
+        date_str = datetime.date.today().isoformat()
     if profile is not None:
         # Local import: market_profiles imports position_plan lazily
         # for profile_config, so this stays a one-way dependency.
+        # The plan's date is passed so the config carries the trading
+        # rules in force on that date (e.g. NEPSE's 10% circuit
+        # before 2026-04-20, 15% from), not today's rule.
         from .market_profiles import profile_config
 
-        cfg = profile_config(profile, base=cfg)
+        cfg = profile_config(profile, base=cfg, on=date_str)
     if config is not None:
         if not isinstance(config, dict):
             raise ValueError("config must be a dict")
         cfg.update(config)
-    date_str = plan.get("date")
-    if date_str is None:
-        date_str = datetime.date.today().isoformat()
     entry = _plan_number(plan, "entry")
     stop = _plan_number(plan, "stop")
     target = _plan_number(plan, "target")

@@ -110,11 +110,14 @@ _DAY = 86400
 # no new data on their non-trading days, so a calendar-day SLA goes red
 # every weekend (Friday data is 2 calendar days old on Sunday, 3 on
 # Monday morning) even when nothing is wrong. Trading days per kind:
-# US stocks and ECB fixings Mon–Fri; NEPSE Sun–Thu (Nepal's trading
-# week); crypto and annual macro trade/publish every day, so their age
-# stays calendar days. Exchange holidays are not modelled — a long
-# holiday weekend can still read STALE, which is a false alarm to
-# triage, not a silent pass.
+# US stocks and ECB fixings Mon–Fri; NEPSE Mon–Fri from 2026-04-06
+# (Sun–Thu before — see the dated rules in market_profiles.py);
+# crypto and annual macro trade/publish every day, so their age
+# stays calendar days. Exchange holidays are modelled only where a
+# holiday calendar exists (data/holidays/): a day outside a
+# calendar's covered range degrades freshness to UNKNOWN, never to
+# a false STALE. Where no calendar exists, a long holiday weekend
+# can still read STALE — a false alarm to triage, not a silent pass.
 FRESHNESS_SLA_SECONDS = {
     "stock_daily": 1 * _DAY,
     "crypto_daily": 1 * _DAY,
@@ -404,27 +407,80 @@ def _trading_days_between(last, today, weekdays):
     ``today`` — the number of days on which new data was expected
     but has not arrived. A Friday last-date checked on Sunday is 0
     (no trading day passed); checked on Monday it is 1."""
-    count = 0
+    known, _unknown = _trading_days_between_fn(
+        last, today, lambda day: day.weekday() in weekdays)
+    return known
+
+
+def _trading_days_between_fn(last, today, is_trading_day):
+    """Trading days strictly after ``last`` up to and including
+    ``today`` under ``is_trading_day`` — a callable ``date -> bool``
+    (or ``None`` for a day whose status is unknown). Returns
+    ``(known, unknown)``: days known to be trading days, and days
+    whose status is unknown (e.g. outside a holiday calendar's
+    covered range)."""
+    known = 0
+    unknown = 0
     day = last + _dt.timedelta(days=1)
     while day <= today:
-        if day.weekday() in weekdays:
-            count += 1
+        status = is_trading_day(day)
+        if status is True:
+            known += 1
+        elif status is None:
+            unknown += 1
         day += _dt.timedelta(days=1)
-    return count
+    return known, unknown
 
 
-def evaluate_freshness(last_date, sla_seconds, today=None, kind=None):
+def _is_trading_day(day, profile, holidays):
+    """True/False/None: was ``day`` a trading day?
+
+    The profile's rule in force on ``day`` decides the weekday
+    (NEPSE: Sun-Thu until 2026-04-05, Mon-Fri from 2026-04-06).
+    When a holiday calendar is given, a listed holiday is not a
+    trading day, and a day outside the calendar's covered range
+    is None (unknown) — never silently counted either way.
+    """
+    if profile is not None:
+        if day.weekday() not in profile.trading_weekdays_on(day):
+            return False
+    elif day.weekday() not in {0, 1, 2, 3, 4}:
+        return False
+    if holidays is not None:
+        status = holidays.status_on(day)
+        if status == "holiday":
+            return False
+        if status == "unknown":
+            return None
+    return True
+
+
+def evaluate_freshness(last_date, sla_seconds, today=None, kind=None,
+                       holidays=None):
     """Judge a series by its last business date against an SLA.
 
     Returns {last_date, age_days, age_trading_days, sla_seconds,
     status} where status is FRESH (age within the SLA) or STALE.
     ``age_days`` is the calendar age (reported as-is); the status
     is judged on ``age_trading_days`` — trading days after the last
-    date on which new data was expected (see TRADING_WEEKDAYS) —
-    so a Friday series is not STALE on a Sunday. ``kind`` selects
-    the trading calendar; with no kind, Mon–Fri is assumed. A
-    future date or an unparsable date raises ValueError instead of
-    being called fresh.
+    date on which new data was expected — so a Friday series is
+    not STALE on a Sunday. ``kind`` selects the trading calendar;
+    with no kind, Mon–Fri is assumed. A future date or an
+    unparsable date raises ValueError instead of being called
+    fresh.
+
+    The weekday rule is the one in force on EACH DAY in the
+    window, not today's rule: NEPSE traded Sun-Thu until
+    2026-04-05 and Mon-Fri from 2026-04-06, so a Friday bar after
+    the change counts and a Sunday bar after it does not.
+
+    ``holidays`` is a HolidayCalendar (see toolkit/holidays.py).
+    With one, the result gains ``age_trading_days_max`` (known +
+    unknown days) and ``unknown_days``, and the status can be
+    UNKNOWN: FRESH when even counting every unknown day as a
+    trading day stays within the SLA, STALE when the KNOWN
+    trading days alone already exceed it, UNKNOWN in between —
+    a missing holiday degrades to unknown, never to a false STALE.
     """
     today = today or _dt.date.today()
     try:
@@ -437,15 +493,46 @@ def evaluate_freshness(last_date, sla_seconds, today=None, kind=None):
     if age_days < 0:
         raise ValueError(
             f"last_date {last_date} is in the future vs {today.isoformat()}")
-    weekdays = TRADING_WEEKDAYS.get(kind, {0, 1, 2, 3, 4}) if kind else {0, 1, 2, 3, 4}
-    age_trading_days = _trading_days_between(last, today, weekdays)
-    age_seconds = age_trading_days * _DAY
+    profile = None
+    if kind:
+        market = _KIND_PROFILES.get(kind)
+        if market is not None:
+            profile = _get_profile(market)
+    age_trading_days, unknown_days = _trading_days_between_fn(
+        last, today,
+        lambda day: _is_trading_day(day, profile, holidays))
+    if holidays is None:
+        age_seconds = age_trading_days * _DAY
+        return {
+            "last_date": str(last_date),
+            "age_days": age_days,
+            "age_trading_days": age_trading_days,
+            "sla_seconds": sla_seconds,
+            "status": "FRESH" if age_seconds <= sla_seconds else "STALE",
+        }
+    age_max = age_trading_days + unknown_days
+    if age_max * _DAY <= sla_seconds:
+        status = "FRESH"
+    elif age_trading_days * _DAY > sla_seconds:
+        status = "STALE"
+    else:
+        status = "UNKNOWN"
     return {
         "last_date": str(last_date),
         "age_days": age_days,
         "age_trading_days": age_trading_days,
+        "age_trading_days_max": age_max,
+        "unknown_days": unknown_days,
         "sla_seconds": sla_seconds,
-        "status": "FRESH" if age_seconds <= sla_seconds else "STALE",
+        "status": status,
+        "status_reason": (
+            "all unknown days counted as trading days and still "
+            "within the SLA" if status == "FRESH" else
+            "known trading days alone exceed the SLA"
+            if status == "STALE" else
+            "the verdict depends on days outside the holiday "
+            "calendar's covered range"
+        ),
     }
 
 

@@ -48,8 +48,9 @@ Engine 1.2 additions (NEPSE Time Machine upgrade, 2026-11-07):
   ``honest_verdict``), and every result states
   "simulation, not a prediction".
 - ``simulate_nepse``: the seeded Monte-Carlo with NEPSE reality
-  applied — daily price moves clipped to the ±15% circuit limit
-  (user-supplied, 28 Oct 2026), an exit-liquidity guard that can
+  applied — daily price moves clipped to the circuit limit in force
+  on each bar's date (10% before 2026-04-20, 15% from; Fourth
+  Amendment Bylaws, 2082), an exit-liquidity guard that can
   BLOCK a position too large for typical volume, and real trading
   frictions from ``toolkit.nepal_frictions.sourced_nepal_frictions``
   (broker slabs, SEBON fee, DP charge, CGT split; settlement T+2).
@@ -57,6 +58,7 @@ Engine 1.2 additions (NEPSE Time Machine upgrade, 2026-11-07):
 """
 from __future__ import annotations
 
+import datetime as _dt
 import math
 import random
 
@@ -102,13 +104,14 @@ EDGE_MARGIN = 0.10
 # settlement T+2 as standard. Re-check against a current
 # NEPSE/SEBON notice before relying on either for a real trade.
 NEPSE_CIRCUIT_SOURCE = (
-    "user-supplied rate-schedule screenshot, 28 Oct 2026 — circuit "
-    "limits +15%/-15% in a day; re-check against a current "
-    "NEPSE/SEBON notice before relying on them for a real trade")
+    "Fourth Amendment Bylaws, 2082 (SEBON-approved): daily limits "
+    "±10% before 2026-04-20, ±15% from; pre-open 2% -> 5% on the "
+    "same date (fiscalnepal, 17 Apr 2026; newbusinessage, 20 Apr 2026)")
 NEPSE_SETTLEMENT_NOTE = (
-    "T+2 settlement as standard (user-supplied, 28 Oct 2026); a T+1 "
-    "override exists only where a specific broker offers and confirms "
-    "it — T+1 is NOT the market standard")
+    "T+2 settlement as standard (CDSC Settlement Procedure, official, "
+    "cdsc.com.np/cmsettlementprocedure, 2026-11-08); T+3 before Jan "
+    "2021. A T+1 override exists only where a specific broker offers "
+    "and confirms it — T+1 is NOT the market standard")
 DEFAULT_MAX_PARTICIPATION = 0.10
 
 
@@ -144,7 +147,10 @@ def _steps_from_prices(prices):
     {"high": high/open - 1, "low": low/open - 1, "close": close/open - 1}.
     Accepts a list of daily closes (floats) or a list of OHLC dicts
     with keys open/high/low/close. For closes, the first close has no
-    preceding bar, so it contributes no step.
+    preceding bar, so it contributes no step. An OHLC bar may also
+    carry a "date" (ISO string or date); when present it is carried
+    on the step so the caller can clip by the rule in force on that
+    bar's date (NEPSE's circuit limit changed on 2026-04-20).
     """
     if prices is None:
         raise ValueError("prices is required")
@@ -161,11 +167,16 @@ def _steps_from_prices(prices):
             op = float(bar["open"])
             if op <= 0:
                 raise ValueError(f"prices[{i}]['open'] must be positive, got {op}")
-            steps.append({
+            step = {
                 "high": float(bar["high"]) / op - 1.0,
                 "low": float(bar["low"]) / op - 1.0,
                 "close": float(bar["close"]) / op - 1.0,
-            })
+            }
+            if "date" in bar:
+                raw = bar["date"]
+                step["date"] = (raw if isinstance(raw, _dt.date)
+                                else _dt.date.fromisoformat(str(raw)))
+            steps.append(step)
         return steps
     closes = validate_series("prices", rows, min_length=2)
     if any(c <= 0 for c in closes):
@@ -608,21 +619,43 @@ def _net_realised_r(entry, exit_price, risk, shares, frictions, holding_days):
     return net_profit / (risk * shares)
 
 
-def _clip_steps_to_circuit(steps, limit_up, limit_down):
+def _clip_steps_to_circuit(steps, limit_up, limit_down, limit_on=None):
     """Clip each step's daily moves to the circuit limits.
 
-    A NEPSE price cannot move beyond ±15% of the previous close in
-    a day, so a simulated step that would carry it further is
-    clipped at the limit instead of being allowed through.
+    A NEPSE price cannot move beyond the daily limit of the previous
+    close in a day, so a simulated step that would carry it further
+    is clipped at the limit instead of being allowed through.
+    ``limit_on`` is an optional callable ``date -> (up, down)``:
+    when given, a step carrying a "date" is clipped by the limit in
+    force on that bar's date (NEPSE: 10% before 2026-04-20, 15%
+    from); a step without a date falls back to ``limit_up`` /
+    ``limit_down``. The returned steps carry no "date" key.
     """
     clipped = []
     for step in steps:
+        up, down = limit_up, limit_down
+        if limit_on is not None and "date" in step:
+            up, down = limit_on(step["date"])
         clipped.append({
-            "high": min(step["high"], limit_up),
-            "low": max(step["low"], -limit_down),
-            "close": max(-limit_down, min(step["close"], limit_up)),
+            "high": min(step["high"], up),
+            "low": max(step["low"], -down),
+            "close": max(-down, min(step["close"], up)),
         })
     return clipped
+
+
+def _dated_limits_for(profile, steps):
+    """(limit_on, as_of) for per-bar-date clipping, or (None, None).
+
+    ``limit_on`` resolves a step's date to the (up, down) circuit
+    limits in force on that date; ``as_of`` is the latest dated
+    step's date, for reporting which rule the reported limits are.
+    """
+    dated = [s["date"] for s in steps if "date" in s]
+    if not dated:
+        return None, None
+    return (lambda d: (profile.circuit_limit_up_on(d),
+                       profile.circuit_limit_down_on(d))), max(dated)
 
 
 def replay_setup(prices, setup, entry, stop, target, horizon=20, *,
@@ -772,9 +805,9 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
     """Seeded Monte-Carlo for a NEPSE hypothetical exit plan.
 
     The plain ``simulate`` plus NEPSE reality, all labelled:
-    - daily moves clipped to the ±15% circuit limit (user-supplied
-      rate-schedule screenshot, 28 Oct 2026 — see
-      ``NEPSE_CIRCUIT_SOURCE``);
+    - daily moves clipped to the circuit limit in force on EACH
+      bar's date (10% before 2026-04-20, 15% from — see
+      ``NEPSE_CIRCUIT_SOURCE``); undated bars use the current 15%;
     - exit-liquidity guard: when ``typical_daily_volume`` is given
       and ``shares`` exceeds 10% of it, the run is BLOCKED and no
       simulation is produced (``blocked: True``);
@@ -844,8 +877,13 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
                          "supply a larger typical_daily_volume."),
             }
     steps = _steps_from_prices(prices)
+    # Dated bars are clipped by the limit in force on EACH bar's
+    # date (NEPSE: 10% before 2026-04-20, 15% from); undated bars
+    # keep the single frictions limits, byte-identical to before.
+    limit_on, limit_as_of = _dated_limits_for(get_profile("nepse"), steps)
     clipped = _clip_steps_to_circuit(
-        steps, frictions.circuit_limit_up, frictions.circuit_limit_down)
+        steps, frictions.circuit_limit_up, frictions.circuit_limit_down,
+        limit_on=limit_on)
     run = _simulate_from_steps(clipped, entry, stop, target,
                                n_sims, seed, horizon)
     risk = entry - stop
@@ -870,8 +908,12 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
         "honest_verdict": honest_verdict(
             result["target_first"], result["break_even"],
             run["n_windows"]),
-        "circuit_limit_up": frictions.circuit_limit_up,
-        "circuit_limit_down": frictions.circuit_limit_down,
+        "circuit_limit_up": (
+            get_profile("nepse").circuit_limit_up_on(limit_as_of)
+            if limit_as_of is not None else frictions.circuit_limit_up),
+        "circuit_limit_down": (
+            get_profile("nepse").circuit_limit_down_on(limit_as_of)
+            if limit_as_of is not None else frictions.circuit_limit_down),
         "circuit_source": NEPSE_CIRCUIT_SOURCE,
         "frictions_source": frictions.source,
         "frictions_as_of": frictions.as_of,
@@ -884,6 +926,11 @@ def simulate_nepse(prices, entry, stop, target, *, shares=100,
                  "SEBON fee, DP charge, CGT on gains after fees); "
                  "average_R_gross is the same simulation before costs"),
     })
+    if limit_as_of is not None:
+        # Dated bars: the reported limits are the ones in force on
+        # the latest bar's date, not a single flat limit.
+        result["circuit_limit_as_of"] = limit_as_of.isoformat()
+        result["circuit_limits_dated"] = True
     return result
 
 
@@ -1039,9 +1086,13 @@ def simulate_with_profile(prices, entry, stop, target, *, profile,
                          "supply a larger typical_daily_volume."),
             }
     steps = _steps_from_prices(prices)
+    # Dated bars are clipped by the limit in force on EACH bar's
+    # date; undated bars keep the single profile limits.
+    limit_on, limit_as_of = _dated_limits_for(profile, steps)
     if profile.circuit_limit_up is not None and profile.circuit_limit_down is not None:
         steps = _clip_steps_to_circuit(
-            steps, profile.circuit_limit_up, profile.circuit_limit_down)
+            steps, profile.circuit_limit_up, profile.circuit_limit_down,
+            limit_on=limit_on)
     run = _simulate_from_steps(steps, entry, stop, target,
                                n_sims, seed, horizon)
     risk = entry - stop
@@ -1072,8 +1123,12 @@ def simulate_with_profile(prices, entry, stop, target, *, profile,
         "honest_verdict": honest_verdict(
             result["target_first"], result["break_even"],
             run["n_windows"]),
-        "circuit_limit_up": profile.circuit_limit_up,
-        "circuit_limit_down": profile.circuit_limit_down,
+        "circuit_limit_up": (
+            profile.circuit_limit_up_on(limit_as_of)
+            if limit_as_of is not None else profile.circuit_limit_up),
+        "circuit_limit_down": (
+            profile.circuit_limit_down_on(limit_as_of)
+            if limit_as_of is not None else profile.circuit_limit_down),
         "circuit_note": profile.circuit_note,
         "unmodelled_fees": sorted(unmodelled_all),
         "buy_charges_at_entry": buy_cost,
@@ -1087,4 +1142,7 @@ def simulate_with_profile(prices, entry, stop, target, *, profile,
                  "is partial. average_R_gross is the same simulation "
                  "before costs."),
     })
+    if limit_as_of is not None:
+        result["circuit_limit_as_of"] = limit_as_of.isoformat()
+        result["circuit_limits_dated"] = True
     return result

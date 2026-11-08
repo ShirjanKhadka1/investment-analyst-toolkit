@@ -47,6 +47,7 @@ from toolkit.connectors import (
     DiskCache,
     evaluate_freshness,
 )
+from toolkit.holidays import load_holidays
 
 SOURCE_ORDER = ("yahoo", "coingecko", "ecb", "worldbank", "nepse_csv")
 
@@ -171,6 +172,13 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
     today = now.date()
     repo_root = Path(repo_root) if repo_root else Path.cwd()
     stats = DiskCache(cache_dir).stats()
+    # NEPSE holiday calendar for freshness: a missing calendar is
+    # "no calendar", not "no holidays" — freshness then falls back
+    # to the weekday-only judgement (no UNKNOWN degradation).
+    try:
+        nepse_holidays = load_holidays("nepse", repo_root=repo_root)
+    except (OSError, ValueError, KeyError):
+        nepse_holidays = None
     prev_by_name = {}
     if previous:
         for entry in previous.get("sources", []) or []:
@@ -222,10 +230,15 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
             if entry["last_data_date"] is not None:
                 judged = evaluate_freshness(
                     entry["last_data_date"], sla, today=today,
-                    kind="nepse_csv_daily")
+                    kind="nepse_csv_daily", holidays=nepse_holidays)
                 entry["status"] = judged["status"]
                 entry["age_days"] = judged["age_days"]
                 entry["age_trading_days"] = judged["age_trading_days"]
+                if "age_trading_days_max" in judged:
+                    entry["age_trading_days_max"] = judged[
+                        "age_trading_days_max"]
+                    entry["unknown_days"] = judged["unknown_days"]
+                    entry["status_reason"] = judged["status_reason"]
             sources.append(entry)
             continue
         if name in probes:

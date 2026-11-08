@@ -64,14 +64,16 @@ def test_nepse_profile_matches_sourced_schedule():
     assert nepse.circuit_limit_down == CIRCUIT_LIMIT
     assert nepse.settlement_lag_business_days == 2
     assert nepse.currency == "NPR"
-    assert set(nepse.trading_weekdays) == {6, 0, 1, 2, 3}
+    # Current rule (from 2026-04-06): Mon-Fri. The Sun-Thu week is
+    # kept only as the pre-change rule in trading_weekdays_rules.
+    assert set(nepse.trading_weekdays) == {0, 1, 2, 3, 4}
     assert nepse.fees["sebon_fee_rate"]["value"] == SEBON_FEE_RATE
     assert nepse.fees["dp_charge_flat"]["value"] == DP_CHARGE_FLAT
     assert nepse.fees["brokerage_minimum_flat"]["value"] == BROKERAGE_MINIMUM_FLAT
     assert nepse.taxes["cgt_short"]["value"] == CGT_RATE_SHORT
     assert nepse.taxes["cgt_long"]["value"] == CGT_RATE_LONG
     assert nepse.status == "tested"
-    assert nepse.disputes  # weekday + settlement disputes are recorded
+    assert nepse.disputes  # breaker window + settlement disputes recorded
 
 
 def test_generic_profile_is_all_unknown():
@@ -85,12 +87,14 @@ def test_generic_profile_is_all_unknown():
 
 
 def test_trading_weekdays_derivation_is_byte_identical():
+    # Current (post-2026-04-06) weekdays. The pre-change Sun-Thu
+    # week lives in the dated rules, not in this table.
     old = {
         "stock_daily": {0, 1, 2, 3, 4},
         "crypto_daily": {0, 1, 2, 3, 4, 5, 6},
         "fx_reference": {0, 1, 2, 3, 4},
         "macro_annual": {0, 1, 2, 3, 4, 5, 6},
-        "nepse_csv_daily": {6, 0, 1, 2, 3},
+        "nepse_csv_daily": {0, 1, 2, 3, 4},
     }
     assert connectors.TRADING_WEEKDAYS == old
     assert set(KIND_PROFILES) == set(old)
@@ -167,3 +171,85 @@ def test_risk_gate_profile_labels_without_changing_checks():
     assert with_profile["verdict"] == plain["verdict"]
     assert with_profile["checks"] == plain["checks"]
     assert with_profile["fingerprint"] == plain["fingerprint"]
+
+
+# ---------------------------------------------------------------------------
+# Effective-dated NEPSE rules (8 Nov 2026)
+# ---------------------------------------------------------------------------
+
+def test_nepse_trading_weekdays_are_effective_dated():
+    nepse = get_profile("nepse")
+    # Sun-Thu until 2026-04-05 (board decision 22 Chaitra 2082).
+    assert nepse.trading_weekdays_on("2026-04-05") == (6, 0, 1, 2, 3)
+    assert nepse.trading_weekdays_on("2026-04-03") == (6, 0, 1, 2, 3)
+    # Mon-Fri from 2026-04-06.
+    assert nepse.trading_weekdays_on("2026-04-06") == (0, 1, 2, 3, 4)
+    assert nepse.trading_weekdays_on("2026-11-08") == (0, 1, 2, 3, 4)
+    # The plain field is the current rule, not the historical one.
+    assert nepse.trading_weekdays == (0, 1, 2, 3, 4)
+
+
+def test_nepse_circuit_limit_is_effective_dated():
+    nepse = get_profile("nepse")
+    # 10% before 2026-04-20, 15% from (Fourth Amendment Bylaws, 2082).
+    assert nepse.circuit_limit_up_on("2026-04-19") == 0.10
+    assert nepse.circuit_limit_down_on("2026-04-19") == 0.10
+    assert nepse.circuit_limit_up_on("2026-04-20") == 0.15
+    assert nepse.circuit_limit_down_on("2026-04-20") == 0.15
+    # A +12% day is within limits after the change, a violation before.
+    assert 0.12 <= nepse.circuit_limit_up_on("2026-04-20")
+    assert 0.12 > nepse.circuit_limit_up_on("2026-04-19")
+
+
+def test_nepse_preopen_and_breaker_are_effective_dated():
+    nepse = get_profile("nepse")
+    assert nepse.preopen_limit_on("2026-04-19") == 0.02
+    assert nepse.preopen_limit_on("2026-04-20") == 0.05
+    # Three-tier breaker before, two-tier from.
+    assert nepse.index_breaker_on("2026-04-19") == (
+        (0.04, "20-minute halt"),
+        (0.05, "40-minute halt after reopening"),
+        (0.06, "suspend rest of day"),
+    )
+    assert nepse.index_breaker_on("2026-04-20") == (
+        (0.05, "15-minute halt if within first two hours"),
+        (0.08, "suspend rest of day"),
+    )
+
+
+def test_nepse_settlement_lag_is_effective_dated():
+    nepse = get_profile("nepse")
+    # T+2 current (CDSC Settlement Procedure, official); T+3 before
+    # the full T+2 cycle (Magh 2077 / Jan 2021).
+    assert nepse.settlement_lag_on("2020-12-31") == 3
+    assert nepse.settlement_lag_on("2021-01-15") == 2
+    assert nepse.settlement_lag_on("2026-11-08") == 2
+
+
+def test_profile_config_on_a_date_carries_the_rules_in_force():
+    before = profile_config("nepse", on="2026-04-15")
+    assert before["circuit_limit_up"] == 0.10
+    assert before["circuit_limit_down"] == 0.10
+    assert before["preopen_limit"] == 0.02
+    assert before["trading_weekdays"] == (0, 1, 2, 3, 4)
+    assert before["settlement_lag_business_days"] == 2
+    after = profile_config("nepse", on="2026-04-25")
+    assert after["circuit_limit_up"] == 0.15
+    assert after["preopen_limit"] == 0.05
+    # Without a date, only currency/market are set (unchanged).
+    plain = profile_config("nepse")
+    assert "circuit_limit_up" not in plain
+    assert plain["currency"] == "NPR" and plain["market"] == "nepse"
+
+
+def test_risk_gate_uses_the_plan_dates_rules():
+    plan = {"entry": 100.0, "stop": 95.0, "target": 110.0,
+            "risk_per_share": 5.0, "shares": 10, "max_loss": 50.0,
+            "entry_window_ok": True, "date": "2026-04-15"}
+    # The 16 checks and the fingerprint do not change with the date;
+    # the config the gate reads does (proved via profile_config).
+    res = risk_gate(plan, profile="nepse")
+    assert res["passed"] + res["failed"] == 16
+    assert res["fingerprint"] == risk_gate(
+        dict(plan, date="2026-04-15"))["fingerprint"]
+    assert profile_config("nepse", on="2026-04-15")["circuit_limit_up"] == 0.10
