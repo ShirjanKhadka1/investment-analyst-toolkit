@@ -381,6 +381,10 @@ def build_dashboard(bars, symbol="DEMO", seed=19, n_sims=10000,
     inputs (fixed seed, no clock, no network) — same input, same text.
     Raises ValueError on a bad user-supplied plan (bad --stop/--target);
     data-driven shortfalls are reported inside the sections instead.
+    The dashboard assumes exchange NEPSE (the risk gate uses the
+    default config, which is the NEPSE-derived config) and PRINTS
+    that assumption in the header — the demo never detects the market
+    from the CSV, so the assumption is stated, not hidden.
     """
     closes = [b["close"] for b in bars]
     highs = [b["high"] for b in bars]
@@ -406,6 +410,9 @@ def build_dashboard(bars, symbol="DEMO", seed=19, n_sims=10000,
     lines.append(f"Symbol: {symbol}   Bars: {n}   "
                  f"Range: {bars[0]['date']} to {last['date']}   "
                  f"Last close: {last['close']:.2f}")
+    lines.append("Exchange (assumed): NEPSE — the demo does not detect "
+                 "the market from the CSV; the risk gate below uses the "
+                 "NEPSE default config.")
 
     # --- 1. Indicator snapshot -------------------------------------------
     lines.append("")

@@ -7,40 +7,40 @@
 <text x="16" y="65" opacity="0">Research and education only — not investment advice, never a buy/sell/hold recommendation.<animate attributeName="opacity" from="0" to="1" begin="0.12s" dur="0.15s" fill="freeze"/></text>
 <text x="16" y="82" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="0.24s" dur="0.15s" fill="freeze"/></text>
 <text x="16" y="99" opacity="0">Symbol: DEMO   Bars: 80   Range: 2026-07-20 to 2026-11-06   Last close: 1284.91<animate attributeName="opacity" from="0" to="1" begin="0.36s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="116" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="0.48s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="133" opacity="0">1. Indicator snapshot<animate attributeName="opacity" from="0" to="1" begin="0.60s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="150" opacity="0">   Indicators describe the past; they cannot prove what a price will do next.<animate attributeName="opacity" from="0" to="1" begin="0.72s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="167" opacity="0">   Close 1284.91 — trend vs SMA20/EMA20: above SMA20 and above EMA20<animate attributeName="opacity" from="0" to="1" begin="0.84s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="184" opacity="0">   RSI(14)      88.2   (70/30 are conventions, not reversal proofs)<animate attributeName="opacity" from="0" to="1" begin="0.96s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="201" opacity="0">   MACD 12/26/9 53.32   signal 41.82   histogram 11.50<animate attributeName="opacity" from="0" to="1" begin="1.08s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="218" opacity="0">   Bollinger 20/2  upper 1312.50   middle 1166.08   lower 1019.66   %B 0.91<animate attributeName="opacity" from="0" to="1" begin="1.20s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="235" opacity="0">   ATR(14)      16.79   (how much prices moved, not which way next)<animate attributeName="opacity" from="0" to="1" begin="1.32s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="252" opacity="0">   SMA20 1166.08   EMA20 1186.73   ADX(14) 50.7   Stoch %K 99.0   %D 98.7<animate attributeName="opacity" from="0" to="1" begin="1.44s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="269" opacity="0">   VWAP (cumulative) 1046.60<animate attributeName="opacity" from="0" to="1" begin="1.56s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="286" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="1.68s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="303" opacity="0">2. Screening — named setups (scanner rules, reimplemented here)<animate attributeName="opacity" from="0" to="1" begin="1.80s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="320" opacity="0">   A match means the past closes satisfy the stated rule. It is not a buy/sell/hold signal.<animate attributeName="opacity" from="0" to="1" begin="1.92s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="337" opacity="0">   [MATCH] breakout_20d: close 1284.91 above 20-day high 1274.72 (+0.80%)<animate attributeName="opacity" from="0" to="1" begin="2.04s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="354" opacity="0">          rule: Latest close above the highest close of the prior 20 closes (needs 21 closes).<animate attributeName="opacity" from="0" to="1" begin="2.16s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="371" opacity="0">   [MATCH] bull_flag: run +12.07% (1101.74 -&gt; 1234.73), last-5 range 3.24%<animate attributeName="opacity" from="0" to="1" begin="2.28s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="388" opacity="0">          rule: Close rose at least 10% over the 10 sessions ending 6 bars ago, then the last 5 closes span at most 5% (needs 16 closes).<animate attributeName="opacity" from="0" to="1" begin="2.40s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="405" opacity="0">   [  --  ] reclaim_ma20: close already above MA20 on the prior bar (1274.72 vs 1156.63)<animate attributeName="opacity" from="0" to="1" begin="2.52s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="422" opacity="0">          rule: Latest close above its 20-day moving average while the prior close was at or below its 20-day moving average (needs 21 closes).<animate attributeName="opacity" from="0" to="1" begin="2.64s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="439" opacity="0">   [  --  ] oversold: RSI-14 88.2 (not below 30)<animate attributeName="opacity" from="0" to="1" begin="2.76s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="456" opacity="0">          rule: Wilder RSI-14 below 30 on the latest close (needs 15 closes).<animate attributeName="opacity" from="0" to="1" begin="2.88s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="473" opacity="0">   [  --  ] oversold_bounce: RSI-14 not below 30 in the last 5 sessions<animate attributeName="opacity" from="0" to="1" begin="3.00s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="490" opacity="0">          rule: Wilder RSI-14 below 30 at least once in the last 5 sessions and the latest close above the prior close (needs 15 closes).<animate attributeName="opacity" from="0" to="1" begin="3.12s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="507" opacity="0">   Matches: 2 of 5 setups. A match is a description of past closes, not a prediction.<animate attributeName="opacity" from="0" to="1" begin="3.24s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="524" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="3.36s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="541" opacity="0">3. Time-Machine odds<animate attributeName="opacity" from="0" to="1" begin="3.48s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="558" opacity="0">   Simulation, not a prediction. Resampled history is not the future; a target-first share above break-even is a property of the past sample, not a probability of profit.<animate attributeName="opacity" from="0" to="1" begin="3.60s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="575" opacity="0">   Hypothetical plan: entry 1284.91, stop 1259.72, target 1335.29 (stop = entry - 1.5 x ATR(14); reward:risk 2.00)<animate attributeName="opacity" from="0" to="1" begin="3.72s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="592" opacity="0">   Seed 19, 10000 replays, horizon 20 days, 61 past windows<animate attributeName="opacity" from="0" to="1" begin="3.84s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="609" opacity="0">   Target first 57.5%   Stop first 39.0%   Neither 3.5%<animate attributeName="opacity" from="0" to="1" begin="3.96s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="626" opacity="0">   Break-even 33.3%   Verdict: Strongly toward target<animate attributeName="opacity" from="0" to="1" begin="4.08s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="643" opacity="0">   Final close: median 1334.07, p5 1244.46, p95 1359.89, average realised R 0.79<animate attributeName="opacity" from="0" to="1" begin="4.20s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="660" opacity="0">   Historical replay (same rule, no randomness): target first 68.9%, stop first 31.1%, neither 0.0% over 61 past windows<animate attributeName="opacity" from="0" to="1" begin="4.32s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="677" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="4.44s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="694" opacity="0">4. Risk gate — hypothetical plan only<animate attributeName="opacity" from="0" to="1" begin="4.56s" dur="0.15s" fill="freeze"/></text>
-<text x="16" y="711" opacity="0">   A PASS is not a yes and not a recommendation: it only means this exact plan passed these 16 checks on the last bar's date.<animate attributeName="opacity" from="0" to="1" begin="4.68s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="116" opacity="0">Exchange (assumed): NEPSE — the demo does not detect the market from the CSV; the risk gate below uses the NEPSE default config.<animate attributeName="opacity" from="0" to="1" begin="0.48s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="133" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="0.60s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="150" opacity="0">1. Indicator snapshot<animate attributeName="opacity" from="0" to="1" begin="0.72s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="167" opacity="0">   Indicators describe the past; they cannot prove what a price will do next.<animate attributeName="opacity" from="0" to="1" begin="0.84s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="184" opacity="0">   Close 1284.91 — trend vs SMA20/EMA20: above SMA20 and above EMA20<animate attributeName="opacity" from="0" to="1" begin="0.96s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="201" opacity="0">   RSI(14)      88.2   (70/30 are conventions, not reversal proofs)<animate attributeName="opacity" from="0" to="1" begin="1.08s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="218" opacity="0">   MACD 12/26/9 53.32   signal 41.82   histogram 11.50<animate attributeName="opacity" from="0" to="1" begin="1.20s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="235" opacity="0">   Bollinger 20/2  upper 1312.50   middle 1166.08   lower 1019.66   %B 0.91<animate attributeName="opacity" from="0" to="1" begin="1.32s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="252" opacity="0">   ATR(14)      16.79   (how much prices moved, not which way next)<animate attributeName="opacity" from="0" to="1" begin="1.44s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="269" opacity="0">   SMA20 1166.08   EMA20 1186.73   ADX(14) 50.7   Stoch %K 99.0   %D 98.7<animate attributeName="opacity" from="0" to="1" begin="1.56s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="286" opacity="0">   VWAP (cumulative) 1046.60<animate attributeName="opacity" from="0" to="1" begin="1.68s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="303" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="1.80s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="320" opacity="0">2. Screening — named setups (scanner rules, reimplemented here)<animate attributeName="opacity" from="0" to="1" begin="1.92s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="337" opacity="0">   A match means the past closes satisfy the stated rule. It is not a buy/sell/hold signal.<animate attributeName="opacity" from="0" to="1" begin="2.04s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="354" opacity="0">   [MATCH] breakout_20d: close 1284.91 above 20-day high 1274.72 (+0.80%)<animate attributeName="opacity" from="0" to="1" begin="2.16s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="371" opacity="0">          rule: Latest close above the highest close of the prior 20 closes (needs 21 closes).<animate attributeName="opacity" from="0" to="1" begin="2.28s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="388" opacity="0">   [MATCH] bull_flag: run +12.07% (1101.74 -&gt; 1234.73), last-5 range 3.24%<animate attributeName="opacity" from="0" to="1" begin="2.40s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="405" opacity="0">          rule: Close rose at least 10% over the 10 sessions ending 6 bars ago, then the last 5 closes span at most 5% (needs 16 closes).<animate attributeName="opacity" from="0" to="1" begin="2.52s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="422" opacity="0">   [  --  ] reclaim_ma20: close already above MA20 on the prior bar (1274.72 vs 1156.63)<animate attributeName="opacity" from="0" to="1" begin="2.64s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="439" opacity="0">          rule: Latest close above its 20-day moving average while the prior close was at or below its 20-day moving average (needs 21 closes).<animate attributeName="opacity" from="0" to="1" begin="2.76s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="456" opacity="0">   [  --  ] oversold: RSI-14 88.2 (not below 30)<animate attributeName="opacity" from="0" to="1" begin="2.88s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="473" opacity="0">          rule: Wilder RSI-14 below 30 on the latest close (needs 15 closes).<animate attributeName="opacity" from="0" to="1" begin="3.00s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="490" opacity="0">   [  --  ] oversold_bounce: RSI-14 not below 30 in the last 5 sessions<animate attributeName="opacity" from="0" to="1" begin="3.12s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="507" opacity="0">          rule: Wilder RSI-14 below 30 at least once in the last 5 sessions and the latest close above the prior close (needs 15 closes).<animate attributeName="opacity" from="0" to="1" begin="3.24s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="524" opacity="0">   Matches: 2 of 5 setups. A match is a description of past closes, not a prediction.<animate attributeName="opacity" from="0" to="1" begin="3.36s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="541" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="3.48s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="558" opacity="0">3. Time-Machine odds<animate attributeName="opacity" from="0" to="1" begin="3.60s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="575" opacity="0">   Simulation, not a prediction. Resampled history is not the future; a target-first share above break-even is a property of the past sample, not a probability of profit.<animate attributeName="opacity" from="0" to="1" begin="3.72s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="592" opacity="0">   Hypothetical plan: entry 1284.91, stop 1259.72, target 1335.29 (stop = entry - 1.5 x ATR(14); reward:risk 2.00)<animate attributeName="opacity" from="0" to="1" begin="3.84s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="609" opacity="0">   Seed 19, 10000 replays, horizon 20 days, 61 past windows<animate attributeName="opacity" from="0" to="1" begin="3.96s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="626" opacity="0">   Target first 57.5%   Stop first 39.0%   Neither 3.5%<animate attributeName="opacity" from="0" to="1" begin="4.08s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="643" opacity="0">   Break-even 33.3%   Verdict: Strongly toward target<animate attributeName="opacity" from="0" to="1" begin="4.20s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="660" opacity="0">   Final close: median 1334.07, p5 1244.46, p95 1359.89, average realised R 0.79<animate attributeName="opacity" from="0" to="1" begin="4.32s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="677" opacity="0">   Historical replay (same rule, no randomness): target first 68.9%, stop first 31.1%, neither 0.0% over 61 past windows<animate attributeName="opacity" from="0" to="1" begin="4.44s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="694" opacity="0"> <animate attributeName="opacity" from="0" to="1" begin="4.56s" dur="0.15s" fill="freeze"/></text>
+<text x="16" y="711" opacity="0">4. Risk gate — hypothetical plan only<animate attributeName="opacity" from="0" to="1" begin="4.68s" dur="0.15s" fill="freeze"/></text>
 </g></svg>

@@ -110,7 +110,7 @@ NEPSE_CIRCUIT_SOURCE = (
 NEPSE_SETTLEMENT_NOTE = (
     "T+2 (transition date unverified). CDSC Settlement Procedure "
     "(official, cdsc.com.np/cmsettlementprocedure, 2026-11-08) states "
-    "T+2 as the standard; the pre-2021 lag is unknown, not T+3. A T+1 "
+    "T+2 as the standard; the pre-2017 lag is unknown, not T+3. A T+1 "
     "override exists only where a specific broker offers and confirms "
     "it — T+1 is NOT the market standard")
 DEFAULT_MAX_PARTICIPATION = 0.10

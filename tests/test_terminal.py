@@ -249,6 +249,15 @@ def test_dashboard_without_health_says_not_checked():
     assert "scripts/data_health.py" in text
 
 
+def test_dashboard_prints_assumed_exchange():
+    """Round 3: the demo keeps its NEPSE default but prints the
+    exchange it assumed — the market is never silently assumed."""
+    bars = load_bars(str(DEMO_CSV))
+    text = build_dashboard(bars)
+    assert "Exchange (assumed): NEPSE" in text
+    assert "does not detect the market from the CSV" in text
+
+
 def test_dashboard_with_health_shows_per_source_status():
     bars = load_bars(str(DEMO_CSV))
     text = build_dashboard(bars, data_health=_health())

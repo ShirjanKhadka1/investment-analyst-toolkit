@@ -44,8 +44,8 @@ __all__ = [
 
 SCHEMA_VERSION = "1.4.0"
 
-_REQUIRED = ("date", "symbol", "thesis", "horizon_days", "expected",
-             "sources", "confidence")
+_REQUIRED = ("date", "symbol", "exchange", "thesis", "horizon_days",
+             "expected", "sources", "confidence")
 _EXPECTED = ("up", "down", "range")
 
 
@@ -65,20 +65,29 @@ def _call_id(call):
 def write_call(path, call):
     """Append one call to a JSONL decision log. Returns the call dict.
 
-    Required fields: date (YYYY-MM-DD), symbol, thesis, horizon_days
-    (positive int), expected (``up`` / ``down`` / ``range``), sources
-    (non-empty list of source labels), confidence (0..1, the stated
-    probability the expected direction/range is right). Optional:
-    exchange (default ``NEPSE``), expected_low / expected_high (for
-    ``range`` calls), entry_close (the first close after the call
-    date — the point-in-time reference price).
+    Required fields: date (YYYY-MM-DD), symbol, exchange (the market
+    label, e.g. ``NEPSE`` or ``NYSE`` — REQUIRED since Round 3: a
+    write without an exchange is refused, so a global call can never
+    be silently labelled NEPSE), thesis, horizon_days (positive int),
+    expected (``up`` / ``down`` / ``range``), sources (non-empty list
+    of source labels), confidence (0..1, the stated probability the
+    expected direction/range is right). Optional: expected_low /
+    expected_high (for ``range`` calls), entry_close (the first close
+    after the call date — the point-in-time reference price).
     Raises ValueError on any missing/invalid field. Never overwrites.
+    Reads of logs written before the exchange requirement
+    (``load_calls``) still default a missing exchange to ``NEPSE`` —
+    the default lives only on the read path, never on writes.
     """
     if not isinstance(call, dict):
         raise ValueError("call must be a dict")  # noqa: TRY004
     for field in _REQUIRED:
         if field not in call or call[field] in (None, ""):
             raise ValueError(f"call is missing required field: {field}")
+    if not isinstance(call["exchange"], str) \
+            or not call["exchange"].strip():
+        raise ValueError("exchange must be a non-empty string, "
+                         "e.g. 'NEPSE'")
     _parse_date(call["date"], "date")
     horizon = call["horizon_days"]
     if isinstance(horizon, bool) or not isinstance(horizon, int) or horizon < 1:
@@ -100,7 +109,7 @@ def write_call(path, call):
     if not 0.0 <= float(confidence) <= 1.0:
         raise ValueError(f"confidence must be in [0, 1], got {confidence!r}")
     record = {"schema_version": SCHEMA_VERSION,
-              "exchange": call.get("exchange", "NEPSE"),
+              "exchange": call["exchange"],
               "status": "open", **call}
     record["call_id"] = _call_id({k: v for k, v in record.items()
                                   if k != "call_id"})
@@ -112,14 +121,21 @@ def write_call(path, call):
 
 
 def load_calls(path):
-    """Read all calls from a JSONL log. Missing file -> empty list."""
+    """Read all calls from a JSONL log. Missing file -> empty list.
+
+    Legacy read default: a record written before the exchange
+    requirement (Round 3) has no ``exchange`` field; it reads back
+    as ``NEPSE``. Writes never default — see ``write_call``.
+    """
     path = Path(path)
     if not path.exists():
         return []
     calls = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
-            calls.append(json.loads(line))
+            call = json.loads(line)
+            call.setdefault("exchange", "NEPSE")
+            calls.append(call)
     return calls
 
 

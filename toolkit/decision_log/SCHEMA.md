@@ -12,7 +12,7 @@ have been logged yet).
 | `call_id` | string, first 16 hex chars of sha256 of the call content | yes |
 | `date` | `YYYY-MM-DD` (call date) | yes |
 | `symbol` | string, e.g. `"BNT"` | yes |
-| `exchange` | string, default `"NEPSE"` | no |
+| `exchange` | string, e.g. `"NEPSE"` | yes — since Round 3; writes without it are refused. Reads of legacy logs (written before the requirement) default a missing value to `"NEPSE"` |
 | `thesis` | string, one paragraph | yes |
 | `horizon_days` | positive int | yes |
 | `expected` | `"up"` / `"down"` / `"range"` | yes |

@@ -279,7 +279,7 @@ def sourced_nepal_frictions(settlement_lag_business_days=2,
     or ISO string) returns the limits in force on that date; with
     no ``as_of`` the current ±15% is returned. Settlement is T+2
     (transition date unverified — see toolkit/market_profiles.py;
-    the pre-2021 lag is unknown, not T+3). A broker-specific T+1
+    the pre-2017 lag is unknown, not T+3). A broker-specific T+1
     override is available ONLY by passing
     settlement_lag_business_days=1 together with broker_override
     naming the broker (e.g. "broker 58", the user-supplied
