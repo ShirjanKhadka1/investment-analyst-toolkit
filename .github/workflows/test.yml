@@ -1,3 +1,29 @@
+# =====================================================================
+# NOT DEPLOYED — STAGED FILE ONLY (Phase 4, 7 Nov 2026).
+# This workflow is NOT live on GitHub. It was prepared locally and has
+# NOT been pushed via the API: the token behind the API helper lacks
+# workflow scope, so an API push of a .github/workflows/ file would
+# fail with 403. The parent deploys it via the GitHub web UI (browser
+# route) and then confirms the file exists on main and the first run
+# is observed green (or red, triaged honestly).
+# Do NOT describe this workflow as deployed, running, or green until
+# the parent confirms that deployment and a run.
+#
+# TARGET:
+#   Repo:   ShirjanKhadka1/investment-analyst-toolkit
+#   Branch: main
+#   Path:   .github/workflows/test.yml   (UPDATE — replaces the Phase 7 file)
+#
+# Change vs the live Phase 7 file: the quality job no longer runs the
+# individual ruff/mypy/coverage commands; it installs the pinned dev
+# tools from requirements-dev.txt and runs `python scripts/qa.py`,
+# the single Phase 4 entry point (lint, typecheck, full tests +
+# coverage, look-ahead mutation check, licence, secret scan, link
+# check, README-claim check, fresh-clone install test). Matrix and
+# smoke jobs are unchanged.
+# fetch-depth: 0 is deliberate: the secret gate scans `git log -p`,
+# and the default shallow checkout would make that scan vacuous.
+# =====================================================================
 # Phase 7: OS x Python matrix + quality gates.
 # Matrix job (pytest only) runs on Linux/macOS/Windows — the
 # macOS/Windows combinations are CI-only: they were never run
@@ -24,14 +50,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "pytest==9.2.0" "ruff==0.17.3" "mypy==2.4.0" "coverage==7.17.0"
-      - run: ruff check toolkit/ tests/
-      - run: mypy toolkit/
-      - run: coverage run -m pytest tests/ -q
-      - run: coverage report
+      - run: pip install -r requirements-dev.txt
+      - run: python scripts/qa.py
   smoke:
     runs-on: ubuntu-latest
     steps:
