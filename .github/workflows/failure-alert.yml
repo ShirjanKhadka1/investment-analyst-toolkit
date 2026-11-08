@@ -39,7 +39,7 @@ name: Failure alert
 
 on:
   workflow_run:
-    workflows: ["Scheduled update"]
+    workflows: ["Scheduled update", "Daily derived refresh", "Data health check"]
     types: [completed]
 
 permissions:
