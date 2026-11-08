@@ -39,6 +39,7 @@ import datetime as _dt
 import json as _json
 import time as _time
 import urllib.error as _urlerror
+import urllib.parse as _urlparse
 import urllib.request as _urlrequest
 
 EDGAR_USER_AGENT = (
@@ -53,6 +54,11 @@ _FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 _CONCEPT_URL = (
     "https://data.sec.gov/api/xbrl/companyconcept/CIK{cik:010d}/{taxonomy}/{tag}.json"
 )
+
+# The only hosts this module ever fetches. The check in _get_json
+# compares the parsed hostname exactly — a substring test would also
+# match lookalikes such as data.sec.gov.evil.com (CodeQL, 8 Nov 2026).
+_ALLOWED_EDGAR_HOSTS = frozenset({"data.sec.gov", "www.sec.gov"})
 
 _last_call_monotonic = 0.0
 _ticker_cache: dict[str, int] | None = None
@@ -78,11 +84,28 @@ def _throttle():
     _last_call_monotonic = _time.monotonic()
 
 
+def _check_edgar_url(url):
+    """Allow only https URLs on the two SEC hosts, else ValueError.
+
+    The hostname is compared exactly after parsing: lookalikes such
+    as ``data.sec.gov.evil.com`` or ``evil.com/data.sec.gov`` are
+    rejected, as is any non-https scheme. No caller may fetch an
+    arbitrary host through this module.
+    """
+    parsed = _urlparse.urlparse(url)
+    if parsed.scheme != "https" \
+            or parsed.hostname not in _ALLOWED_EDGAR_HOSTS:
+        raise ValueError(f"refusing non-EDGAR URL: {url!r}")
+    return url
+
+
 def _get_json(url, user_agent=None):
+    _check_edgar_url(url)
     _throttle()
+    # No manual Host header: urllib sets it from the URL, which is
+    # always one of the two allowed hosts above.
     headers = {"User-Agent": user_agent or EDGAR_USER_AGENT,
-               "Accept-Encoding": "gzip, deflate",
-               "Host": "data.sec.gov" if "data.sec.gov" in url else "www.sec.gov"}
+               "Accept-Encoding": "gzip, deflate"}
     req = _urlrequest.Request(url, headers=headers)
     try:
         with _urlrequest.urlopen(req, timeout=30) as resp:

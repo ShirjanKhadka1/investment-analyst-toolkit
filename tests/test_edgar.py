@@ -138,3 +138,60 @@ def test_get_json_sends_declared_user_agent(monkeypatch):
     edgar._get_json("https://data.sec.gov/submissions/CIK0000320193.json")
     assert seen["ua"] == edgar.EDGAR_USER_AGENT
     assert "investment-analyst-toolkit" in seen["ua"]
+
+
+class _Resp:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def read(self):
+        return b"{}"
+
+
+def test_get_json_allows_both_edgar_hosts(monkeypatch):
+    seen = []
+
+    def fake_urlopen(req, timeout=None):
+        seen.append((req.full_url, req.get_header("Host")))
+        return _Resp()
+
+    monkeypatch.setattr(edgar._urlrequest, "urlopen", fake_urlopen)
+    edgar._get_json("https://data.sec.gov/submissions/CIK0000320193.json")
+    edgar._get_json("https://www.sec.gov/files/company_tickers.json")
+    assert seen[0][0].startswith("https://data.sec.gov/")
+    assert seen[1][0].startswith("https://www.sec.gov/")
+    # No manual Host header: urllib sets it from the URL.
+    assert seen[0][1] is None and seen[1][1] is None
+
+
+@pytest.mark.parametrize("bad_url", [
+    "https://data.sec.gov.evil.invalid/submissions/CIK0000320193.json",
+    "https://www.sec.gov.evil.invalid/files/company_tickers.json",
+    "https://evil.invalid/data.sec.gov/submissions/CIK0000320193.json",
+    "https://evil.invalid/www.sec.gov/files/company_tickers.json",
+    "https://data.sec.gov@evil.invalid/submissions/CIK0000320193.json",
+    "https://www.sec.gov@evil.invalid/files/company_tickers.json",
+    "http://data.sec.gov/submissions/CIK0000320193.json",
+    "http://www.sec.gov/files/company_tickers.json",
+    "https://sec.gov.evil.invalid/x.json",
+    "ftp://data.sec.gov/x.json",
+])
+def test_get_json_rejects_lookalike_hosts(bad_url, monkeypatch):
+    def boom(req, timeout=None):
+        raise AssertionError("urlopen must not run for a rejected URL")
+
+    monkeypatch.setattr(edgar._urlrequest, "urlopen", boom)
+    with pytest.raises(ValueError, match="refusing non-EDGAR URL"):
+        edgar._get_json(bad_url)
+
+
+def test_check_edgar_url_accepts_exact_hosts_only():
+    assert edgar._check_edgar_url(
+        "https://data.sec.gov/api/xbrl/companyfacts/CIK0000320193.json")
+    assert edgar._check_edgar_url(
+        "https://www.sec.gov/files/company_tickers.json")
+    # Hostnames are case-insensitive; urlparse lowercases them.
+    assert edgar._check_edgar_url("https://DATA.SEC.GOV/x.json")
