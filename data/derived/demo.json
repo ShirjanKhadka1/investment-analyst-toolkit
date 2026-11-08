@@ -1,7 +1,7 @@
 {
   "dataset": "demo",
   "source_csv": "demo.csv",
-  "generated_at": "2026-11-08T02:08:22+00:00",
+  "generated_at": "2026-11-08T02:22:37+00:00",
   "generated_by": "scripts/refresh_derived.py",
   "as_of": "2026-11-06",
   "n_bars": 80,
