@@ -1,21 +1,19 @@
 # Daily track record — STAGED, NOT DEPLOYED.
 #
 # Purpose: once a day, fetch the seven watchlist tickers
-# (docs/watchlist-proposal.md), run the global rules team, log one
-# directional call per ticker (5-trading-day horizon), settle calls
+# (docs/watchlist-proposal.md), run the pre-registered direction
+# rules (docs/direction-rules.md), log one directional call per
+# ticker (5-trading-day horizon, non-overlapping), settle calls
 # whose horizon has passed, and commit the results to the DATA branch
 # (data/track-record) — NEVER to main. Main carries the code and the
 # spec; the data branch carries the outcomes.
 #
-# DO NOT DEPLOY YET. This workflow is staged only, for two reasons:
-#   1. The watchlist itself is a proposal — it needs the user's
-#      approval first (docs/watchlist-proposal.md).
-#   2. The runner script `scripts/track_record_daily.py` does not
-#      exist yet. The rules team returns discussion flags, not a
-#      direction verdict, so the rule that maps a persona's sections
-#      to UP / DOWN / neutral must be specified, implemented in that
-#      script, and tested before this workflow can run. The workflow
-#      must never invent a direction to fill the gap.
+# DO NOT DEPLOY YET. This workflow is staged only: the watchlist
+# itself is a proposal — it needs the user's approval first
+# (docs/watchlist-proposal.md). The runner script
+# (scripts/track_record_daily.py) and the direction rules exist and
+# are tested; the watchlist approval is the remaining activation
+# step before this workflow runs.
 #
 # Deploy (browser route — the API token has no workflow scope):
 # copy this file to .github/workflows/daily-track-record.yml on main
@@ -24,11 +22,11 @@
 # then dispatch it once by hand and read the log before relying on
 # the schedule. The schedule below runs daily after the US close.
 #
-# Safety: the job checks out the code, writes results into a work
-# tree of the data branch, and pushes ONLY to data/track-record. It
-# never checks out main for writing, never merges, and never touches
-# any other branch. A failed fetch is a missed day, recorded as such
-# in the run log — never filled in, never retried into a backfill.
+# Safety: the script writes results ONLY to the data branch
+# (--publish-branch data/track-record, --publish). It refuses
+# --publish-branch main outright, logs each call before its
+# outcome, records a failed fetch as a missed day (never filled
+# in), and is idempotent — a re-run never duplicates a call.
 name: Daily track record
 
 on:
@@ -55,22 +53,6 @@ jobs:
         run: |
           python3 scripts/track_record_daily.py \
             --calls data/track-record/calls.jsonl \
-            --out data/track-record/track-record.md
-      - name: Publish results to the data branch (never main)
-        run: |
-          set -euo pipefail
-          git config user.name "track-record"
-          git config user.email "track-record@users.noreply.github.com"
-          # Results live on data/track-record; create it on first run.
-          if git ls-remote --exit-code --heads origin data/track-record >/dev/null 2>&1; then
-            git worktree add /tmp/track-record-data data/track-record
-          else
-            git worktree add -b data/track-record /tmp/track-record-data
-          fi
-          cp data/track-record/calls.jsonl /tmp/track-record-data/calls.jsonl
-          cp data/track-record/track-record.md /tmp/track-record-data/track-record.md
-          git -C /tmp/track-record-data add calls.jsonl track-record.md
-          git -C /tmp/track-record-data diff --cached --quiet || \
-            git -C /tmp/track-record-data commit -m \
-              "Daily track record: $(date -u +%F) (data branch only, never main)"
-          git -C /tmp/track-record-data push origin data/track-record
+            --out data/track-record/track-record.md \
+            --publish-branch data/track-record \
+            --publish
