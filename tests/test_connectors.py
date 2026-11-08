@@ -188,12 +188,62 @@ def test_sla_table_values():
 
 
 def test_evaluate_freshness_fresh_and_stale_boundary():
+    # TODAY is Sat 2026-11-07. A Friday series is 1 calendar day old
+    # but 0 trading days old — FRESH. Thursday is 1 trading day old —
+    # still FRESH; Wednesday is 2 trading days old — STALE.
     fresh = evaluate_freshness("2026-11-06", 86400, today=TODAY)
     assert fresh == {"last_date": "2026-11-06", "age_days": 1,
+                     "age_trading_days": 0,
                      "sla_seconds": 86400, "status": "FRESH"}
-    stale = evaluate_freshness("2026-11-05", 86400, today=TODAY)
+    one_trading_day = evaluate_freshness("2026-11-05", 86400, today=TODAY)
+    assert one_trading_day["status"] == "FRESH"
+    assert one_trading_day["age_trading_days"] == 1
+    stale = evaluate_freshness("2026-11-04", 86400, today=TODAY)
     assert stale["status"] == "STALE"
-    assert stale["age_days"] == 2
+    assert stale["age_days"] == 3
+    assert stale["age_trading_days"] == 2
+
+
+def test_evaluate_freshness_weekend_does_not_go_stale():
+    # Friday data checked on Sunday and on Monday morning is fresh:
+    # no trading day has passed without new data.
+    sunday = datetime.date(2026, 11, 8)
+    monday = datetime.date(2026, 11, 9)
+    assert evaluate_freshness(
+        "2026-11-06", 86400, today=sunday,
+        kind="stock_daily")["status"] == "FRESH"
+    assert evaluate_freshness(
+        "2026-11-06", 86400, today=monday,
+        kind="stock_daily")["status"] == "FRESH"
+    # Thursday data checked Monday: Friday and Monday both passed
+    # with no new data — genuinely stale.
+    assert evaluate_freshness(
+        "2026-11-05", 86400, today=monday,
+        kind="stock_daily")["status"] == "STALE"
+
+
+def test_evaluate_freshness_nepse_trades_sunday():
+    # NEPSE's week is Sun–Thu: Thursday data checked Sunday is 1
+    # trading day old (Sunday is a trading day), so FRESH; Wednesday
+    # data checked Sunday is 2 trading days old (Thu + Sun) — STALE.
+    sunday = datetime.date(2026, 11, 8)
+    assert evaluate_freshness(
+        "2026-11-05", 86400, today=sunday,
+        kind="nepse_csv_daily")["status"] == "FRESH"
+    assert evaluate_freshness(
+        "2026-11-04", 86400, today=sunday,
+        kind="nepse_csv_daily")["status"] == "STALE"
+
+
+def test_evaluate_freshness_crypto_counts_weekends():
+    # Crypto trades every day: Friday data checked Sunday is 2 days
+    # old with no new data — STALE, not a weekend pass.
+    sunday = datetime.date(2026, 11, 8)
+    assert evaluate_freshness(
+        "2026-11-06", 86400, today=sunday,
+        kind="crypto_daily")["status"] == "STALE"
+    assert evaluate_freshness(
+        "2026-11-06", 86400, today=sunday)["status"] == "FRESH"
 
 
 def test_evaluate_freshness_year_only_read_as_31_dec():
