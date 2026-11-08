@@ -19,17 +19,18 @@ Re-verified 7 Nov 2026 (Phase 2, from this environment via the
 toolkit's own fetchers): Yahoo AAPL fresh through 2026-11-06;
 CoinGecko BTC through 2026-11-07; ECB fixing dated 2026-11-06
 (29 currencies); World Bank Nepal GDP through 2025
-($45,489,810,283.11); Stooq still returns no data.
+($45,489,810,283.11). Stooq REMOVED 8 Nov 2026 (third failed verification — see docs/global-markets-audit.md).
 
 ## No-key chain (used by `toolkit/free_data.py` and `toolkit/connectors.py`)
 
 | Source | Provides | Licence / terms | Verification (28 Oct 2026) |
 |---|---|---|---|
-| Yahoo Finance chart API | Stock/ETF daily price history | Public endpoint, no key. No licence published on the endpoint; use under Yahoo's terms. Redistribution TO VERIFY. | Working: AAPL, 251 points, last date 2026-10-27, fresh. Re-verified 7 Nov 2026: AAPL fresh through 2026-11-06. |
-| Stooq daily CSV | Stock daily closes (fallback only) | Free CSV, no key; Stooq's terms apply to reuse. Redistribution TO VERIFY. | NOT relied on alone: smoke check returned an HTML page, not CSV. Re-checked 7 Nov 2026: still no data. |
+| Yahoo Finance chart API | Stock/ETF daily price history — UNOFFICIAL, best-effort | Public endpoint, no key. No licence published on the endpoint; use under Yahoo's terms. Redistribution TO VERIFY. Yahoo publishes no public API for this endpoint; it can be rate-limited/tarpitted by User-Agent/IP. | Working: AAPL, 251 points, last date 2026-10-27, fresh. Re-verified 7 Nov 2026: AAPL fresh through 2026-11-06. 8 Nov 2026: SPY/7203.T/EURUSD/BTC-USD all timed out from this VM's shared egress (tarpit by User-Agent — browser UA works); AAPL cached series still usable. Works from GitHub Actions runners. |
+| Stooq daily CSV | REMOVED 8 Nov 2026 | — | Third failed verification: HTML instead of CSV on 28 Oct and 7 Nov 2026; connection timeout 8 Nov 2026. Removed from toolkit/data.py, toolkit/free_data.py, toolkit/connectors.py and all tests. |
 | CoinGecko keyless public API | Crypto daily prices (market chart) | Documented keyless API; shared IP pool, roughly 10–30 calls/min. Respect the limit; never work around a rate limit. | Working: BTC price + 91 daily points, fresh. Re-verified 7 Nov 2026: BTC through 2026-11-07 (last price $75,912). |
 | ECB euro reference rates | Daily EUR reference fixings (latest only) | Published by the ECB as official reference rates; attribute the ECB. A fixing is not a tradable quote and not a series. | Working: 2026-10-27 fixing, 29 currencies. Re-verified 7 Nov 2026: 2026-11-06 fixing, 29 currencies (USD 1.1165). |
 | World Bank API v2 | Macro indicators by country/year | World Bank Open Data terms apply. Exact redistribution licence TO VERIFY before republishing. | Working: Nepal GDP 2025. Re-verified 7 Nov 2026: Nepal GDP 2025, $45,489,810,283.11. |
+| SEC EDGAR (toolkit/edgar.py) | US fundamentals (XBRL company facts, submissions, ticker->CIK) | Public APIs, declared User-Agent required, no key. Fair access: max 10 req/s; module throttles to 5/s. | Verified 8 Nov 2026: data.sec.gov submissions for Apple (CIK 320193) returned 200, most recent filing 2026-11-06. Ticker table (www.sec.gov) intermittently tarpitted from this VM — pass the CIK directly if it times out. |
 
 ## Keyed or unverified (NOT in the no-key chain)
 

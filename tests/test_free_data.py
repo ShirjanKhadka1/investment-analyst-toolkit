@@ -146,7 +146,7 @@ def test_fetch_free_many_isolates_failures():
 
 # --- Registry ---------------------------------------------------------------
 def test_default_fetchers_stock_and_crypto():
-    assert [n for n, _ in default_fetchers("stock")] == ["yahoo", "stooq"]
+    assert [n for n, _ in default_fetchers("stock")] == ["yahoo"]
     assert [n for n, _ in default_fetchers("crypto")] == ["coingecko", "yahoo"]
     try:
         default_fetchers("nepse")

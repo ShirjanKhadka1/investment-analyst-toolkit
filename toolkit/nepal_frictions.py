@@ -267,17 +267,20 @@ def default_unknown_frictions():
 
 
 def sourced_nepal_frictions(settlement_lag_business_days=2,
-                            broker_override=None):
+                            broker_override=None, as_of=None):
     """The sourced NEPSE schedule (Phase 4 patch, 28 Oct 2026).
 
     Broker slabs, SEBON fee, DP charge and CGT split from the
     user-supplied rate-schedule screenshot of 28 Oct 2026; CGT
     halving per the Nepal Gazette notice cited in the module
-    docstring; circuit limits +15%/-15% user-supplied, current
-    as of 28 Oct 2026 (re-check against a current NEPSE/SEBON
-    notice before relying on them for a real trade). Settlement
-    is T+2 days as standard (user-supplied, 28 Oct 2026). A
-    broker-specific T+1 override is available ONLY by passing
+    docstring. Circuit limits are EFFECTIVE-DATED: ±15% from
+    2026-04-20, ±10% before (Fourth Amendment Bylaws, 2082,
+    SEBON-approved — fiscalnepal, 17 Apr 2026). ``as_of`` (a date
+    or ISO string) returns the limits in force on that date; with
+    no ``as_of`` the current ±15% is returned. Settlement is T+2
+    days as standard (CDSC Settlement Procedure, official,
+    2026-11-08); T+3 before Jan 2021. A broker-specific T+1
+    override is available ONLY by passing
     settlement_lag_business_days=1 together with broker_override
     naming the broker (e.g. "broker 58", the user-supplied
     example) — the override must be confirmed with that broker
@@ -297,6 +300,15 @@ def sourced_nepal_frictions(settlement_lag_business_days=2,
         source += (f" Settlement override: T+1 via {broker_override}, "
                    "user-supplied example as of 28 Oct 2026, to be "
                    "confirmed with that broker before use.")
+    circuit_limit = CIRCUIT_LIMIT
+    if as_of is not None:
+        # Lazy import: market_profiles imports this module.
+        from .market_profiles import get_profile as _get_profile
+
+        nepse = _get_profile("nepse")
+        circuit_limit = nepse.circuit_limit_up_on(as_of)
+        source += (f" Circuit limit as of {as_of}: {circuit_limit:.0%} "
+                   "(effective-dated rule, Fourth Amendment Bylaws, 2082).")
     return NepalFrictions(
         brokerage_slabs=BROKERAGE_SLABS,
         brokerage_minimum_flat=BROKERAGE_MINIMUM_FLAT,
@@ -304,8 +316,8 @@ def sourced_nepal_frictions(settlement_lag_business_days=2,
         dp_charge_flat=DP_CHARGE_FLAT,
         cgt_rate_short=CGT_RATE_SHORT,
         cgt_rate_long=CGT_RATE_LONG,
-        circuit_limit_up=CIRCUIT_LIMIT,
-        circuit_limit_down=CIRCUIT_LIMIT,
+        circuit_limit_up=circuit_limit,
+        circuit_limit_down=circuit_limit,
         settlement_lag_business_days=settlement_lag_business_days,
         settlement_broker_note=broker_override,
         source=source,

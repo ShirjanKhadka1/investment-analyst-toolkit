@@ -196,7 +196,7 @@ def test_simulate_nepse_labels_everything_and_reports_net_r():
     assert res["shares"] == 100
     assert res["circuit_limit_up"] == pytest.approx(0.15)
     assert res["circuit_limit_down"] == pytest.approx(0.15)
-    assert "rate-schedule screenshot, 28 Oct 2026" in res["circuit_source"]
+    assert "Fourth Amendment Bylaws, 2082" in res["circuit_source"]
     assert "rate-schedule screenshot, 28 Oct 2026" in res["frictions_source"]
     assert res["frictions_as_of"] == "2026-10-28"
     assert res["settlement_lag_business_days"] == 2
@@ -312,3 +312,75 @@ def test_readme_worked_example_replay_setup():
     assert res2["n_setup_windows"] == 0
     assert res2["target_first"] is None
     assert res2["honest_verdict"] == "insufficient data"
+
+
+# ---------------------------------------------------------------------------
+# Effective-dated circuit limits (8 Nov 2026)
+# ---------------------------------------------------------------------------
+
+def _dated_bars(last_date, n=30):
+    """Dated OHLC bars ending on ``last_date``; the last bar closes
+    +12% on its open (a move within limits after 2026-04-20, a
+    violation before)."""
+    import datetime
+
+    bars = []
+    day = last_date
+    closes = []
+    while len(closes) < n:
+        if day.weekday() < 5:
+            closes.append(day)
+        day -= datetime.timedelta(days=1)
+    closes.reverse()
+    for i, day in enumerate(closes):
+        open_px = 100.0 + i * 0.5
+        close_px = open_px * 1.12 if i == len(closes) - 1 else open_px * 1.001
+        bars.append({"date": day.isoformat(), "open": open_px,
+                     "high": max(open_px, close_px), "low": min(open_px, close_px),
+                     "close": close_px})
+    return bars
+
+
+def test_clip_steps_uses_limit_in_force_on_each_bar_date():
+    from toolkit.market_profiles import get_profile
+
+    nepse = get_profile("nepse")
+    steps = timemachine._steps_from_prices([
+        {"date": "2026-04-17", "open": 100.0, "high": 112.0,
+         "low": 100.0, "close": 112.0},
+        {"date": "2026-04-21", "open": 100.0, "high": 112.0,
+         "low": 100.0, "close": 112.0},
+    ])
+    clipped = timemachine._clip_steps_to_circuit(
+        steps, 0.15, 0.15,
+        limit_on=lambda d: (nepse.circuit_limit_up_on(d),
+                            nepse.circuit_limit_down_on(d)))
+    # +12% on 17 Apr (limit 10%) is clipped; on 21 Apr (15%) it stands.
+    assert clipped[0]["close"] == pytest.approx(0.10)
+    assert clipped[1]["close"] == pytest.approx(0.12)
+    assert "date" not in clipped[0]
+
+
+def test_simulate_nepse_dated_bars_report_the_rule_in_force():
+    import datetime
+
+    before = timemachine.simulate_nepse(
+        _dated_bars(datetime.date(2026, 4, 17)), 112.0, 100.0, 120.0,
+        n_sims=20, seed=19, horizon=5)
+    assert before["circuit_limit_up"] == pytest.approx(0.10)
+    assert before["circuit_limit_as_of"] == "2026-04-17"
+    assert before["circuit_limits_dated"] is True
+    after = timemachine.simulate_nepse(
+        _dated_bars(datetime.date(2026, 4, 21)), 112.0, 100.0, 120.0,
+        n_sims=20, seed=19, horizon=5)
+    assert after["circuit_limit_up"] == pytest.approx(0.15)
+    assert after["circuit_limit_as_of"] == "2026-04-21"
+    assert after["circuit_limits_dated"] is True
+
+
+def test_simulate_nepse_undated_bars_keep_current_limit():
+    res = timemachine.simulate_nepse(
+        [100.0 + i * 0.5 for i in range(30)], 115.0, 110.0, 120.0,
+        n_sims=20, seed=19, horizon=5)
+    assert res["circuit_limit_up"] == pytest.approx(0.15)
+    assert "circuit_limit_as_of" not in res

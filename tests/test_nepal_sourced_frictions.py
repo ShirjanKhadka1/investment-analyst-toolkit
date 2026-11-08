@@ -149,3 +149,15 @@ def test_unsourced_slab_and_invalid_slab_rejected():
         NepalFrictions(
             brokerage_slabs=((50000.0, 1.5),),
             source="test", as_of="2026-10-28")
+
+
+def test_sourced_frictions_circuit_limit_is_effective_dated():
+    from toolkit.nepal_frictions import sourced_nepal_frictions
+
+    assert sourced_nepal_frictions().circuit_limit_up == 0.15
+    assert sourced_nepal_frictions(
+        as_of="2026-04-19").circuit_limit_up == 0.10
+    assert sourced_nepal_frictions(
+        as_of="2026-04-20").circuit_limit_up == 0.15
+    assert sourced_nepal_frictions(
+        as_of="2026-11-08").circuit_limit_down == 0.15

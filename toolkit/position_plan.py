@@ -239,7 +239,7 @@ def _plan_number(plan, key):
     return value if _is_number(value) else None
 
 
-def risk_gate(plan, config=None):
+def risk_gate(plan, config=None, profile=None):
     """PASS/BLOCK checklist over a hypothetical plan — research only.
 
     Inputs: plan — a dict with at least entry, stop, target,
@@ -248,7 +248,14 @@ def risk_gate(plan, config=None):
     ("equity"/"etf"), symbol, short (bool), blocked (bool),
     daily_loss_usd, trades_today, orders_today, entry_window_ok
     (bool), is_duplicate (bool), date ("YYYY-MM-DD"); config — a dict
-    like DEFAULT_RESEARCH_CONFIG (missing keys fall back to it).
+    like DEFAULT_RESEARCH_CONFIG (missing keys fall back to it);
+    profile — a market key or MarketProfile (default None = NEPSE).
+    The 16 checks are market-agnostic and never change: a profile
+    supplies the config's currency/market context (see
+    ``market_profiles.profile_config``) and is recorded in the
+    result as ``market`` / ``currency``. Lot-size enforcement lives
+    in ``timemachine.simulate_with_profile``, not here, so the
+    16-check fingerprint never changes meaning.
     Output: dict with verdict ("PASS" only if all 16 checks pass,
     else "BLOCK"), per-check {"pass", "reason"}, passed/failed
     counts, failed_checks, date, and fingerprint — sha256 of the
@@ -267,13 +274,22 @@ def risk_gate(plan, config=None):
         # one in the toolkit.
         raise ValueError("plan must be a dict")  # noqa: TRY004
     cfg = dict(DEFAULT_RESEARCH_CONFIG)
+    date_str = plan.get("date")
+    if date_str is None:
+        date_str = datetime.date.today().isoformat()
+    if profile is not None:
+        # Local import: market_profiles imports position_plan lazily
+        # for profile_config, so this stays a one-way dependency.
+        # The plan's date is passed so the config carries the trading
+        # rules in force on that date (e.g. NEPSE's 10% circuit
+        # before 2026-04-20, 15% from), not today's rule.
+        from .market_profiles import profile_config
+
+        cfg = profile_config(profile, base=cfg, on=date_str)
     if config is not None:
         if not isinstance(config, dict):
             raise ValueError("config must be a dict")
         cfg.update(config)
-    date_str = plan.get("date")
-    if date_str is None:
-        date_str = datetime.date.today().isoformat()
     entry = _plan_number(plan, "entry")
     stop = _plan_number(plan, "stop")
     target = _plan_number(plan, "target")
@@ -382,7 +398,7 @@ def risk_gate(plan, config=None):
     fingerprint = hashlib.sha256(
         json.dumps({"plan": plan, "date": date_str},
                    sort_keys=True, default=str).encode("utf-8")).hexdigest()
-    return {
+    result = {
         "verdict": "PASS" if not failed else "BLOCK",
         "date": date_str,
         "fingerprint": fingerprint,
@@ -392,6 +408,13 @@ def risk_gate(plan, config=None):
         "failed": len(failed),
         "failed_checks": failed,
     }
+    if profile is not None:
+        from .market_profiles import get_profile as _get_profile
+
+        resolved = _get_profile(profile) if isinstance(profile, str) else profile
+        result["market"] = resolved.key
+        result["currency"] = resolved.currency
+    return result
 
 
 def extended_risk_gate(plan, config=None, context=None):

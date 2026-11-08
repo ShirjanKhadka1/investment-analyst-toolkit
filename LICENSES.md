@@ -33,7 +33,7 @@ reimplementation. Full inspection record (Phase 0 / Phase 0a):
 | Source | Licence / terms |
 |---|---|
 | Yahoo Finance chart API | Public endpoint, no key. No licence published on the endpoint; use under Yahoo's terms. Redistribution TO VERIFY. |
-| Stooq daily CSV | Free CSV, no key; Stooq's terms apply to reuse. Redistribution TO VERIFY. |
+| Stooq daily CSV | REMOVED 8 Nov 2026 (third failed verification; see docs/global-markets-audit.md). No Stooq code or data remains in the repo. |
 | CoinGecko keyless public API | Documented keyless API; shared IP pool, roughly 10–30 calls/min. Respect the limit; never work around a rate limit. |
 | ECB euro reference rates | Published by the ECB as official reference rates; attribute the ECB. A fixing is not a tradable quote and not a series. |
 | World Bank API v2 | World Bank Open Data terms apply. Exact redistribution licence TO VERIFY before republishing. |

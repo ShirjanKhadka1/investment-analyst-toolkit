@@ -186,18 +186,6 @@ def _get_text(url, timeout=20):
         raise RuntimeError(f"Network call failed for {url}: {e.reason}") from e
 
 
-def fetch_stooq_prices(symbol):
-    """Stooq daily closes, CSV, no key. Symbol like 'aapl.us'. Returns [(date, close)]."""
-    text = _get_text(f"https://stooq.com/q/d/l/?s={symbol}&i=d")
-    rows = list(csv.DictReader(text.splitlines()))
-    if not rows or "Close" not in (rows[0] or {}):
-        raise RuntimeError(f"No Stooq data for {symbol}")
-    out = [(r["Date"], float(r["Close"])) for r in rows if r.get("Close")]
-    if not out:
-        raise RuntimeError(f"No Stooq closes for {symbol}")
-    return out
-
-
 def fetch_alpha_vantage_prices(symbol, api_key=None):
     """Alpha Vantage daily prices. Key from env ALPHA_VANTAGE_API_KEY or argument."""
     key = api_key or get_api_key("ALPHA_VANTAGE_API_KEY", "Alpha Vantage", "https://www.alphavantage.co/support/#api-key")

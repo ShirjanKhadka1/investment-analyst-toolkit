@@ -180,3 +180,16 @@ def test_paper_ledger_roundtrip(tmp_path):
         paper_ledger.record_plan(path, plan, {"verdict": "MAYBE"})
     with pytest.raises(ValueError):
         paper_ledger.record_plan(path, {"entry": 1}, gate)
+
+
+def test_exchange_label_defaults_to_nepse_but_is_caller_controlled(tmp_path):
+    """The exchange label defaults to NEPSE (the default market) and
+    is set by the caller for any other market — a global call logged
+    without an exchange is labelled NEPSE, so global work must pass
+    its exchange explicitly. See the conflict sweep in
+    docs/positioning-draft.md (C3)."""
+    rec = _write(tmp_path)
+    assert rec["exchange"] == "NEPSE"
+    rec = _write(tmp_path, exchange="NYSE", symbol="AAPL")
+    assert rec["exchange"] == "NYSE"
+    assert rec["symbol"] == "AAPL"

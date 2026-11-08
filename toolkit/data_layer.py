@@ -64,20 +64,6 @@ DATA_SOURCES = [
         "verification": "Verified working 28 Oct 2026 (AAPL, 251 points, fresh).",
     },
     {
-        "name": "Stooq daily CSV",
-        "kind": "stock",
-        "needs_key": False,
-        "in_no_key_chain": True,
-        "licence_terms": (
-            "Free CSV download, no key. Fallback only; Stooq's own terms "
-            "apply to reuse. Redistribution terms TO VERIFY."
-        ),
-        "verification": (
-            "NOT relied on alone: a 28 Oct 2026 smoke check from this "
-            "environment returned an HTML page, not CSV."
-        ),
-    },
-    {
         "name": "CoinGecko keyless public API",
         "kind": "crypto",
         "needs_key": False,
@@ -123,10 +109,11 @@ DATA_SOURCES = [
             "are public, with a declared User-Agent required. No key."
         ),
         "verification": (
-            "NOT VERIFIED from this environment: 28 Oct 2026 fetch "
-            "returned HTTP 403 despite a declared User-Agent. Existing "
-            "fetcher left in place, not claimed verified, not retried "
-            "aggressively. TO VERIFY from a non-VM network."
+            "Verified working 8 Nov 2026 (toolkit/edgar.py): data.sec.gov "
+            "submissions for Apple (CIK 320193) returned 200, most recent "
+            "filing 2026-11-06; companyfacts returned 200 in Step 0. "
+            "Ticker table (www.sec.gov) intermittently tarpitted from "
+            "this VM — pass the CIK directly if it times out."
         ),
     },
     {

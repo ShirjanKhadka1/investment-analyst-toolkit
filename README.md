@@ -60,7 +60,7 @@ Honest comparison against the projects this toolkit learned from. Star counts ar
 | --- | --- | --- |
 | [FinceptTerminal](https://github.com/Fincept-Corporation/FinceptTerminal) (AGPL-3.0) | Breadth and execution: a full Bloomberg-style terminal with 201 data connectors, 22 live broker adapters and algo/RL trading. | Stdlib-only, no keys, no paid tiers, no execution at all; every number reproducible from a CSV. Ideas/formulas only — no Fincept code copied (AGPL). |
 | [TradingAgents](https://github.com/TauricResearch/TradingAgents) (Apache-2.0, 121,074 stars) | LLM debate depth: a multi-agent trading-firm simulation (bull/bear debate, three-way risk committee) ending in a 5-tier Buy–Sell rating, backed by a paper. | Deterministic and keyless: a no-LLM rules mode, walk-forward testing against a naive baseline, and a decision log settled against realised returns. Needs no LLM API key and makes no LLM calls per decision. |
-| [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill) (MIT, v2.0.0) | Agent-pack workflow: 11 skills, each one SKILL.md + one stdlib tool, with the Time Machine, exit math and 16-check risk gate this toolkit adapts. | A Python library + terminal instead of an agent pack, with NEPSE-aware frictions (sourced broker/SEBON/DP/CGT schedule, ±15% circuit limits, T+2). US day-trading specifics (PDT, NYSE holidays) are not carried over. |
+| [day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill) (MIT, v2.0.0) | Agent-pack workflow: 11 skills, each one SKILL.md + one stdlib tool, with the Time Machine, exit math and 16-check risk gate this toolkit adapts. | A Python library + terminal instead of an agent pack, with NEPSE-aware frictions (sourced broker/SEBON/DP/CGT schedule, ±15% circuit limits since 20 Apr 2026 — 10% before — T+2). US day-trading specifics (PDT, NYSE holidays) are not carried over. |
 | [OpenBB](https://github.com/openbq-org/OpenBB) (Apache-2.0, 75,185 stars) | Data breadth: one call fans out to 19 providers behind a standard provider contract, consumable from Python, REST, Excel or MCP. | Zero-dependency and CSV-first: no provider to break, a point-in-time store built in, and a freshness SLA with stale data flagged, never published silently. |
 | [qlib](https://github.com/microsoft/qlib) (MIT, 50,086 stars) | ML depth: Alpha158 factors, a model zoo (LightGBM, LSTM, Transformers) and an experiment recorder, from Microsoft Research. | Model-light by design: stdlib-only walk-forward evaluation where the naive baseline usually wins — and that loss stays in the record. No heavy dependencies, no training runs. |
 
@@ -74,7 +74,7 @@ flowchart TD
     TERM --> TM["toolkit/timemachine.py<br/>seeded Monte-Carlo + replay"]
     TERM --> GATE["toolkit/position_plan.py<br/>16-check risk gate"]
     TERM --> HEALTH["data_health.json<br/>freshness SLA"]
-    CONN["toolkit/connectors.py<br/>Yahoo / Stooq / CoinGecko / ECB / World Bank<br/>cache + TTL, bounded retries"] --> HEALTH
+    CONN["toolkit/connectors.py<br/>Yahoo (unofficial) / SEC EDGAR / CoinGecko / ECB / World Bank<br/>cache + TTL, bounded retries"] --> HEALTH
     PIT["toolkit/pit_store.py<br/>as_of / published_at"] --> TM
     PIT --> PRED["toolkit/predictive.py<br/>walk-forward vs naive"]
     PRED --> MODELS["MODELS.md<br/>model cards"]
@@ -304,8 +304,9 @@ fixtures only.
   describes the past sample only — every result still states
   "simulation, not a prediction".
 - **NEPSE simulation** — `simulate_nepse(...)`: the seeded
-  Monte-Carlo with daily moves clipped to the ±15% circuit limit
-  (user-supplied, 28 Oct 2026), an exit-liquidity guard that
+  Monte-Carlo with daily moves clipped to the circuit limit in
+  force on each bar's date (10% before 20 Apr 2026, 15% from;
+  Fourth Amendment Bylaws, 2082, SEBON-approved), an exit-liquidity guard that
   BLOCKs a position above 10% of typical daily volume instead of
   simulating it, and real trading frictions from
   `sourced_nepal_frictions()` (broker slabs 0.36%/0.33%/0.31%/
@@ -405,7 +406,7 @@ is supplied by the caller and every check fails closed when it is
 missing. A PASS from either gate is not a recommendation.
 `toolkit/paper_ledger.py` records hypothetical plans and their gate
 verdicts (fingerprint included) — paper only, no orders, no
-execution. Tests: `tests/test_decision_log.py` (10 tests, covering
+execution. Tests: `tests/test_decision_log.py` (11 tests, covering
 1.4 and 1.5 on synthetic fixtures).
 
 ## Research report pipeline (Engine 1.9)
@@ -446,14 +447,18 @@ of them; see `toolkit/SOURCES_MERGE_2026-11-07.md`): one standard
 interface per source, core never touches a vendor API. Priority order:
 caller-supplied CSVs first (the only NEPSE path — there is no
 documented free public NEPSE OHLCV API, and no live feed is
-invented), then Yahoo Finance, Stooq (fallback only), CoinGecko for
+invented), then Yahoo Finance (unofficial, best-effort), CoinGecko for
 crypto, ECB reference rates and the World Bank API. Each connector has
 a timeout, bounded retries (transient failures only, max 3 attempts
 with backoff — a 403/429 is never retried), an on-disk cache with a
 per-source TTL, and a freshness SLA (daily bars and FX: 1 trading day;
 World Bank annual: 1 year). Judged in trading days, not calendar days,
-so Friday data is not STALE on a Sunday; NEPSE uses its Sun–Thu week
-and crypto counts every day. `scripts/data_health.py` writes
+so Friday data is not STALE on a Sunday; NEPSE uses its Mon–Fri week
+(Sun–Thu before 6 Apr 2026) and crypto counts every day. A per-market
+holiday calendar (`data/holidays/nepse.json`, seeded only from official
+NEPSE notices — Dashain 2083 only so far) makes a festival closure read
+FRESH instead of a false STALE; a day outside the calendar's covered
+range degrades freshness to UNKNOWN, never to STALE. `scripts/data_health.py` writes
 `data_health.json` with per-source FRESH/STALE/UNAVAILABLE/UNKNOWN
 status, last-fetch time, age and cache hits; stale data is flagged,
 never published silently. The terminal dashboard shows it as section
@@ -462,7 +467,7 @@ refreshes `data/derived/*.json` (indicator snapshot, screening
 matches, Time-Machine odds) from the repo's CSVs with `as_of`
 provenance and a stale flag. Both scripts exit non-zero with a clear
 error on failure, so a scheduled run can alert on it. Tests:
-`tests/test_connectors.py` (41 tests), `tests/test_data_health.py`
+`tests/test_connectors.py` (43 tests), `tests/test_data_health.py`
 (17 tests, including fixtures cut from real responses fetched
 2026-11-07 — see `tests/fixtures/SOURCES.md`), and
 `tests/test_refresh_derived.py` (8 tests), all offline.
@@ -477,7 +482,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 512/512 tests passing (2026-11-08, fresh clone, Python 3.12, pytest 9.2.0): 509 before + 3 new trading-day freshness tests — connectors (41), data health (17), derived refresh (8) and terminal health section (6).
+Tests: 577/577 tests passing (2026-11-08, fresh clone, Python 3.12, pytest 9.2.0): 548 before + 29 new (12 EDGAR URL-allowlist + 16 effective-dated NEPSE rules + 1 exchange-label).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a
@@ -536,13 +541,14 @@ report a security issue privately.
 MIT.
 
 ## v0.9.0 — Phase 2 data layer + Phase 3 front door
-- **Data layer (`toolkit/connectors.py`, `scripts/data_health.py`, `scripts/refresh_derived.py`):** provider-contract connectors (caller CSVs first, then Yahoo, Stooq, CoinGecko, ECB, World Bank), per-source TTL cache, freshness SLA in `data_health.json`, derived refresh with `as_of` provenance. See the "Data layer and autonomy (Phase 2)" section above.
+- **Data layer (`toolkit/connectors.py`, `scripts/data_health.py`, `scripts/refresh_derived.py`):** provider-contract connectors (caller CSVs first, then Yahoo (unofficial, best-effort), SEC EDGAR, CoinGecko, ECB, World Bank), per-source TTL cache, freshness SLA in `data_health.json`, derived refresh with `as_of` provenance. See the "Data layer and autonomy (Phase 2)" section above.
 - **Front door:** README rewritten around the one-command terminal (hook, install + first result in under 60 seconds — timed 2.3 seconds for a clean clone + run, 2026-11-07), a worked example with numbers pinned by tests, an honest comparison table, a Mermaid architecture diagram, a live-demo section that states plainly there is no hosted interactive demo, a roadmap, and good-first-issues as text.
 - **Demo assets, generated from a real run:** `docs/demo-transcript.md`, `docs/demo.svg` (animated) and `docs/demo.gif` (11 frames), all written by `scripts/generate_demo_assets.py` from `python -m toolkit.terminal demo.csv`; `tests/test_demo_assets.py` fails if the transcript drifts from a live run.
 - **Nepali front door:** `README.ne.md` — the hook, install, first run, what it is/is not, and licence, translated into Nepali (technical terms with no good Nepali equivalent stay in English and are noted).
 - **Lint fix:** `ruff check` is now clean across the whole repo — 7 pre-existing errors in `scripts/check_numbers.py`, `scripts/generate_status.py` and `scripts/generate_models_table.py` fixed (3 shebangs on non-executable files, a nested `if`, a missing `check=False`, a blind `except Exception`, an unused variable). The README's earlier "`ruff check` clean" claim was stale until this fix.
 - Test total at v0.9.0 was 509 (505 at Phase 2 + 4 new demo-asset tests), verified 2026-11-07 in a fresh clone.
-- **2026-11-08 fix:** freshness SLA is now judged in trading days, not calendar days (Friday data no longer reads STALE on a Sunday; NEPSE uses its Sun–Thu week, crypto counts every day), and a repo-root `conftest.py` makes `import toolkit` work under the bare `pytest` binary as well as `python -m pytest` — the two gaps that turned CI red on 8 Nov. Tests: 512/512 (509 + 3 new freshness tests), verified 2026-11-08 in a fresh clone.
+- **2026-11-08 fix:** freshness SLA is now judged in trading days, not calendar days (Friday data no longer reads STALE on a Sunday; NEPSE uses its Sun–Thu week, crypto counts every day), and a repo-root `conftest.py` makes `import toolkit` work under the bare `pytest` binary as well as `python -m pytest` — the two gaps that turned CI red on 8 Nov. Tests stood at 512 (509 + 3 new freshness tests), verified 2026-11-08 in a fresh clone.
+- **2026-11-08, global-markets (PR #9):** NEPSE rules are effective-dated, not single values — trading week Sun–Thu until 5 Apr 2026, Mon–Fri from 6 Apr 2026 (board decision 22 Chaitra 2082); daily price limit 10% before 20 Apr 2026, 15% from, pre-open band 2% → 5% (Fourth Amendment Bylaws, 2082); index breaker three-tier (4/5/6%) before, two-tier (5%/8%) from; settlement T+2 (CDSC procedure, official), T+3 before Jan 2021. Freshness, the Time Machine and the risk gate use the rule in force on each bar's date; the EDGAR fetcher now validates URLs by parsed hostname (CodeQL fix). Tests stood at 577 (560 + 17 new), verified 2026-11-08 in a fresh clone.
 
 ## v0.2.0 — Job 3: portfolio, performance, forecast, free API data
 - `toolkit/portfolio.py` — returns, sample + shrunk covariance, equal / inverse-vol / min-variance / max-Sharpe weights, clean long-only weights, efficient frontier. Shrinkage + L2 by default; every portfolio compared to 1/N.
@@ -562,8 +568,8 @@ MIT.
 - Tests at v0.3: 23/23 passed. (Historical count for that version only; the current count is in the Tests section above and in status.json, verified by CI.)
 
 ## v0.4.0 — Quality data, autonomous updates, predictive models, zero-error guards
-- **No stale data, ever:** `fetch_fresh_prices()` tries sources in order (Yahoo → Stooq → Alpha Vantage / Twelve Data / FMP with your key), skips any source that fails or is older than `max_age_days`, and raises listing every attempt if all are stale — it never returns stale data labelled fresh, and never invents a price.
-- **API keys, properly:** keys come from the environment ONLY (`.env.example` lists FRED, Alpha Vantage, Twelve Data, FMP). No key is bundled, hard-coded, or invented; a missing key raises an error naming the provider, env var, and where to get a free key. No-key sources (Yahoo, Stooq, World Bank, SEC EDGAR, CSV) work with no key at all.
+- **No stale data, ever:** `fetch_fresh_prices()` tries sources in order (Yahoo → Alpha Vantage / Twelve Data / FMP with your key), skips any source that fails or is older than `max_age_days`, and raises listing every attempt if all are stale — it never returns stale data labelled fresh, and never invents a price.
+- **API keys, properly:** keys come from the environment ONLY (`.env.example` lists FRED, Alpha Vantage, Twelve Data, FMP). No key is bundled, hard-coded, or invented; a missing key raises an error naming the provider, env var, and where to get a free key. No-key sources (Yahoo, World Bank, SEC EDGAR, CSV) work with no key at all.
 - **Predictive, walk-forward only:** naive, moving-average, linear trend, exponential smoothing; `auto_select_model()` picks by out-of-sample MAE; inverse-MAE ensemble; anomaly flags (z-score); volatility regime (high/low).
 - **Autonomous auto-updating:** `toolkit/autonomous.py` — `run_once()` fetches fresh data, re-runs prediction + performance, writes timestamped + `latest` reports and a hash-chained audit log; one symbol failing never kills the run (its old report is kept, marked STALE). `run_loop()` repeats daily by default. Research only — no trades, no spend.
 - **Zero-error guards:** every series is validated at the boundary — finite numbers only (NaN/inf/None/str/bool rejected), price pairs must be ISO dates, strictly increasing, unique, close > 0. Bad input fails loudly with what to fix, never as a wrong number downstream.
@@ -640,7 +646,7 @@ hold recommendation; NEPSE stays CSV-only.
 ## v0.7.0 — Phase 4: engines + prediction accuracy
 - **Engine validation:** every toolkit formula audited against a named reference (Black–Scholes–Merton 1973 + put-call parity, Gordon 1959, Markowitz portfolio variance, Sharpe 1966/1994, Sortino, historical CVaR, DuPont identity, exact GBM discretisation, walk-forward evaluation). Correct formulas left unchanged; genuine bugs proven by failing cases first, then fixed: `options.greeks` and Monte Carlo silently returned put values for an unknown kind (now raise `ValueError`), negative trade costs added money in backtests (now rejected), non-positive prices and bad alphas now rejected, flat-volatility regime no longer flips on float noise.
 - **Nepal frictions (`toolkit/nepal_frictions.py`):** brokerage, SEBON fee, DP charge, capital gains tax, circuit limits, settlement lag as parameters — every rate UNKNOWN by default, because no rate is stated in the local Nepal guides; a rate is accepted only with a source + as-of date. Cost reports return UNKNOWN (never zero) when any needed rate is unknown, so a backtest can never run cost-free by accident. NEPSE stated; scanner stays CSV-only; no live feed.
-- **Nepal frictions, sourced schedule (Phase 4 patch, 28 Oct 2026 — deploy after Phase 4 verifies):** `sourced_nepal_frictions()` carries the user-supplied schedule — broker slabs 0.36%/0.33%/0.31%/0.27%/0.24% (min Rs 10), SEBON 0.015%, DP Rs 25, CGT 5% at ≤365 days / 3.75% above (gain after fees, sell only; Gazette vol. 76, Additional 40, Part 5, 31 Bhadra 2083), circuit limits +15%/−15% (re-check against a current NEPSE/SEBON notice before relying on them), settlement T+2 standard with a broker-confirmed T+1 override (example: broker 58 — T+1 is not the standard). Dividends at flat 5%: note only, not implemented. Tests: 118/118 (106 at v0.7.0 + 12 patch tests).
+- **Nepal frictions, sourced schedule (Phase 4 patch, 28 Oct 2026 — deploy after Phase 4 verifies):** `sourced_nepal_frictions()` carries the user-supplied schedule — broker slabs 0.36%/0.33%/0.31%/0.27%/0.24% (min Rs 10), SEBON 0.015%, DP Rs 25, CGT 5% at ≤365 days / 3.75% above (gain after fees, sell only; Gazette vol. 76, Additional 40, Part 5, 31 Bhadra 2083), circuit limits ±15% from 20 Apr 2026 (±10% before; Fourth Amendment Bylaws, 2082, SEBON-approved), settlement T+2 standard (CDSC procedure, official; T+3 before Jan 2021) with a broker-confirmed T+1 override (example: broker 58 — T+1 is not the standard). Dividends at flat 5%: note only, not implemented. Tests: 118/118 (106 at v0.7.0 + 12 patch tests).
 - **Prediction accuracy (`toolkit/accuracy_report.py`, `docs/post-mortem-prediction-failures.md`):** ledger-driven accuracy per model/version with n stated, pending never counted as wins, failures listed with reason + action, zero-scored models render "no scored predictions". Post-mortem written first for the one locally evidenced failure (fixture, n=1, direction wrong, abs error 15.0 — not smoothed). Before/after OOS (walk-forward, existing models, `predictive.py` unchanged): level-shift fixture naive wins (MAE 3.33 vs 10.0/11.06/14.66, `beats_naive: False`); trending fixture linear_trend genuinely wins (MAE 0.0 vs naive 2.0). Two scratch candidates lost to naive and were NOT adopted. No model change shipped that fails the naive test.
 - Tests: 106/106 passed (66 at v0.6.0 + 5 accuracy-report + 35 engine-validation tests), verified 28 Oct 2026 in a fresh venv.
 
@@ -651,7 +657,7 @@ hold recommendation; NEPSE stays CSV-only.
   by test), a payload validator that rejects corrupt series whole
   (never repairs, never partially publishes), and a publish gate
   (`publish_check`) that rejects stale series as fresh. Full record:
-  `DATA_SOURCES.md` — free public sources only (Yahoo → Stooq, CoinGecko,
+  `DATA_SOURCES.md` — free public sources only (Yahoo, CoinGecko,
   ECB, World Bank); SEC EDGAR is NOT verified from this environment and
   is not claimed verified; keyed providers run on the user's own key
   only; NEPSE has no live feed (no documented free public API verified
@@ -686,8 +692,8 @@ hold recommendation; NEPSE stays CSV-only.
 - **Recording failure and improving from it:** every failure gets a reason (direction wrong / error above threshold) and an action — the failing model is demoted in the next auto-selection by inverse-MAE re-weighting. Failures are never deleted from the record.
 - **Archiving:** every run is timestamped and indexed in `archive/index.json`; `latest` is only a pointer. Pruning is opt-in and never deletes a symbol's latest run.
 - **Agentic accuracy loop:** new Accuracy Auditor agent + prediction-accuracy-loop runbook in finance-research-agents: audit the ledger, log failures, demote failing models, check archive completeness and data freshness before any report goes out.
-- **All API calls:** Yahoo, Stooq, World Bank, SEC EDGAR (no key) + FRED, Alpha Vantage, Twelve Data, FMP (your env key only), all through the fresh-data fallback chain.
+- **All API calls:** Yahoo (unofficial, best-effort), World Bank, SEC EDGAR (no key) + FRED, Alpha Vantage, Twelve Data, FMP (your env key only), all through the fresh-data fallback chain.
 - **Honest limit, stated plainly:** no system is failure-free. This one is built so failures are measured, logged, and acted on — that is the closest to "no failure" that is honest.
 - Tests at v0.5.0: 52/52 passed (47 at v0.5 + free-data, + 5 model-comparison tests). (Historical count for that version only; the current count is in the Tests section above and in status.json, verified by CI.)
-- **Free-data layer (post-v0.5):** `toolkit/free_data.py` — unified no-key fetcher (Yahoo → Stooq for stocks; CoinGecko for crypto; ECB reference rates; World Bank macro), every series carrying source, retrieval time, last date and age, stale data never presented as fresh. No live NEPSE feed exists in this layer: no documented free public NEPSE OHLCV API was verified (see the NEPSE scanner's teardown).
+- **Free-data layer (post-v0.5):** `toolkit/free_data.py` — unified no-key fetcher (Yahoo for stocks — unofficial, best-effort; CoinGecko for crypto; ECB reference rates; World Bank macro), every series carrying source, retrieval time, last date and age, stale data never presented as fresh. No live NEPSE feed exists in this layer: no documented free public NEPSE OHLCV API was verified (see the NEPSE scanner's teardown).
 - **Walk-forward model comparison (post-v0.5):** `predictive.compare_models_walk_forward()` runs naive + all existing models through the same walk-forward split, ranks them by MAE, and reports `beats_naive: False` when naive wins — that result is kept in the record, not hidden.

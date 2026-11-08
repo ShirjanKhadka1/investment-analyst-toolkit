@@ -43,7 +43,7 @@ _ECB_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
 
 def test_list_free_data_sources_all_no_key():
     sources = free_data.list_free_data_sources()
-    assert len(sources) == 5
+    assert len(sources) == 4  # Stooq removed 8 Nov 2026
     assert all(s["needs_key"] is False for s in sources)
     kinds = {s["kind"] for s in sources}
     assert {"stock", "crypto", "fx-reference", "macro"} <= kinds
@@ -73,15 +73,12 @@ def test_coingecko_history_empty_payload_raises(monkeypatch):
         free_data.fetch_coingecko_history("BTC")
 
 
-def test_crypto_and_stooq_adapters_rewrite_symbols(monkeypatch):
+def test_crypto_adapter_rewrites_symbols(monkeypatch):
     captured = []
     monkeypatch.setattr(free_data, "fetch_yahoo_prices", lambda s: captured.append(s))
-    monkeypatch.setattr(free_data, "fetch_stooq_prices", lambda s: captured.append(s))
     free_data._yahoo_crypto_adapter("BTC")
     free_data._yahoo_crypto_adapter("ETH-USD")
-    free_data._stooq_adapter("AAPL")
-    free_data._stooq_adapter("aapl.us")
-    assert captured == ["BTC-USD", "ETH-USD", "aapl.us", "aapl.us"]
+    assert captured == ["BTC-USD", "ETH-USD"]
 
 
 def test_ecb_reference_rates_from_fixture(monkeypatch):
@@ -452,22 +449,6 @@ def test_fetch_fred_series_key_guard_and_parsing(monkeypatch):
     assert data.fetch_fred_series("GDP", "KEY") == [("2024-01-02", 123.5)]
 
 
-def test_fetch_stooq_prices_parsing_and_rejections(monkeypatch):
-    monkeypatch.setattr(data, "_get_text",
-                        lambda url: "Date,Close\n2024-01-02,100.5\n2024-01-03,101.5\n")
-    assert data.fetch_stooq_prices("aapl.us") == [("2024-01-02", 100.5), ("2024-01-03", 101.5)]
-    monkeypatch.setattr(data, "_get_text", lambda url: "Date,Open\n2024-01-02,100.5\n")
-    with pytest.raises(RuntimeError, match="No Stooq"):
-        data.fetch_stooq_prices("aapl.us")
-    monkeypatch.setattr(data, "_get_text", lambda url: "")
-    with pytest.raises(RuntimeError, match="No Stooq"):
-        data.fetch_stooq_prices("aapl.us")
-    # Rows present with a Close column but no usable close -> "no closes".
-    monkeypatch.setattr(data, "_get_text", lambda url: "Date,Close\n2024-01-02,\n")
-    with pytest.raises(RuntimeError, match="No Stooq closes"):
-        data.fetch_stooq_prices("aapl.us")
-
-
 def test_alpha_vantage_parses_sorted_and_rejects_empty(monkeypatch):
     monkeypatch.delenv("ALPHA_VANTAGE_API_KEY", raising=False)
     with pytest.raises(ValueError, match="ALPHA_VANTAGE_API_KEY"):
@@ -567,15 +548,11 @@ def test_cli_predict_demo_and_csv(tmp_path):
     assert cli.main(["predict", "--csv", str(csv_path)]) == 0
 
 
-def test_cli_data_yahoo_and_stooq_stubbed(monkeypatch, capsys):
+def test_cli_data_yahoo_stubbed(monkeypatch, capsys):
     today = datetime.date.today().isoformat()
     monkeypatch.setattr(cli.data, "fetch_yahoo_prices", lambda s: [(today, 100.0)])
     assert cli.main(["data", "--symbol", "AAPL", "--source", "yahoo"]) == 0
     assert "AAPL" in capsys.readouterr().out
-    captured = []
-    monkeypatch.setattr(cli.data, "fetch_stooq_prices", lambda s: captured.append(s) or [(today, 100.0)])
-    assert cli.main(["data", "--symbol", "aapl", "--source", "stooq"]) == 0
-    assert captured == ["aapl.us"]
 
 
 def test_cli_autonomous_once_stubbed(monkeypatch):
