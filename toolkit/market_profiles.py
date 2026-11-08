@@ -47,8 +47,8 @@ from .nepal_frictions import (
 
 __all__ = [
     "KIND_PROFILES",
-    "MarketProfile",
     "PROFILES",
+    "MarketProfile",
     "UnknownMarketError",
     "default_profile",
     "get_profile",
@@ -140,8 +140,8 @@ NEPSE = MarketProfile(
     settlement_note="T+2 as standard (user-supplied, 28 Oct 2026); broker 58 offers T+1.",
     fees={
         "brokerage_slabs": {
-            "value": None,
-            "unit": "slabs (see nepal_frictions.BROKERAGE_SLABS)",
+            "value": BROKERAGE_SLABS,
+            "unit": "(upper bound NPR, rate) per slab; see nepal_frictions",
             "note": "0.36% to Rs 50k, 0.33% to Rs 5 lakh, 0.31% to Rs 20 lakh, "
                     "0.27% to Rs 1 crore, 0.24% above; minimum Rs 10.",
         },
@@ -161,13 +161,17 @@ NEPSE = MarketProfile(
     sources=_NEPSE_SOURCES,
     status="tested",
     disputes=(
-        "Trading week: Sun-Thu here (user-supplied schedule, 28 Oct 2026), "
-        "but several sources say NEPSE moved to Mon-Fri in April 2026 "
-        "(board decision 2082 Chaitra 23; punji.app 2026-09-25, "
-        "markethours.io 2026-11-08). Verify against NEPSE's own calendar "
-        "before changing — it changes freshness judgements.",
-        "Settlement: T+2 here (user-supplied schedule); at least one guide "
-        "says T+3 (arthneeti.org NEPSE guide). Verify before relying on it.",
+        (
+            "Trading week: Sun-Thu here (user-supplied schedule, 28 Oct 2026), "
+            "but several sources say NEPSE moved to Mon-Fri in April 2026 "
+            "(board decision 2082 Chaitra 23; punji.app 2026-09-25, "
+            "markethours.io 2026-11-08). Verify against NEPSE's own calendar "
+            "before changing — it changes freshness judgements."
+        ),
+        (
+            "Settlement: T+2 here (user-supplied schedule); at least one guide "
+            "says T+3 (arthneeti.org NEPSE guide). Verify before relying on it."
+        ),
     ),
 )
 

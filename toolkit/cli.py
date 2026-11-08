@@ -18,7 +18,7 @@ def main(argv=None):
     sub.add_parser("forecast-demo")
     pd = sub.add_parser("data")
     pd.add_argument("--symbol", required=True)
-    pd.add_argument("--source", default="yahoo", choices=["yahoo", "stooq"])
+    pd.add_argument("--source", default="yahoo", choices=["yahoo"])
     pd.add_argument("--max-age-days", type=int, default=7)
     pp = sub.add_parser("predict")
     pp.add_argument("--csv", default=None)
@@ -35,7 +35,7 @@ def main(argv=None):
     args = p.parse_args(argv)
     if args.cmd == "data":
         from . import data as _data
-        fn = _data.fetch_yahoo_prices if args.source == "yahoo" else (lambda s: _data.fetch_stooq_prices(s.lower() + ".us"))
+        fn = _data.fetch_yahoo_prices
         pairs = fn(args.symbol)
         fresh = _data.check_freshness(pairs[-1][0], max_age_days=args.max_age_days)
         print({"symbol": args.symbol, "source": args.source, "n_points": len(pairs), "last_date": pairs[-1][0], "last_close": pairs[-1][1], "freshness": fresh})

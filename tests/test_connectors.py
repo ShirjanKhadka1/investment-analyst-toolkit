@@ -414,10 +414,10 @@ def test_chain_falls_back_when_csv_missing(tmp_path):
 
 def test_chain_records_stale_then_falls_back():
     chain = [Connector("yahoo", lambda s: STALE_PAIRS),
-             Connector("stooq", lambda s: FRESH_PAIRS)]
+             Connector("coingecko", lambda s: FRESH_PAIRS)]
     model = fetch_prices("AAPL", kind="stock", chain=chain, today=TODAY,
                          sleep=_no_sleep)
-    assert model["source"] == "stooq"
+    assert model["source"] == "coingecko"
     assert model["tried"][0] == {
         "source": "yahoo", "status": "stale",
         "error": model["tried"][0]["error"]}
@@ -427,25 +427,25 @@ def test_chain_records_stale_then_falls_back():
 def test_chain_all_fail_lists_every_attempt():
     chain = [Connector("yahoo", lambda s: (_ for _ in ()).throw(
                 RuntimeError("API call failed (403) for https://example.test"))),
-             Connector("stooq", lambda s: (_ for _ in ()).throw(
-                RuntimeError("No Stooq data for aapl.us")))]
+             Connector("coingecko", lambda s: (_ for _ in ()).throw(
+                RuntimeError("No coingecko data for aapl.us")))]
     with pytest.raises(RuntimeError) as excinfo:
         fetch_prices("AAPL", kind="stock", chain=chain, today=TODAY,
                      sleep=_no_sleep)
     text = str(excinfo.value)
-    assert "yahoo" in text and "stooq" in text
-    assert "403" in text and "No Stooq data" in text
+    assert "yahoo" in text and "coingecko" in text
+    assert "403" in text and "No coingecko data" in text
     assert "No fresh data was returned" in text
 
 
 def test_default_price_chain_stock_and_crypto():
     stock = default_price_chain("stock")
-    assert [c.name for c in stock] == ["yahoo", "stooq"]
+    assert [c.name for c in stock] == ["yahoo"]
     crypto = default_price_chain("crypto")
     assert [c.name for c in crypto] == ["coingecko", "yahoo"]
     with_csv = default_price_chain(
         "stock", csv_path="x.csv", csv_source="test")
-    assert [c.name for c in with_csv] == ["csv", "yahoo", "stooq"]
+    assert [c.name for c in with_csv] == ["csv", "yahoo"]
     with pytest.raises(ValueError, match="unknown price kind"):
         default_price_chain("bond")
 
@@ -509,7 +509,7 @@ def test_fetch_macro_empty_values_is_unavailable():
 def test_list_connectors_covers_all_sources_with_terms():
     rows = list_connectors()
     names = [r["name"] for r in rows]
-    assert names == ["csv", "yahoo", "stooq", "coingecko", "ecb", "worldbank"]
+    assert names == ["csv", "yahoo", "coingecko", "ecb", "worldbank"]
     for row in rows:
         assert row["licence_terms"].strip(), f"{row['name']} has no terms note"
         assert row["sla_seconds"] > 0

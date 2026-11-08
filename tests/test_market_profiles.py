@@ -8,7 +8,7 @@ TRADING_WEEKDAYS table must survive the derivation unchanged.
 
 import pytest
 
-from toolkit import connectors, market_profiles, timemachine
+from toolkit import connectors, timemachine
 from toolkit.market_profiles import (
     KIND_PROFILES,
     PROFILES,

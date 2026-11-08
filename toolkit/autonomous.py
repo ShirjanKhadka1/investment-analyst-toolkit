@@ -55,7 +55,7 @@ def run_once(config):
     stamp = (config.get("now") or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y%m%dT%H%M%SZ")
     fetchers = config.get("fetchers")
     if fetchers is None:
-        fetchers = [("yahoo", data_mod.fetch_yahoo_prices), ("stooq", lambda s: data_mod.fetch_stooq_prices(s.lower() + ".us"))]
+        fetchers = [("yahoo", data_mod.fetch_yahoo_prices)]
     summary = {"run_at": stamp, "symbols": {}}
     audit_path = os.path.join(out_dir, "audit.jsonl")
     prev_hash = "GENESIS"

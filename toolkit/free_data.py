@@ -10,9 +10,10 @@ What is wired in here (all verified or documented on 28 Oct 2026 — see
 research/free-data-sources-2026-10-28.md for the full audit):
 - Yahoo Finance chart API: stock/ETF price history, no key. Public
   endpoint, used as the toolkit's primary stock source since v0.2.
-- Stooq daily CSV: stock history, no key. Kept as a fallback only —
-  on 28 Oct 2026 a smoke check from this environment returned an HTML
-  page instead of CSV, so Stooq is NOT relied on alone.
+- Stooq daily CSV: REMOVED 8 Nov 2026 — third failed verification
+  (HTML instead of CSV on 28 Oct and 7 Nov 2026; connection timeout
+  8 Nov 2026; see docs/global-markets-audit.md). The stock chain is
+  Yahoo only now; a second stock source is an open gap.
 - CoinGecko keyless public API (docs.coingecko.com, "Keyless Public
   API"): crypto prices and market charts, no key, ~10-30 calls/min
   shared IP pool. Used for crypto series only.
@@ -52,7 +53,6 @@ from .data import (
     _get_json,
     _get_text,
     check_freshness,
-    fetch_stooq_prices,
     fetch_worldbank_indicator,
     fetch_yahoo_prices,
 )
@@ -83,9 +83,6 @@ def list_free_data_sources():
     return [
         {"source": "Yahoo Finance chart API", "needs_key": False,
          "provides": "stock/ETF daily price history", "kind": "stock"},
-        {"source": "Stooq daily CSV", "needs_key": False,
-         "provides": "stock daily closes (fallback only; unverified 28 Oct 2026)",
-         "kind": "stock"},
         {"source": "CoinGecko keyless public API", "needs_key": False,
          "provides": "crypto daily prices (market chart)", "kind": "crypto"},
         {"source": "ECB euro reference rates", "needs_key": False,
@@ -144,14 +141,6 @@ def _yahoo_crypto_adapter(symbol):
     return fetch_yahoo_prices(sym)
 
 
-def _stooq_adapter(symbol):
-    """Stooq fallback for stocks: AAPL -> aapl.us (as in v0.4)."""
-    sym = str(symbol).lower()
-    if "." not in sym:
-        sym = sym + ".us"
-    return fetch_stooq_prices(sym)
-
-
 # ---------------------------------------------------------------------------
 # ECB euro reference rates (official daily XML, no key)
 # ---------------------------------------------------------------------------
@@ -191,10 +180,11 @@ def fetch_ecb_reference_rates():
 # ---------------------------------------------------------------------------
 def default_fetchers(kind="stock"):
     """Ordered (name, callable) fallback chain for a series kind.
-    kind='stock' -> Yahoo, then Stooq. kind='crypto' -> CoinGecko,
+    kind='stock' -> Yahoo only (Stooq removed 8 Nov 2026 — see module
+    docstring). kind='crypto' -> CoinGecko,
     then Yahoo (BTC-USD style). Anything else raises ValueError."""
     if kind == "stock":
-        return [("yahoo", fetch_yahoo_prices), ("stooq", _stooq_adapter)]
+        return [("yahoo", fetch_yahoo_prices)]
     if kind == "crypto":
         return [("coingecko", fetch_coingecko_history), ("yahoo", _yahoo_crypto_adapter)]
     raise ValueError(f"unknown free-data kind {kind!r} (use 'stock' or 'crypto')")

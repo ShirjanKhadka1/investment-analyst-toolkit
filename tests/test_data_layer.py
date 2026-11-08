@@ -50,7 +50,7 @@ def _corrupt(symbol):
 
 def test_registry_every_source_has_licence_terms():
     sources = list_data_sources()
-    assert len(sources) >= 8
+    assert len(sources) >= 7  # 8 before Stooq was removed 8 Nov 2026
     for entry in sources:
         assert entry["name"] and entry["verification"]
         assert entry["licence_terms"].strip(), entry["name"]

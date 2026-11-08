@@ -30,5 +30,5 @@ recorded blocker). Failures are visible in the public workflow run log
 and in the `STALE_OR_FAILED` labels in this directory.
 
 Data sources for these reports: the free, public sources recorded in
-`../DATA_SOURCES.md` (Yahoo → Stooq fallback for stocks). No live NEPSE
+`../DATA_SOURCES.md` (Yahoo, unofficial best-effort, for stocks). No live NEPSE
 feed exists in this layer — see `DATA_SOURCES.md` for why.

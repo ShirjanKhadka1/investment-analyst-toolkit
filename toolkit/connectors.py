@@ -29,8 +29,12 @@ Sources, in priority order (see DATA_SOURCES.md for the audit trail):
    ``(path) -> [(date, close)]`` shape, so the scanner loader plugs
    in without a copy.
 2. Yahoo Finance chart API (stock/ETF daily closes, no key).
-3. Stooq daily CSV (stock fallback only; it returned no data on
-   28 Oct 2026 and again on 7 Nov 2026 — it is never relied on alone).
+   UNOFFICIAL and best-effort: Yahoo publishes no public API for
+   this endpoint, so it can be rate-limited or tarpitted by
+   User-Agent/IP (observed 8 Nov 2026 from this VM's shared egress;
+   works from GitHub Actions runners). It is never relied on alone —
+   the chain reports every failed attempt instead of inventing data.
+3. SEC EDGAR (US fundamentals, no key; see ``toolkit/edgar.py``).
 4. CoinGecko keyless public API (crypto daily prices, no key).
 5. ECB euro reference rates (daily FX fixings, latest only).
 6. World Bank API v2 (macro indicators by country/year, no key).
@@ -69,7 +73,6 @@ from pathlib import Path
 from .checks import validate_price_pairs
 from .data import (
     check_freshness,
-    fetch_stooq_prices,
     fetch_yahoo_prices,
 )
 from .data_layer import StaleDataError
@@ -140,7 +143,6 @@ TRADING_WEEKDAYS = {
 CACHE_TTL_SECONDS = {
     "csv": 12 * 3600,
     "yahoo": 12 * 3600,
-    "stooq": 12 * 3600,
     "coingecko": 6 * 3600,
     "ecb": 12 * 3600,
     "worldbank": 30 * _DAY,
@@ -160,10 +162,6 @@ _CONNECTOR_TERMS = {
         "endpoint itself; use is under Yahoo's terms. Redistribution "
         "terms are TO VERIFY — do not redistribute Yahoo data as your "
         "own dataset; publish derived analytics only."
-    ),
-    "stooq": (
-        "Free CSV download, no key. Fallback only; Stooq's own terms "
-        "apply to reuse. Redistribution terms TO VERIFY."
     ),
     "coingecko": (
         "Documented keyless public API; shared IP pool, roughly "
@@ -186,7 +184,6 @@ _CONNECTOR_TERMS = {
 _SOURCE_KINDS = {
     "csv": "nepse_csv_daily",
     "yahoo": "stock_daily",
-    "stooq": "stock_daily",
     "coingecko": "crypto_daily",
     "ecb": "fx_reference",
     "worldbank": "macro_annual",
@@ -589,13 +586,6 @@ def _yahoo_pairs(symbol):
     return fetch_yahoo_prices(symbol)
 
 
-def _stooq_pairs(symbol):
-    sym = str(symbol).lower()
-    if "." not in sym:
-        sym = sym + ".us"
-    return fetch_stooq_prices(sym)
-
-
 def _coingecko_pairs(symbol):
     return fetch_coingecko_history(symbol)
 
@@ -609,14 +599,13 @@ def _yahoo_crypto_pairs(symbol):
 
 def default_price_chain(kind="stock", csv_path=None, csv_source=None):
     """Ordered connectors for a series kind. kind='stock' -> CSV (if
-    given), Yahoo, Stooq. kind='crypto' -> CSV (if given), CoinGecko,
+    given), Yahoo. kind='crypto' -> CSV (if given), CoinGecko,
     Yahoo (BTC-USD style). Anything else raises ValueError."""
     chain = []
     if csv_path is not None:
         chain.append(CsvConnector(csv_path, csv_source or "caller-supplied CSV"))
     if kind == "stock":
-        chain += [Connector("yahoo", _yahoo_pairs),
-                  Connector("stooq", _stooq_pairs)]
+        chain += [Connector("yahoo", _yahoo_pairs)]
     elif kind == "crypto":
         chain += [Connector("coingecko", _coingecko_pairs),
                   Connector("yahoo", _yahoo_crypto_pairs)]
@@ -739,7 +728,7 @@ def list_connectors():
     licence/terms note. A connector with no terms note cannot exist
     — the registry test enforces it."""
     rows = []
-    for name in ("csv", "yahoo", "stooq", "coingecko", "ecb", "worldbank"):
+    for name in ("csv", "yahoo", "coingecko", "ecb", "worldbank"):
         kind = _SOURCE_KINDS[name]
         rows.append({
             "name": name,
