@@ -450,8 +450,10 @@ invented), then Yahoo Finance, Stooq (fallback only), CoinGecko for
 crypto, ECB reference rates and the World Bank API. Each connector has
 a timeout, bounded retries (transient failures only, max 3 attempts
 with backoff — a 403/429 is never retried), an on-disk cache with a
-per-source TTL, and a freshness SLA (daily bars and FX: 1 day;
-World Bank annual: 1 year). `scripts/data_health.py` writes
+per-source TTL, and a freshness SLA (daily bars and FX: 1 trading day;
+World Bank annual: 1 year). Judged in trading days, not calendar days,
+so Friday data is not STALE on a Sunday; NEPSE uses its Sun–Thu week
+and crypto counts every day. `scripts/data_health.py` writes
 `data_health.json` with per-source FRESH/STALE/UNAVAILABLE/UNKNOWN
 status, last-fetch time, age and cache hits; stale data is flagged,
 never published silently. The terminal dashboard shows it as section
@@ -460,7 +462,7 @@ refreshes `data/derived/*.json` (indicator snapshot, screening
 matches, Time-Machine odds) from the repo's CSVs with `as_of`
 provenance and a stale flag. Both scripts exit non-zero with a clear
 error on failure, so a scheduled run can alert on it. Tests:
-`tests/test_connectors.py` (38 tests), `tests/test_data_health.py`
+`tests/test_connectors.py` (41 tests), `tests/test_data_health.py`
 (17 tests, including fixtures cut from real responses fetched
 2026-11-07 — see `tests/fixtures/SOURCES.md`), and
 `tests/test_refresh_derived.py` (8 tests), all offline.
@@ -475,7 +477,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 509/509 tests passing (Phase 2 data layer + Phase 3 front door, 2026-11-07, fresh clone, Python 3.12, pytest 9.2.0): 505 before + 4 new demo-asset tests — connectors (38), data health (17), derived refresh (8) and terminal health section (6).
+Tests: 512/512 tests passing (2026-11-08, fresh clone, Python 3.12, pytest 9.2.0): 509 before + 3 new trading-day freshness tests — connectors (41), data health (17), derived refresh (8) and terminal health section (6).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a
@@ -539,7 +541,8 @@ MIT.
 - **Demo assets, generated from a real run:** `docs/demo-transcript.md`, `docs/demo.svg` (animated) and `docs/demo.gif` (11 frames), all written by `scripts/generate_demo_assets.py` from `python -m toolkit.terminal demo.csv`; `tests/test_demo_assets.py` fails if the transcript drifts from a live run.
 - **Nepali front door:** `README.ne.md` — the hook, install, first run, what it is/is not, and licence, translated into Nepali (technical terms with no good Nepali equivalent stay in English and are noted).
 - **Lint fix:** `ruff check` is now clean across the whole repo — 7 pre-existing errors in `scripts/check_numbers.py`, `scripts/generate_status.py` and `scripts/generate_models_table.py` fixed (3 shebangs on non-executable files, a nested `if`, a missing `check=False`, a blind `except Exception`, an unused variable). The README's earlier "`ruff check` clean" claim was stale until this fix.
-- Tests: 509/509 (505 at Phase 2 + 4 new demo-asset tests), verified 2026-11-07 in a fresh clone.
+- Test total at v0.9.0 was 509 (505 at Phase 2 + 4 new demo-asset tests), verified 2026-11-07 in a fresh clone.
+- **2026-11-08 fix:** freshness SLA is now judged in trading days, not calendar days (Friday data no longer reads STALE on a Sunday; NEPSE uses its Sun–Thu week, crypto counts every day), and a repo-root `conftest.py` makes `import toolkit` work under the bare `pytest` binary as well as `python -m pytest` — the two gaps that turned CI red on 8 Nov. Tests: 512/512 (509 + 3 new freshness tests), verified 2026-11-08 in a fresh clone.
 
 ## v0.2.0 — Job 3: portfolio, performance, forecast, free API data
 - `toolkit/portfolio.py` — returns, sample + shrunk covariance, equal / inverse-vol / min-variance / max-Sharpe weights, clean long-only weights, efficient frontier. Shrinkage + L2 by default; every portfolio compared to 1/N.
