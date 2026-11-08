@@ -192,6 +192,7 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
             "last_fetch": None,
             "last_data_date": None,
             "age_days": None,
+            "age_trading_days": None,
             "cache_hits": 0,
             "error": None,
             "note": "",
@@ -220,9 +221,11 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
                     entry["note"] += f"; skipped unreadable: {skipped}"
             if entry["last_data_date"] is not None:
                 judged = evaluate_freshness(
-                    entry["last_data_date"], sla, today=today)
+                    entry["last_data_date"], sla, today=today,
+                    kind="nepse_csv_daily")
                 entry["status"] = judged["status"]
                 entry["age_days"] = judged["age_days"]
+                entry["age_trading_days"] = judged["age_trading_days"]
             sources.append(entry)
             continue
         if name in probes:
@@ -232,9 +235,10 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
                 entry["last_fetch"] = now.isoformat(timespec="seconds")
                 entry["error"] = None
                 judged = evaluate_freshness(
-                    entry["last_data_date"], sla, today=today)
+                    entry["last_data_date"], sla, today=today, kind=kind)
                 entry["status"] = judged["status"]
                 entry["age_days"] = judged["age_days"]
+                entry["age_trading_days"] = judged["age_trading_days"]
             except Exception as exc:  # noqa: BLE001 — probe failure is data
                 entry["status"] = "UNAVAILABLE"
                 entry["error"] = str(exc)
@@ -243,9 +247,10 @@ def build_health_report(*, cache_dir=None, probes=None, previous=None,
                 entry["note"] = "live probe failed; last known values kept"
         elif entry["last_data_date"] is not None:
             judged = evaluate_freshness(
-                entry["last_data_date"], sla, today=today)
+                entry["last_data_date"], sla, today=today, kind=kind)
             entry["status"] = judged["status"]
             entry["age_days"] = judged["age_days"]
+            entry["age_trading_days"] = judged["age_trading_days"]
             entry["note"] = "from on-disk cache only (no probe this run)"
         else:
             entry["note"] = "never fetched (no cache entry, no probe)"
