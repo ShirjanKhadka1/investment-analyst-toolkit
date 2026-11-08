@@ -1,0 +1,63 @@
+# =====================================================================
+# NOT DEPLOYED — PREPARED FILE ONLY (Phase 2, 7 Nov 2026).
+# This workflow is NOT live on GitHub. It was prepared locally and
+# has NOT been pushed via the API: the token behind the API helper
+# lacks workflow scope, so an API push of a .github/workflows/ file
+# would fail with 403. The parent deploys it via the GitHub web UI
+# (browser route) and then confirms the file exists on main and the
+# first scheduled run. Do NOT describe this workflow as deployed,
+# running, or alerting until the parent confirms that deployment.
+#
+# TARGET:
+#   Repo:   ShirjanKhadka1/investment-analyst-toolkit
+#   Branch: main
+#   Path:   .github/workflows/data-health-check.yml
+#
+# Behaviour: every day at 09:30 UTC (15:15 NPT, after the derived
+# refresh) it probes live data health (Yahoo, CoinGecko, ECB, World
+# Bank, user-supplied NEPSE CSVs) and fails the job when the overall
+# status is DEGRADED (any source STALE or UNAVAILABLE) — the exit
+# code is the alert hook; the existing Failure alert workflow opens
+# a GitHub issue on failure once its watch list is extended (see
+# DEPLOY-NOTE.md). The report is kept as a workflow artifact; this
+# workflow commits nothing, so the committed data_health.json is
+# only ever written by the daily derived refresh. No email alert
+# exists (Gmail connector not connected — recorded blocker).
+# Research only: no trades, no spend, no recommendations. No secrets.
+# =====================================================================
+
+name: Data health check
+
+on:
+  schedule:
+    # 09:30 UTC = 15:15 NPT, after the daily derived refresh.
+    - cron: "30 9 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/data_health.py"
+      - "toolkit/connectors.py"
+      - "data_health.json"
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe data health
+        # Exit 2 when overall status is DEGRADED; exit 0 otherwise.
+        # The report file is written first either way.
+        run: python3 scripts/data_health.py --probe --output /tmp/data_health.json
+      - name: Keep the report as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: data-health
+          path: /tmp/data_health.json
+          retention-days: 30
