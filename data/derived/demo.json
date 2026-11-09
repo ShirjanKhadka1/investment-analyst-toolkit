@@ -1,14 +1,14 @@
 {
   "dataset": "demo",
   "source_csv": "demo.csv",
-  "generated_at": "2026-11-08T15:59:29+00:00",
+  "generated_at": "2026-11-09T19:51:41+00:00",
   "generated_by": "scripts/refresh_derived.py",
   "as_of": "2026-11-06",
   "n_bars": 80,
   "last_close": 1284.91,
   "stale": false,
   "sla_label": "1 day",
-  "age_days": 2,
+  "age_days": 3,
   "stale_note": "",
   "indicators_last": {
     "rsi_14": 88.23245407730212,
