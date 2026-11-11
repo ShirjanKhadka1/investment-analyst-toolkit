@@ -1,14 +1,14 @@
 {
   "dataset": "demo",
   "source_csv": "demo.csv",
-  "generated_at": "2026-11-10T17:04:25+00:00",
+  "generated_at": "2026-11-11T17:10:26+00:00",
   "generated_by": "scripts/refresh_derived.py",
   "as_of": "2026-11-06",
   "n_bars": 80,
   "last_close": 1284.91,
   "stale": true,
   "sla_label": "1 day",
-  "age_days": 4,
+  "age_days": 5,
   "stale_note": "STALE: last bar is older than the 1-day SLA \u2014 do not treat this dataset as fresh.",
   "indicators_last": {
     "rsi_14": 88.23245407730212,
