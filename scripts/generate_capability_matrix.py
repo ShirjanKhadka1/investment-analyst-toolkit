@@ -368,11 +368,15 @@ REPOS = [
      "TauricResearch/TradingAgents", "Apache-2.0",
      [
          (("Multi-agent debate (bull/bear researchers -> research "
-          "manager; three-way risk debate)"),
-          "partial",
-          ("The debate structure lives in finance-research-agents "
-          "runbooks; this repo has no debate runner."),
-          ""),
+          "manager)"),
+          "implemented",
+          ("toolkit/agent_team.py runs the bull/bear debate in "
+          "schema-validated JSON, then a trader proposes a direction "
+          "and a portfolio manager writes the memo; the 19-check "
+          "deterministic risk gate stands in for the three-way "
+          "risk debate, which this repo does not run as an LLM "
+          "debate."),
+          "tests/test_agent_team.py"),
          (("Analyst team roles (fundamentals / market / news / "
           "sentiment)"),
           "partial",
@@ -573,8 +577,11 @@ def render():
                  "moves two rows from 'not planned' to 'partial': "
                  "structured JSON handoffs (multi-agent-market-research) "
                  "and the multi-provider LLM factory (tradingagents). "
-                 "The executable agent team that would use it (PR B) is "
-                 "not in scope for this change.")
+                 "The executable agent team (toolkit/agent_team.py, "
+                 "PR B) moves the bull/bear debate row from 'partial' "
+                 "to 'implemented'; the three-way risk debate stays "
+                 "'partial' — the deterministic risk gate stands in "
+                 "for it.")
     lines.append("")
     return "\n".join(lines)
 
