@@ -389,6 +389,99 @@ def test_main_with_string_argv_publishes_first_run(tmp_path, monkeypatch):
                             "calls.jsonl").splitlines()) == 7
 
 
+def _main_with_fake_fetch(monkeypatch, repo, as_of, fail_for=()):
+    """Run main() in ``repo`` with the workflow's exact argv.
+
+    Canned bars via a patched ``run_day`` (fetch injected), so the
+    test never touches the network. Returns main()'s exit code.
+    """
+    series = _all_ticker_series(as_of)
+    fetch = _fake_fetch_factory(
+        {**series, **_index_series(as_of)}, fail_for)
+    real_run_day = _daily.run_day
+
+    def run_day_with_fake_fetch(*args, **kwargs):
+        kwargs["fetch"] = fetch
+        return real_run_day(*args, **kwargs)
+
+    monkeypatch.setattr(_daily, "run_day", run_day_with_fake_fetch)
+    monkeypatch.chdir(repo)
+    return _daily.main([
+        "--calls", "data/track-record/calls.jsonl",
+        "--out", "data/track-record/track-record.md",
+        "--publish-branch", "data/track-record",
+        "--publish", "--as-of", as_of])
+
+
+def _origin_rev_list_count(origin, branch):
+    proc = subprocess.run(
+        ["git", "--git-dir", str(origin), "rev-list", "--count", branch],
+        capture_output=True, text=True, check=True)
+    return int(proc.stdout.strip())
+
+
+def _origin_head(origin, branch):
+    proc = subprocess.run(
+        ["git", "--git-dir", str(origin), "rev-parse", branch],
+        capture_output=True, text=True, check=True)
+    return proc.stdout.strip()
+
+
+def test_publish_second_run_is_idempotent(tmp_path, monkeypatch):
+    """A second identical dispatch must publish 'no changes'.
+
+    End-to-end publish path, second half of the story the PR #24
+    test does not cover. The deployed workflow runs daily, and a
+    manual re-dispatch on the same day must not create a duplicate
+    commit or duplicate calls. Branch creation here is from HEAD
+    (``git worktree add -b``), not ``--orphan`` — the branch is
+    absent at the start, so publish() must still create it, with
+    the track-record git identity, one commit, and a push.
+    """
+    repo, origin = _make_git_repo(tmp_path)
+    assert _main_with_fake_fetch(monkeypatch, repo, "2026-11-06") == 0
+    # 1 init commit on main + 1 publish commit on the new branch.
+    assert _origin_rev_list_count(origin, "data/track-record") == 2
+    assert len(_origin_file(origin, "data/track-record",
+                            "calls.jsonl").splitlines()) == 7
+    author = subprocess.run(
+        ["git", "--git-dir", str(origin), "log", "-1",
+         "--format=%an%x00%ae", "data/track-record"],
+        capture_output=True, text=True, check=True).stdout.strip()
+    assert author == "track-record\x00track-record@users.noreply.github.com"
+    head_before = _origin_head(origin, "data/track-record")
+    # Same day, same bars: run_day logs 0 new calls, publish finds
+    # no changes and must not commit again.
+    assert _main_with_fake_fetch(monkeypatch, repo, "2026-11-06") == 0
+    assert _origin_head(origin, "data/track-record") == head_before
+    assert _origin_rev_list_count(origin, "data/track-record") == 2
+    assert len(_origin_file(origin, "data/track-record",
+                            "calls.jsonl").splitlines()) == 7
+
+
+def test_publish_with_missed_days_publishes_nonempty_log(
+        tmp_path, monkeypatch):
+    """A failed fetch records a missed day and publishes it.
+
+    ISF.L's fetch fails, so the run logs 6 calls + 1 missed day.
+    The branch must hold a non-empty missed_days.jsonl naming the
+    ticker and date — a missed day is a published fact, never
+    backfilled, and never silently dropped by publish().
+    """
+    repo, origin = _make_git_repo(tmp_path)
+    assert _main_with_fake_fetch(monkeypatch, repo, "2026-11-06",
+                                 fail_for=("ISF.L",)) == 0
+    calls = _origin_file(origin, "data/track-record", "calls.jsonl")
+    assert len(calls.splitlines()) == 6
+    assert "ISF.L" not in calls
+    missed = _origin_file(origin, "data/track-record",
+                          "missed_days.jsonl")
+    records = [json.loads(line) for line in missed.splitlines()]
+    assert len(records) == 1
+    assert records[0]["symbol"] == "ISF.L"
+    assert records[0]["date"] == "2026-11-06"
+
+
 def test_special_session_settles_on_13_november(tmp_path):
     """NIFTYBEES.NS: the 2026-11-08 Muhurat bar counts (see spec)."""
     dates = _dates_through("2026-11-13", skip=("2026-11-10",),
