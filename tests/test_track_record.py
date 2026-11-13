@@ -7,6 +7,7 @@ missed-day rule, and the special session (NIFTYBEES.NS 2026-11-08).
 """
 import importlib.util
 import json
+import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -249,6 +250,100 @@ def test_missed_day_recorded_and_never_backfilled(tmp_path):
     _summary2, _, _, _ = _run(tmp_path, "2026-11-09", series)
     isf = [c for c in load_calls(calls) if c["symbol"] == "ISF.L"]
     assert len(isf) == 1 and isf[0]["date"] == "2026-11-09"
+
+
+def test_run_day_writes_empty_missed_file_when_zero_missed(tmp_path):
+    """Zero missed days must still leave a missed_days.jsonl behind.
+
+    Regression: the deployed first run (2026-11-13) logged 7 calls
+    with 0 missed days, but no missed_days.jsonl was ever written —
+    and publish() then died copying a file that did not exist.
+    """
+    series = _all_ticker_series("2026-11-06")
+    summary, _calls, _out, missed = _run(tmp_path, "2026-11-06", series)
+    assert summary["calls_logged"] == 7
+    assert summary["missed_days"] == 0
+    assert missed.exists()
+    assert missed.read_text(encoding="utf-8") == ""
+
+
+def _make_git_repo(tmp_path):
+    """A temp repo with a local bare origin, ready for publish()."""
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True,
+                   capture_output=True)
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", "-b", "main", str(repo)], check=True,
+                   capture_output=True)
+    for key, value in (("user.name", "test"),
+                       ("user.email", "test@example.invalid")):
+        subprocess.run(["git", "-C", str(repo), "config", key, value],
+                       check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
+                    str(origin)], check=True, capture_output=True)
+    (repo / "README.md").write_text("test\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "README.md"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-m", "init"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "push", "origin", "main"],
+                   check=True, capture_output=True)
+    return repo, origin
+
+
+def _origin_file(origin, branch, name):
+    proc = subprocess.run(
+        ["git", "--git-dir", str(origin), "show", f"{branch}:{name}"],
+        capture_output=True, text=True, check=True)
+    return proc.stdout
+
+
+def test_publish_first_run_with_no_missed_days_file(tmp_path):
+    """First run, zero missed days, no missed_days.jsonl: publish
+    succeeds, creates data/track-record, commits all three files.
+
+    Reproduces the 2026-11-13 deployed failure (run
+    43413814636): publish() copied missed_days.jsonl unconditionally
+    and `cp` failed because the file was never written. The file is
+    deleted here after run_day to simulate the pre-fix output.
+    """
+    series = _all_ticker_series("2026-11-06")
+    summary, calls, out, missed = _run(tmp_path, "2026-11-06", series)
+    assert summary["calls_logged"] == 7 and summary["missed_days"] == 0
+    missed.unlink()  # pre-fix output: file never written
+    repo, origin = _make_git_repo(tmp_path)
+    message = _daily.publish([calls, out, missed], "data/track-record",
+                             repo_root=repo)
+    assert message is not None
+    assert message.startswith("Daily track record: ")
+    listing = subprocess.run(
+        ["git", "--git-dir", str(origin), "ls-tree", "--name-only",
+         "data/track-record"], capture_output=True, text=True,
+        check=True).stdout.splitlines()
+    # The branch is created from HEAD, so it also carries the repo
+    # tree; the three published outputs must all be present in it.
+    assert {"calls.jsonl", "missed_days.jsonl",
+            "track-record.md"} <= set(listing)
+    assert _origin_file(origin, "data/track-record",
+                        "missed_days.jsonl") == ""
+    assert len(_origin_file(origin, "data/track-record",
+                            "calls.jsonl").splitlines()) == 7
+
+
+def test_publish_refuses_a_missing_calls_log(tmp_path):
+    """Precision guard: only missed_days.jsonl may be absent.
+
+    A genuinely missing calls.jsonl must still fail loudly instead
+    of being papered over with an empty file.
+    """
+    repo, _origin = _make_git_repo(tmp_path)
+    out = tmp_path / "track-record.md"
+    out.write_text("# track record\n", encoding="utf-8")
+    missed = tmp_path / "missed_days.jsonl"
+    missed.write_text("", encoding="utf-8")
+    with pytest.raises(FileNotFoundError, match="calls.jsonl"):
+        _daily.publish([tmp_path / "calls.jsonl", out, missed],
+                       "data/track-record", repo_root=repo)
 
 
 def test_special_session_settles_on_13_november(tmp_path):
