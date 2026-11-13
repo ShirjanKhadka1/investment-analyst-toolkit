@@ -72,13 +72,26 @@ from .portfolio import (
     returns_from_prices,
 )
 
-try:  # Optional extra: numpy is never a core requirement.
-    import numpy as _np
 
-    HAS_NUMPY = True
-except ImportError:  # pragma: no cover - import outcome is env-dependent
-    _np = None  # type: ignore[assignment]
-    HAS_NUMPY = False
+def _load_numpy():  # pragma: no cover - import outcome is env-dependent
+    """Optional numpy import, isolated so mypy stays clean with numpy
+    installed and without it (see [mypy-numpy] in mypy.ini). Returns
+    the numpy module, or None when it is not installed. The whole
+    function is excluded from coverage measurement: its two branches
+    are taken in different environments (numpy present vs absent),
+    so no single-env coverage run can cover both — the behaviour is
+    instead proven by the HAS_NUMPY / NumpyUnavailableError tests,
+    which pass in both envs."""
+    try:
+        import numpy as np
+
+        return np
+    except ImportError:  # pragma: no cover - import outcome is env-dependent
+        return None
+
+
+_np = _load_numpy()
+HAS_NUMPY = _np is not None
 
 __all__ = [
     "HAS_NUMPY",
@@ -155,7 +168,10 @@ def period_returns(bars, use_numpy=False):
     return bit-identical lists; the pure path is the default.
     """
     bars = validate_bars(bars)
-    if use_numpy:
+    # Numpy path (excluded from core coverage — see the pragma on the
+    # `if` line): exercised by the identical-results tests in numpy
+    # envs (CI `full` job).
+    if use_numpy:  # pragma: no cover
         _require_numpy()
         out = {}
         for symbol, pairs in bars.items():
@@ -690,7 +706,8 @@ def bootstrap_ci(returns, n_bootstrap=1000, alpha=0.05, seed=0,
     if estimate is None:
         raise ValueError("statistic is undefined on these returns")
     stats = []
-    if use_numpy:
+    # Numpy path (excluded from core coverage, as in period_returns).
+    if use_numpy:  # pragma: no cover
         arr = _np.array(returns, dtype=float)
         for idx in index_sets:
             value = _statistic(arr[idx].tolist(), statistic, periods_per_year)

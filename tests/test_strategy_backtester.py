@@ -340,16 +340,33 @@ def test_bootstrap_ci_rejects_bad_inputs():
 
 
 def test_bootstrap_numpy_path_matches_pure_path_exactly():
-    np = pytest.importorskip("numpy")
-    assert np is not None  # the skip above handles absence
+    """Same fixture both ways: bit-identical bounds when numpy is
+    present; graceful NumpyUnavailableError (never a silent fallback)
+    when it is absent.
+
+    Deliberately NOT pytest.importorskip: a skip would make the test
+    count differ between the core-only env (656) and the numpy env
+    (658), and the repo's count gate (scripts/check_numbers.py,
+    run by the CI quality job with no numpy installed) requires one
+    stable count. So the test passes in both envs — proving the
+    identical-results half when numpy is there, and the graceful
+    degradation half when it is not.
+    """
+    # Pure-path comparisons run in BOTH envs (so the Sharpe path stays
+    # covered without numpy); only the numpy half is skipped when it
+    # is absent.
     pure = bootstrap_ci(RETURNS, n_bootstrap=200, seed=7, use_numpy=False)
+    pure_sharpe = bootstrap_ci(RETURNS, n_bootstrap=200, seed=3,
+                               statistic="sharpe", use_numpy=False)
+    if not sb.HAS_NUMPY:
+        with pytest.raises(NumpyUnavailableError, match="not installed"):
+            bootstrap_ci(RETURNS, n_bootstrap=200, seed=7, use_numpy=True)
+        return
     fast = bootstrap_ci(RETURNS, n_bootstrap=200, seed=7, use_numpy=True)
     assert fast["use_numpy"] is True
     for key in ("statistic", "estimate", "lower", "upper", "alpha",
                 "n_bootstrap", "n_usable", "n", "seed"):
         assert fast[key] == pure[key], key
-    pure_sharpe = bootstrap_ci(RETURNS, n_bootstrap=200, seed=3,
-                               statistic="sharpe", use_numpy=False)
     fast_sharpe = bootstrap_ci(RETURNS, n_bootstrap=200, seed=3,
                                statistic="sharpe", use_numpy=True)
     assert fast_sharpe["estimate"] == pure_sharpe["estimate"]
@@ -358,8 +375,13 @@ def test_bootstrap_numpy_path_matches_pure_path_exactly():
 
 
 def test_period_returns_numpy_path_matches_pure_path_exactly():
-    np = pytest.importorskip("numpy")
-    assert np is not None
+    """Bit-identical returns both ways when numpy is present;
+    graceful error when absent (same no-skip reason as the
+    bootstrap test above — the count gate needs one stable count)."""
+    if not sb.HAS_NUMPY:
+        with pytest.raises(NumpyUnavailableError, match="not installed"):
+            period_returns(bars(), use_numpy=True)
+        return
     assert period_returns(bars(), use_numpy=True) == period_returns(bars())
 
 
