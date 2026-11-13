@@ -13,6 +13,9 @@ Stdlib only. Gates run the same commands CI runs (see
   readme-claim scripts/qa_readme.py (regenerates status.json, checks numbers)
   counts       scripts/qa_counts.py (pack numbers in the docs must match
                a fresh recount of the finance-research-agents roster)
+  capability-matrix
+               scripts/generate_capability_matrix.py --check (the matrix
+               doc must match what the generator renders)
   fresh-clone  scripts/qa_fresh_clone.py (clone + demo under 60 s)
 
 Dev tools come from requirements-dev.txt (pinned versions identical
@@ -27,12 +30,19 @@ Exit 0 only when every run gate passes. Prints a per-gate PASS/FAIL
 summary at the end.
 """
 import argparse
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib
+except ImportError:  # Python < 3.11: tomllib is stdlib only from 3.11.
+    # ImportError (not ModuleNotFoundError) is deliberate: it also
+    # covers the sys.modules["tomllib"] = None simulation used by the
+    # regression test, which raises ImportError, not ModuleNotFoundError.
+    tomllib = None
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = ROOT / "scripts"
@@ -65,6 +75,34 @@ def gate_typecheck(_args):
     return proc.returncode
 
 
+def _coverage_fail_under():
+    """Read [tool.coverage.report] fail_under from pyproject.toml.
+
+    tomllib is stdlib only from Python 3.11. On 3.10 fall back to a
+    strict, section-scoped parse of the same file (only the
+    [tool.coverage.report] section is read, and only an integer
+    fail_under is accepted). Fails loudly if the value cannot be
+    found — never silently defaults.
+    """
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    if tomllib is not None:
+        return tomllib.loads(text)["tool"]["coverage"]["report"]["fail_under"]
+    in_section = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("["):
+            in_section = bool(re.match(
+                r"\[\s*tool\.coverage\.report\s*\]\s*(?:#.*)?$", line))
+            continue
+        if in_section:
+            match = re.match(r"fail_under\s*=\s*(\d+)\s*(?:#.*)?$", line)
+            if match:
+                return int(match.group(1))
+    raise ValueError(
+        "could not read fail_under from pyproject.toml "
+        "([tool.coverage.report] section missing or malformed)")
+
+
 def gate_tests(_args):
     proc = _run(_tool("pytest") + ["tests/", "-q"])
     print(proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "")
@@ -84,8 +122,7 @@ def gate_tests(_args):
         if line.startswith("TOTAL"):
             total = int(line.split()[-1].rstrip("%"))
     print(report.stdout.strip().splitlines()[-1] if report.stdout.strip() else "")
-    fail_under = tomllib.loads((ROOT / "pyproject.toml").read_text(
-        encoding="utf-8"))["tool"]["coverage"]["report"]["fail_under"]
+    fail_under = _coverage_fail_under()
     if total is None:
         print("could not parse coverage total")
         return 1
@@ -109,6 +146,15 @@ def _script_gate(name):
     return gate
 
 
+def gate_capability_matrix(_args):
+    proc = _run([sys.executable,
+                 str(SCRIPTS / "generate_capability_matrix.py"), "--check"])
+    print(proc.stdout.strip())
+    if proc.stderr.strip():
+        print(proc.stderr.strip()[-1000:])
+    return proc.returncode
+
+
 GATES = [
     ("lint", gate_lint),
     ("typecheck", gate_typecheck),
@@ -119,6 +165,7 @@ GATES = [
     ("links", _script_gate("qa_links.py")),
     ("readme-claim", _script_gate("qa_readme.py")),
     ("counts", _script_gate("qa_counts.py")),
+    ("capability-matrix", gate_capability_matrix),
     ("fresh-clone", _script_gate("qa_fresh_clone.py")),
 ]
 
