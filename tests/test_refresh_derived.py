@@ -98,13 +98,46 @@ def _run_refresh(*args, cwd=REPO_ROOT):
         cwd=cwd, capture_output=True, text=True, timeout=120, check=False)
 
 
-def test_main_refreshes_demo_and_exits_zero(tmp_path):
-    proc = _run_refresh("--csv", str(DEMO_CSV),
+def _write_fresh_csv(tmp_path, name="fresh.csv", n_bars=45):
+    """Write a synthetic CSV whose last bar is the latest Mon-Fri
+    date on or before today, so it reads FRESH under the 1-trading-day
+    SLA on any day the suite runs (a Friday last bar is 0 trading days
+    old on a weekend, 1 on a Monday). Mirrors _write_stale_csv."""
+    csv_path = tmp_path / name
+    last = datetime.date.today()
+    while last.weekday() >= 5:  # Saturday = 5, Sunday = 6
+        last -= datetime.timedelta(days=1)
+    first = last - datetime.timedelta(days=n_bars - 1)
+    rows = ["date,open,high,low,close,volume"]
+    price = 100.0
+    day = first
+    for _ in range(n_bars):
+        rows.append(f"{day.isoformat()},{price:.2f},{price + 1:.2f},"
+                    f"{price - 1:.2f},{price:.2f},1000")
+        price += 1.0
+        day += datetime.timedelta(days=1)
+    csv_path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    return csv_path, last.isoformat()
+
+
+def test_main_refreshes_fresh_csv_and_exits_zero(tmp_path):
+    # The CLI smoke test runs with the real calendar, so it must not
+    # use the committed demo.csv: its last bar is fixed (2026-11-06)
+    # and reads STALE against the 1-trading-day SLA within days of
+    # generation — that is the data ageing, not a code failure, and
+    # the demo dataset's exact values stay pinned by
+    # test_refresh_demo_csv_is_fresh_and_complete with a fixed TODAY.
+    # Stale-flagging itself is covered by
+    # test_main_stale_csv_warns_but_exits_zero. A fixture generated
+    # at run time keeps this smoke test calendar-proof without
+    # weakening the gate.
+    csv_path, last = _write_fresh_csv(tmp_path)
+    proc = _run_refresh("--csv", str(csv_path),
                         "--out-dir", str(tmp_path / "derived"), cwd=REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     assert "refreshed" in proc.stdout
-    assert "(as of 2026-11-06, 80 bars, fresh)" in proc.stdout
-    dataset = json.loads((tmp_path / "derived" / "demo.json").read_text())
+    assert f"(as of {last}, 45 bars, fresh)" in proc.stdout
+    dataset = json.loads((tmp_path / "derived" / "fresh.json").read_text())
     assert dataset["stale"] is False
 
 
