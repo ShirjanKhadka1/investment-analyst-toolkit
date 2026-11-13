@@ -3,6 +3,7 @@
 [![Tests](https://github.com/ShirjanKhadka1/investment-analyst-toolkit/actions/workflows/test.yml/badge.svg)](https://github.com/ShirjanKhadka1/investment-analyst-toolkit/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Track record: n=0 settled](https://img.shields.io/badge/track--record-n%3D0%20settled-lightgrey)](docs/track-record.md)
+[![M8ven Score](https://m8ven.ai/badge/mcp/shirjankhadka1-investment-analyst-toolkit-x7r1ve?v=6e83bc6046d2b99e27e0a85346128542)](https://m8ven.ai/mcp/shirjankhadka1-investment-analyst-toolkit-x7r1ve?s=readme)
 
 **One command, no keys, no installs beyond Python 3.10+, a result in under 60 seconds:**
 
