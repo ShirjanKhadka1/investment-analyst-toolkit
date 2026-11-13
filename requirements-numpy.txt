@@ -1,0 +1,9 @@
+# Optional extra: numpy for the strategy backtester (Round 6).
+# The core toolkit stays standard-library only; nothing here is a
+# runtime dependency. Install with `pip install -r requirements-numpy.txt`
+# to run the numpy path of toolkit/strategy_backtester.py (vectorised
+# gathering / elementwise work in the bootstrap and period_returns).
+# The pure-Python path is the default and produces bit-identical
+# results — see toolkit/strategy_backtester.py. Pinned to the version
+# verified 13 Nov 2026 (Python 3.12, numpy path tested both ways).
+numpy==2.2.6

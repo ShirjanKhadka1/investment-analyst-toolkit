@@ -16,6 +16,11 @@ CI installs exactly these pinned versions (see .github/workflows/test.yml).
 No other dependency exists in this repo: no requirements.txt, no
 compiled steps, no network fetch at build time.
 
+## Optional extra (not a runtime dependency)
+| Extra | Version | Used for |
+| --- | --- | --- |
+| numpy (`requirements-numpy.txt`) | 2.2.6 | Optional speed extra for `toolkit/strategy_backtester.py` only (bootstrap gathering / elementwise returns). The core stays stdlib-only; the pure-Python path is the default and produces bit-identical results. CI runs it in the `full` job of `.github/workflows/test.yml`; the matrix `test` job stays core-only. |
+
 ## Supply-chain status (honest split: config vs enabled)
 - Dependency pinning: DONE (this file + pinned CI installs).
 - CodeQL workflow: config file added (.github/workflows/codeql.yml);
