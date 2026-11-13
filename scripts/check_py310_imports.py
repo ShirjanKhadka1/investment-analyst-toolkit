@@ -339,6 +339,24 @@ def check_tree(root):
     return violations
 
 
+def _format_violation(rel, lineno, module, minimum):
+    """One violation line for the FAIL report.
+
+    The path is rendered POSIX-style so the output is identical on
+    Linux, macOS and Windows: on Windows a Path prints with
+    backslashes (tests\\test_x.py), which broke the
+    test_main_exits_one_on_violation assertion in CI (PR #28, job
+    test windows-latest 3.12).
+    """
+    posix = rel.as_posix()
+    if minimum is None:
+        return f"  {posix}:{lineno}: {module}"
+    return (f"  {posix}:{lineno}: unguarded import of '{module}' "
+            f"(stdlib since Python {minimum[0]}.{minimum[1]}); "
+            f"guard with try/except ImportError or "
+            f"sys.version_info >= ({minimum[0]}, {minimum[1]})")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root",
@@ -355,13 +373,7 @@ def main(argv=None):
             rel = path.relative_to(root)
         except ValueError:
             rel = path
-        if minimum is None:
-            print(f"  {rel}:{lineno}: {module}")
-        else:
-            print(f"  {rel}:{lineno}: unguarded import of '{module}' "
-                  f"(stdlib since Python {minimum[0]}.{minimum[1]}); "
-                  f"guard with try/except ImportError or "
-                  f"sys.version_info >= ({minimum[0]}, {minimum[1]})")
+        print(_format_violation(rel, lineno, module, minimum))
     return 1
 
 

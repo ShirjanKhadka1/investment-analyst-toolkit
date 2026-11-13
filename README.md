@@ -501,7 +501,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 722/722 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 25 new (LLM provider layer: schema failure, caps, retry limit, key redaction, canned provider responses) + 12 new (capability matrix generator + qa gate) + 3 new (Python 3.10 tomllib fallback in qa.py: guarded import + regression tests) + 35 new (portfolio strategy backtester: costs from market profiles, walk-forward, bootstrap, tear sheet, numpy-identical tests) + 24 new (Python 3.10 stdlib-import guard: AST checker, qa gate, generate_status.py tomllib fallback).
+Tests: 723/723 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 25 new (LLM provider layer: schema failure, caps, retry limit, key redaction, canned provider responses) + 12 new (capability matrix generator + qa gate) + 3 new (Python 3.10 tomllib fallback in qa.py: guarded import + regression tests) + 35 new (portfolio strategy backtester: costs from market profiles, walk-forward, bootstrap, tear sheet, numpy-identical tests) + 25 new (Python 3.10 stdlib-import guard: AST checker, qa gate, generate_status.py tomllib fallback, POSIX path rendering).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a

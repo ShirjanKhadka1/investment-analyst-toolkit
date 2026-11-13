@@ -11,7 +11,7 @@ without tomllib.
 import importlib.util
 import sys
 import textwrap
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from unittest import mock
 
 import pytest
@@ -196,6 +196,19 @@ def test_main_exits_one_on_violation(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "tests/test_x.py:1" in out
     assert "tomllib" in out
+
+
+def test_violation_paths_print_posix_style():
+    # Regression test for the Windows-only CI failure (PR #28, job
+    # test windows-latest 3.12): the checker printed the OS-native
+    # path (tests\test_x.py), while test_main_exits_one_on_violation
+    # expects tests/test_x.py. PureWindowsPath proves the POSIX
+    # rendering on any platform, including this Linux run.
+    line = check._format_violation(PureWindowsPath("tests\\test_x.py"),
+                                  1, "tomllib", (3, 11))
+    assert "tests/test_x.py:1" in line
+    assert "\\" not in line
+    assert "tomllib" in line
 
 
 def _load_generate_status_without_tomllib():
