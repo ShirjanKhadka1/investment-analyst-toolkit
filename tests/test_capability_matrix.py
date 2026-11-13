@@ -17,6 +17,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -147,6 +149,58 @@ def test_qa_registers_the_capability_matrix_gate():
     assert "capability-matrix" in names
     assert names.index("capability-matrix") > names.index("counts")
     assert names.index("capability-matrix") < names.index("fresh-clone")
+
+
+def _load_qa_without_tomllib():
+    """Load scripts/qa.py with the tomllib import blocked, simulating
+    Python 3.10 (tomllib is stdlib only from 3.11). Setting
+    sys.modules["tomllib"] = None makes `import tomllib` raise
+    ImportError, which is what qa.py's guarded import catches."""
+    from unittest import mock
+
+    with mock.patch.dict(sys.modules, {"tomllib": None}):
+        spec = importlib.util.spec_from_file_location(
+            "qa_under_test_no_tomllib", REPO_ROOT / "scripts" / "qa.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    return module
+
+
+def test_qa_imports_without_tomllib_and_reads_fail_under():
+    # Regression test for the Python 3.10 CI failure (PR #26, job
+    # test ubuntu-latest 3.10): importing scripts/qa.py failed with
+    # ModuleNotFoundError: No module named 'tomllib', because the
+    # top-level import ran on 3.10. qa.py must import and still read
+    # the real fail_under from pyproject.toml via its fallback.
+    qa_no_tomllib = _load_qa_without_tomllib()
+    assert qa_no_tomllib.tomllib is None
+    assert qa_no_tomllib._coverage_fail_under() == 80
+
+
+def test_coverage_fail_under_matches_tomllib_on_py311_plus():
+    # The 3.11+ path must be unchanged: the helper must return the
+    # same value as a direct tomllib parse of the same file.
+    try:
+        import tomllib
+    except ModuleNotFoundError:
+        pytest.skip("tomllib is stdlib from Python 3.11")
+    expected = tomllib.loads(
+        (REPO_ROOT / "pyproject.toml").read_text(
+            encoding="utf-8"))["tool"]["coverage"]["report"]["fail_under"]
+    qa = _load_qa()
+    assert qa._coverage_fail_under() == expected == 80
+
+
+def test_coverage_fail_under_fails_loudly_without_the_value(tmp_path):
+    # The 3.10 fallback must never silently default: if the section
+    # or the value is missing, it raises instead of guessing.
+    qa_no_tomllib = _load_qa_without_tomllib()
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.coverage.report]\nshow_missing = true\n",
+        encoding="utf-8")
+    qa_no_tomllib.ROOT = tmp_path
+    with pytest.raises(ValueError, match="could not read fail_under"):
+        qa_no_tomllib._coverage_fail_under()
 
 
 def test_render_is_deterministic():
