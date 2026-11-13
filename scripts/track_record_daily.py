@@ -424,6 +424,10 @@ def publish(outputs, branch, repo_root=None):
     missing output — above all ``calls.jsonl`` — is an error, not
     something to paper over with an empty file.
     """
+    # main() passes argparse strings; callers may also pass Paths.
+    # Normalize once so every later use (cp loop, git add) sees
+    # Path objects — a string has no .name and died in `git add`.
+    outputs = [Path(o) for o in outputs]
     if branch == "main":
         raise ValueError("refusing to publish track-record results to "
                          "main — results live on a data branch only")

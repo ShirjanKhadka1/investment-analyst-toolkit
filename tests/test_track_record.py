@@ -346,6 +346,49 @@ def test_publish_refuses_a_missing_calls_log(tmp_path):
                        "data/track-record", repo_root=repo)
 
 
+def test_main_with_string_argv_publishes_first_run(tmp_path, monkeypatch):
+    """main() with string argv (the workflow's call path) must publish.
+
+    Regression: the re-dispatched workflow run #2 (2026-11-13,
+    run 43419967124) died in publish() with
+    ``AttributeError: 'str' object has no attribute 'name'``.
+    main() passes argparse strings to publish(), whose ``git add``
+    line used ``p.name`` on the original list — while the ``cp``
+    loop had already converted each entry to a Path. The PR #22
+    regression test missed this because it called publish() with
+    Path objects directly. This test drives the real main() with
+    the exact argv the workflow uses, so it fails on the old code.
+    """
+    repo, origin = _make_git_repo(tmp_path)
+    series = _all_ticker_series("2026-11-06")
+    fetch = _fake_fetch_factory(
+        {**series, **_index_series("2026-11-06")})
+    real_run_day = _daily.run_day
+
+    def run_day_with_fake_fetch(*args, **kwargs):
+        kwargs["fetch"] = fetch
+        return real_run_day(*args, **kwargs)
+
+    monkeypatch.setattr(_daily, "run_day", run_day_with_fake_fetch)
+    monkeypatch.chdir(repo)
+    rc = _daily.main([
+        "--calls", "data/track-record/calls.jsonl",
+        "--out", "data/track-record/track-record.md",
+        "--publish-branch", "data/track-record",
+        "--publish", "--as-of", "2026-11-06"])
+    assert rc == 0
+    listing = subprocess.run(
+        ["git", "--git-dir", str(origin), "ls-tree", "--name-only",
+         "data/track-record"], capture_output=True, text=True,
+        check=True).stdout.splitlines()
+    # The branch is created from HEAD, so it also carries the repo
+    # tree; the three published outputs must all be present in it.
+    assert {"calls.jsonl", "missed_days.jsonl",
+            "track-record.md"} <= set(listing)
+    assert len(_origin_file(origin, "data/track-record",
+                            "calls.jsonl").splitlines()) == 7
+
+
 def test_special_session_settles_on_13_november(tmp_path):
     """NIFTYBEES.NS: the 2026-11-08 Muhurat bar counts (see spec)."""
     dates = _dates_through("2026-11-13", skip=("2026-11-10",),
