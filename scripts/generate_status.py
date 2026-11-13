@@ -17,6 +17,62 @@ import sys
 from datetime import date
 from pathlib import Path
 
+try:
+    import tomllib
+except ImportError:  # Python < 3.11: tomllib is stdlib only from 3.11.
+    tomllib = None
+
+
+def _section_value(text, section, key):
+    """Strict, section-scoped parse of one ``key = value`` line.
+
+    Only the named [section] is read; returns the raw value string, or
+    None when the section or the key is absent. Used by the Python 3.10
+    fallback in _pyproject_values (tomllib is stdlib only from 3.11).
+    """
+    in_section = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("["):
+            in_section = bool(re.match(
+                r"\[\s*" + re.escape(section) + r"\s*\]\s*(?:#.*)?$",
+                line))
+            continue
+        if in_section:
+            match = re.match(rf"{re.escape(key)}\s*=\s*(.+?)\s*(?:#.*)?$",
+                             line)
+            if match:
+                return match.group(1)
+    return None
+
+
+def _pyproject_values(root):
+    """Return (version, coverage fail_under) from pyproject.toml.
+
+    tomllib is stdlib only from Python 3.11. On 3.10 fall back to a
+    strict, section-scoped parse of the same file (only the [project]
+    version and the [tool.coverage.report] fail_under are read).
+    Raises ValueError if either value cannot be found — never silently
+    defaults.
+    """
+    text = (Path(root) / "pyproject.toml").read_text(encoding="utf-8")
+    if tomllib is not None:
+        proj = tomllib.loads(text)
+        return (proj["project"]["version"],
+                proj["tool"]["coverage"]["report"]["fail_under"])
+    version_raw = _section_value(text, "project", "version")
+    fail_under_raw = _section_value(text, "tool.coverage.report",
+                                    "fail_under")
+    version_match = (re.fullmatch(r'"([^"]+)"', version_raw or "")
+                     or re.fullmatch(r"'([^']+)'", version_raw or ""))
+    fail_under_match = re.fullmatch(r"(\d+)", fail_under_raw or "")
+    if version_match is None or fail_under_match is None:
+        raise ValueError(
+            "could not read version/fail_under from pyproject.toml "
+            "([project] version or [tool.coverage.report] fail_under "
+            "missing or malformed)")
+    return version_match.group(1), int(fail_under_match.group(1))
+
 
 def run(cmd, cwd, env=None):
     e = dict(os.environ)
@@ -55,11 +111,10 @@ def main():
                   "version read from pyproject.toml when present",
     }
     
-    import tomllib
     try:
-        proj = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-        status["version"] = proj["project"]["version"]
-        status["coverage_fail_under"] = proj["tool"]["coverage"]["report"]["fail_under"]
+        version, fail_under = _pyproject_values(root)
+        status["version"] = version
+        status["coverage_fail_under"] = fail_under
     except (OSError, KeyError, ValueError) as exc:
         status["version"] = None
         status["version_note"] = f"TO VERIFY: could not read pyproject.toml ({exc})"

@@ -5,8 +5,8 @@
   "method": "tests counted from a live pytest run in this checkout; version read from pyproject.toml when present",
   "version": "0.9.0",
   "coverage_fail_under": 80,
-  "tests_passed": 698,
-  "tests_total": 698,
+  "tests_passed": 722,
+  "tests_total": 722,
   "coverage_percent": 91,
   "coverage_note": "measured by coverage.py in this run"
 }
