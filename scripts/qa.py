@@ -13,6 +13,9 @@ Stdlib only. Gates run the same commands CI runs (see
   readme-claim scripts/qa_readme.py (regenerates status.json, checks numbers)
   counts       scripts/qa_counts.py (pack numbers in the docs must match
                a fresh recount of the finance-research-agents roster)
+  capability-matrix
+               scripts/generate_capability_matrix.py --check (the matrix
+               doc must match what the generator renders)
   fresh-clone  scripts/qa_fresh_clone.py (clone + demo under 60 s)
 
 Dev tools come from requirements-dev.txt (pinned versions identical
@@ -109,6 +112,15 @@ def _script_gate(name):
     return gate
 
 
+def gate_capability_matrix(_args):
+    proc = _run([sys.executable,
+                 str(SCRIPTS / "generate_capability_matrix.py"), "--check"])
+    print(proc.stdout.strip())
+    if proc.stderr.strip():
+        print(proc.stderr.strip()[-1000:])
+    return proc.returncode
+
+
 GATES = [
     ("lint", gate_lint),
     ("typecheck", gate_typecheck),
@@ -119,6 +131,7 @@ GATES = [
     ("links", _script_gate("qa_links.py")),
     ("readme-claim", _script_gate("qa_readme.py")),
     ("counts", _script_gate("qa_counts.py")),
+    ("capability-matrix", gate_capability_matrix),
     ("fresh-clone", _script_gate("qa_fresh_clone.py")),
 ]
 
