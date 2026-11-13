@@ -501,7 +501,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 614/614 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 613 before + 1 new (MCP tool annotations test).
+Tests: 617/617 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 614 before + 3 new (track-record first-run publish fix).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a

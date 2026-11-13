@@ -393,6 +393,14 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
             logged += 1
             calls = load_calls(calls_path)
     all_calls = load_calls(calls_path)
+    # A run with zero missed days writes no missed-day record, so the
+    # file would not exist — and publish() copies all three outputs.
+    # Guarantee the file exists (empty when nothing was missed) so a
+    # first run publishes cleanly instead of dying in `cp`.
+    missed_path = Path(missed_path)
+    if not missed_path.exists():
+        missed_path.parent.mkdir(parents=True, exist_ok=True)
+        missed_path.touch()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(
         track_record_mod.render_track_record_md(all_calls),
@@ -409,6 +417,12 @@ def publish(outputs, branch, repo_root=None):
     Refuses ``main`` outright. Creates the branch on first use.
     Commits only when the worktree differs; pushes to origin.
     Returns the commit message, or None when nothing changed.
+
+    Only ``missed_days.jsonl`` may legitimately be absent (a run
+    produced before the file was guaranteed, or a first run with
+    zero missed days): it is published as an empty log. Any other
+    missing output — above all ``calls.jsonl`` — is an error, not
+    something to paper over with an empty file.
     """
     if branch == "main":
         raise ValueError("refusing to publish track-record results to "
@@ -429,8 +443,17 @@ def publish(outputs, branch, repo_root=None):
                            capture_output=True)
         for src in outputs:
             src = Path(src)
-            subprocess.run(["cp", str(src), str(worktree / src.name)],
-                           check=True)
+            dest = worktree / src.name
+            if not src.exists():
+                if src.name == "missed_days.jsonl":
+                    # First run with zero missed days: no record was
+                    # ever written. Publish an empty log rather than
+                    # failing the whole run in `cp`.
+                    dest.touch()
+                    continue
+                raise FileNotFoundError(
+                    f"track-record output missing: {src}")
+            subprocess.run(["cp", str(src), str(dest)], check=True)
         subprocess.run(["git", "config", "user.name", "track-record"],
                        cwd=worktree, check=True)
         subprocess.run(["git", "config", "user.email",
@@ -443,7 +466,7 @@ def publish(outputs, branch, repo_root=None):
         if diff.returncode == 0:
             return None
         message = (f"Daily track record: "
-                   f"{date.today(timezone.utc).isoformat()} "
+                   f"{datetime.now(timezone.utc).date().isoformat()} "
                    "(data branch only, never main)")
         subprocess.run(["git", "commit", "-m", message], cwd=worktree,
                        check=True, capture_output=True)
