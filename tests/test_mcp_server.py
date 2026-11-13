@@ -78,6 +78,36 @@ def test_tools_list_names_all_eight():
         assert "description" in tool
 
 
+def test_all_tools_declare_all_four_hints():
+    # M8ven / OpenAI directory rule: every tool must declare all four
+    # hints as explicit booleans. Values verified against the handlers
+    # (see _ANNOTATIONS_READ_ONLY in toolkit/mcp_server.py): pure
+    # computation on caller-supplied arguments — no writes, no state,
+    # no network, no orders.
+    response = mcp_server.handle_request(
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    )
+    tools = response["result"]["tools"]
+    assert len(tools) == 8
+    for tool in tools:
+        annotations = tool.get("annotations")
+        assert isinstance(annotations, dict), tool["name"]
+        for hint in (
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        ):
+            assert isinstance(annotations.get(hint), bool), (
+                tool["name"], hint)
+        assert annotations == {
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": False,
+        }, tool["name"]
+
+
 # --- tool calls on synthetic data ---------------------------------------------
 
 def test_call_indicators_synthetic():

@@ -1,12 +1,12 @@
 {
   "repo": "investment-analyst-toolkit",
   "generated_by": "scripts/generate_status.py (Round 3: pytest run + file reads)",
-  "generated_at": "2026-11-08",
+  "generated_at": "2026-11-13",
   "method": "tests counted from a live pytest run in this checkout; version read from pyproject.toml when present",
   "version": "0.9.0",
   "coverage_fail_under": 80,
   "tests_passed": 613,
-  "tests_total": 613,
+  "tests_total": 614,
   "coverage_percent": 91,
   "coverage_note": "measured by coverage.py in this run"
 }

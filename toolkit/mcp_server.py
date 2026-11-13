@@ -61,9 +61,27 @@ _INVALID_REQUEST = -32600
 _METHOD_NOT_FOUND = -32601
 _INVALID_PARAMS = -32602
 
+# Tool annotations, verified against the handlers below (see also
+# tests/test_mcp_server.py::test_all_tools_declare_all_four_hints).
+# Every handler is a pure function on caller-supplied arguments: it
+# computes and returns a value, writes nothing, keeps no state, makes
+# no network call and places no order. ``timemachine_simulate`` is
+# deterministic — ``timemachine.simulate`` uses a fixed default seed
+# (19) — and ``research_report`` only calls ``report.build_report`` /
+# ``render_html`` (the CSV loaders and ``write_report_html`` are never
+# reached from a handler). So for all eight tools: read-only, not
+# destructive, idempotent, and closed-world.
+_ANNOTATIONS_READ_ONLY = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+    "openWorldHint": False,
+}
+
 _TOOLS = [
     {
         "name": "indicators",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "Indicator snapshot from caller-supplied closes: latest close, "
             "SMA-20/50, Wilder RSI-14. Research only; past bars only."),
@@ -75,6 +93,7 @@ _TOOLS = [
     },
     {
         "name": "screen_setups",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "Named-setup screening on caller-supplied closes (breakout_20d, "
             "bull_flag, reclaim_ma20, oversold, oversold_bounce). A match "
@@ -87,6 +106,7 @@ _TOOLS = [
     },
     {
         "name": "timemachine_simulate",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "Seeded Monte-Carlo replay of a hypothetical exit plan on "
             "caller-supplied closes. Simulation, not a prediction."),
@@ -106,6 +126,7 @@ _TOOLS = [
     },
     {
         "name": "risk_gate",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "Risk gate on a hypothetical exit plan {entry, stop, target, "
             "optionally budget and entry_window_ok}. A PASS is not a yes; "
@@ -121,6 +142,7 @@ _TOOLS = [
     },
     {
         "name": "quant_risk_summary",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "Risk summary (Sharpe, Sortino, max drawdown, VaR/CVaR) from "
             "caller-supplied returns and prices."),
@@ -135,6 +157,7 @@ _TOOLS = [
     },
     {
         "name": "quant_dcf",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "FCFF DCF value from caller-supplied free cash flows, discount "
             "rate, and terminal growth. A model output, not a valuation."),
@@ -150,6 +173,7 @@ _TOOLS = [
     },
     {
         "name": "nepse_frictions",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "NEPSE trade-cost breakdown from sourced frictions (broker "
             "slabs, SEBON fee, DP charge, CGT by holding period). Sourced "
@@ -167,6 +191,7 @@ _TOOLS = [
     },
     {
         "name": "research_report",
+        "annotations": _ANNOTATIONS_READ_ONLY,
         "description": (
             "One-page HTML research report for a symbol from "
             "caller-supplied bars, fundamentals, and peer rows. Every "
