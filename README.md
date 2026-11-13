@@ -501,7 +501,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 623/623 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 614 before + 3 new (per-calendar 5-trading-day window tests) + 3 new (track-record first-run publish fix) + 1 new (main() string-argv publish test) + 2 new (end-to-end publish path: idempotent re-run + missed days).
+Tests: 660/660 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 25 new (LLM provider layer: schema failure, caps, retry limit, key redaction, canned provider responses) + 12 new (capability matrix generator + qa gate).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a
