@@ -12,6 +12,18 @@
   pre { background: #f2f2f2; padding: 12px; border-radius: 6px; overflow-x: auto; }
   pre code { padding: 0; }
   .note { color: #555; font-size: 0.95em; }
+  @media (max-width: 640px) {
+    body { margin: 24px auto; padding: 0 16px; }
+    h1 { font-size: 1.45em; }
+    table { display: block; overflow-x: auto; }
+  }
+  @media (max-width: 480px) {
+    body { margin: 20px auto; padding: 0 14px; }
+    h1 { font-size: 1.3em; }
+    h2 { font-size: 1.15em; }
+    pre { padding: 10px; font-size: 0.85em; }
+    p code, li code { overflow-wrap: anywhere; }
+  }
 </style>
 </head>
 <body>
