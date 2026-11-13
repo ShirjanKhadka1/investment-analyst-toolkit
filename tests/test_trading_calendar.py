@@ -66,3 +66,42 @@ def test_add_trading_days_rejects_bad_n():
 
 def test_crypto_trades_every_day():
     assert settlement_date("crypto", "2026-11-06", 5) == date(2026, 11, 11)
+
+
+# --- 5-trading-day windows per watchlist calendar (Round 5, Task 1) ---
+# One "trading week" is 5 trading days on the ticker's own profile
+# calendar (docs/watchlist-proposal.md). Pinned here from the same
+# decision date, Friday 2026-11-06, so the calendars can be compared.
+
+
+def test_five_trading_day_windows_per_calendar():
+    """5 trading days from Fri 2026-11-06, per watchlist profile."""
+    cases = [
+        # (profile, observed bars, expected settlement date)
+        ("us", frozenset(), date(2026, 11, 13)),      # Mon-Fri, no holiday file
+        ("uk", frozenset(), date(2026, 11, 13)),      # Mon-Fri, no holiday file
+        ("fx", frozenset(), date(2026, 11, 13)),      # Mon-Fri (24/5), no holiday file
+        ("crypto", frozenset(), date(2026, 11, 11)),  # every day: 5 calendar days
+        ("india", DIWALI_WEEK_BARS, date(2026, 11, 13)),  # Muhurat Sun bar counts
+        ("india", frozenset(d for d in DIWALI_WEEK_BARS
+                            if d != "2026-11-08"),
+         date(2026, 11, 16)),  # no Muhurat bar: Tue 10 Nov is a holiday
+    ]
+    for profile, observed, expected in cases:
+        assert settlement_date(profile, "2026-11-06", 5,
+                               observed) == expected, profile
+
+
+def test_weekend_days_per_calendar():
+    """Crypto counts Sat/Sun; FX and US skip them (Round 5, Task 1)."""
+    assert is_trading_day("crypto", "2026-11-07") is True   # Saturday
+    assert is_trading_day("crypto", "2026-11-08") is True   # Sunday
+    assert is_trading_day("fx", "2026-11-07") is False      # Saturday
+    assert is_trading_day("fx", "2026-11-08") is False      # Sunday
+    assert is_trading_day("us", "2026-11-07") is False      # Saturday
+    assert is_trading_day("us", "2026-11-08") is False      # Sunday
+
+
+def test_crypto_five_trading_days_from_a_saturday():
+    """Crypto's 5 trading days from Sat 2026-11-07 land Thu 2026-11-12."""
+    assert settlement_date("crypto", "2026-11-07", 5) == date(2026, 11, 12)

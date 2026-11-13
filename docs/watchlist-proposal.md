@@ -136,6 +136,34 @@ direction. The remaining activation blockers are the watchlist
 approval itself and the deployment of the staged workflow; the
 script exists and is tested.
 
+### What "5 trading days" means, per calendar
+
+"5 trading days" is counted on the ticker's own profile calendar
+(`toolkit/trading_calendar.py`: `settlement_date` is the date 5
+trading days after the decision day, decision day excluded). The
+weekdays each profile counts are fixed in
+`toolkit/market_profiles.py` (`trading_weekdays` /
+`trading_weekdays_on`):
+
+| Ticker | Profile | Trading weekdays | What 5 trading days means |
+|---|---|---|---|
+| SPY, AAPL, VT | `us` | Mon–Fri | 5 weekdays. No US holiday file exists yet (`data/holidays/` holds only `india.json` and `nepse.json`), so holiday status is UNKNOWN and treated as open — every weekday counts. E.g. a call decided Fri 2026-11-06 settles Fri 2026-11-13. |
+| NIFTYBEES.NS | `india` | Mon–Fri | 5 weekdays minus listed holidays in `data/holidays/india.json` (coverage: Diwali week 2026 only — outside it, UNKNOWN = open). An observed bar on a non-standard day counts: the Sun 2026-11-08 Muhurat-session bar makes a Fri 2026-11-06 call settle Fri 2026-11-13; without that bar it settles Mon 2026-11-16 (Tue 10 Nov is the Diwali-Balipratipada holiday). |
+| ISF.L | `uk` | Mon–Fri | 5 weekdays. No UK holiday file exists yet, so every weekday counts. E.g. Fri 2026-11-06 → Fri 2026-11-13. |
+| EURUSD=X | `fx` | Mon–Fri | 5 weekdays. FX is a 24/5 market (opens Sunday evening) but the weekday list is what the calendar uses, so Saturday and Sunday never count, and there is no holiday file. E.g. Fri 2026-11-06 → Fri 2026-11-13. |
+| BTC-USD | `crypto` | Every day (Mon–Sun) | 5 calendar days — weekends count, and spot crypto has no holidays. E.g. Fri 2026-11-06 → Wed 2026-11-11; a call decided Sat 2026-11-07 settles Thu 2026-11-12. |
+
+Two rules apply on every calendar (see "Special-session rule"
+below): an observed bar always counts as a trading day, even on
+a non-standard day; a calendar trading day with no bar never
+counts — it is a missed day and settlement waits.
+
+NEPSE is not on this watchlist, so its calendar defines no
+horizon here. (For the record: NEPSE traded Sun–Thu until
+2026-04-05 and Mon–Fri since 2026-04-06 —
+`toolkit/market_profiles.py`, tested in
+`tests/test_market_profiles.py::test_nepse_trading_weekdays_are_effective_dated`.)
+
 ### Settlement
 
 After the 5-trading-day horizon, the call settles against realised
