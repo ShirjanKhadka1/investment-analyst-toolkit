@@ -31,9 +31,10 @@ from . import (
     ratios,
     report,
     rules_mode,
+    strategy_backtester,
     timemachine,
     tracker,
     valuation,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "connectors", "data", "decision_log", "edgar", "forecast", "indicators", "market_profiles", "montecarlo", "nepal_frictions", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "timemachine", "tracker", "valuation"]
+__all__ = ["archive", "autonomous", "backtest", "checks", "connectors", "data", "decision_log", "edgar", "forecast", "indicators", "market_profiles", "montecarlo", "nepal_frictions", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "strategy_backtester", "timemachine", "tracker", "valuation"]

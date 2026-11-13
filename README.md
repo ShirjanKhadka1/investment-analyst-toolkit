@@ -501,10 +501,10 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 623/623 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 614 before + 3 new (per-calendar 5-trading-day window tests) + 3 new (track-record first-run publish fix) + 1 new (main() string-argv publish test) + 2 new (end-to-end publish path: idempotent re-run + missed days).
+Tests: 658/658 tests passing (2026-11-13, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 35 new (portfolio strategy backtester: costs from market profiles, walk-forward, bootstrap, tear sheet, numpy-identical tests).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
-this is a guardrail, not full type safety), coverage 91% total with a
+this is a guardrail, not full type safety), coverage 92% total with a
 `fail_under=80` gate left unchanged (the remaining misses are mostly
 defensive/unreachable branches, e.g. predictive.py 342-343, 348-349, 572
 plus new-engine edge branches; quant.py 93%, predictive.py 95%;
@@ -585,6 +585,7 @@ MIT.
 - `toolkit/options.py` — Black-Scholes call/put, Greeks (delta, gamma, theta, vega, rho), implied volatility by bisection. Put-call parity tested.
 - `toolkit/montecarlo.py` — seeded GBM paths (reproducible), Monte Carlo option pricing, simulated VaR.
 - `toolkit/backtest.py` — moving-average crossover signals (no lookahead: position uses yesterday's signal), backtest with trade costs, buy-and-hold benchmark on the same data.
+- `toolkit/strategy_backtester.py` — portfolio-level backtester on caller-supplied daily bars: weights from `toolkit/portfolio.py` (1/N, inverse-volatility, min-variance, max-Sharpe, long-only), costs from `toolkit/market_profiles.py` (NEPSE sourced schedule; markets with no sourced schedule raise instead of assuming zero), buy-and-hold + naive 1/N baselines, walk-forward evaluation, seeded bootstrap confidence intervals, self-contained HTML tear sheet (no external refs). Core is stdlib-only; numpy is an optional extra (`requirements-numpy.txt`) and the pure-Python path is the default, with bit-identical results both ways. Tests: `tests/test_strategy_backtester.py` (35 tests).
 - `toolkit/cli.py` — command line: `python -m toolkit.cli option ...` and `forecast-demo`, no network, no key.
 - Agent pack: `agents/debate-analyst.md` — bull vs bear debate + risk veto, toolkit numbers for every argument.
 - Tests at v0.3: 23/23 passed. (Historical count for that version only; the current count is in the Tests section above and in status.json, verified by CI.)
