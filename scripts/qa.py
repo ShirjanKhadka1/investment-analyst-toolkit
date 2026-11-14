@@ -5,6 +5,9 @@ Stdlib only. Gates run the same commands CI runs (see
 .github/workflows/test.yml, quality job):
   lint         ruff check toolkit/ tests/ scripts/
   typecheck    mypy toolkit/
+  py310-imports
+               scripts/check_py310_imports.py (no unguarded imports of
+               3.11+ stdlib modules, e.g. tomllib)
   tests        pytest tests/ -q, then coverage (fail_under from pyproject)
   lookahead    scripts/qa_lookahead.py (suites + leaking-variant mutation)
   licence      scripts/qa_licence.py
@@ -158,6 +161,7 @@ def gate_capability_matrix(_args):
 GATES = [
     ("lint", gate_lint),
     ("typecheck", gate_typecheck),
+    ("py310-imports", _script_gate("check_py310_imports.py")),
     ("tests", gate_tests),
     ("lookahead", _script_gate("qa_lookahead.py")),
     ("licence", _script_gate("qa_licence.py")),
