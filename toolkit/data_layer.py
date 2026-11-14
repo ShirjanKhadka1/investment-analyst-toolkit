@@ -117,7 +117,25 @@ DATA_SOURCES = [
         ),
     },
     {
-        "name": "FRED / Alpha Vantage / Twelve Data / FMP",
+        "name": "FRED",
+        "kind": "macro",
+        "needs_key": True,
+        "in_no_key_chain": False,
+        "licence_terms": (
+            "FRED Terms of Use apply; free API key under the user's "
+            "own FRED account. The key comes from the environment "
+            "(FRED_API_KEY) only, never from this repo, and no key "
+            "is bundled or invented. Derived analytics only."
+        ),
+        "verification": (
+            "Provider implemented Round 7.1 (toolkit/data.py "
+            "fetch_fred_observations, env key FRED_API_KEY); tested "
+            "offline with a fake key. Not in the no-key chain; no "
+            "live call made, no key supplied."
+        ),
+    },
+    {
+        "name": "Alpha Vantage / Twelve Data / FMP",
         "kind": "keyed",
         "needs_key": True,
         "in_no_key_chain": False,

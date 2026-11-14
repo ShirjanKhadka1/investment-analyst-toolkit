@@ -12,8 +12,15 @@ research/free-data-sources-2026-10-28.md for the full audit):
   endpoint, used as the toolkit's primary stock source since v0.2.
 - Stooq daily CSV: REMOVED 8 Nov 2026 — third failed verification
   (HTML instead of CSV on 28 Oct and 7 Nov 2026; connection timeout
-  8 Nov 2026; see docs/global-markets-audit.md). The stock chain is
-  Yahoo only now; a second stock source is an open gap.
+  8 Nov 2026; see docs/global-markets-audit.md). RE-IMPLEMENTED
+  14 Nov 2026 (Round 7.1): a parser + fetcher, tested offline
+  against a Stooq-format fixture — but NOT in the live chain. The
+  stock chain stays Yahoo-only until the runner probe
+  (ops/ready-for-browser/stooq-ci-probe.yml, STAGED, unverified)
+  passes from a GitHub-hosted runner. From this VM Stooq still
+  answers with a JavaScript-challenge HTML page, not CSV. Enable
+  only via ``include_stooq=True`` on ``default_fetchers`` /
+  ``toolkit.connectors.default_price_chain``.
 - CoinGecko keyless public API (docs.coingecko.com, "Keyless Public
   API"): crypto prices and market charts, no key, ~10-30 calls/min
   shared IP pool. Used for crypto series only.
@@ -64,7 +71,11 @@ __all__ = [
     "fetch_free_macro",
     "fetch_free_many",
     "fetch_free_prices",
+    "fetch_stooq_bars",
+    "fetch_stooq_prices",
     "list_free_data_sources",
+    "parse_stooq_csv",
+    "stooq_symbol",
 ]
 
 _COINGECKO_IDS = {
@@ -176,15 +187,133 @@ def fetch_ecb_reference_rates():
 
 
 # ---------------------------------------------------------------------------
+# Stooq daily CSV (Round 7.1 — implemented, NOT live)
+#
+# Stooq serves daily bars as CSV at
+# https://stooq.com/q/d/l/?s=<symbol>&i=d with columns
+# Date,Open,High,Low,Close,Volume. No key. The symbol is the
+# lower-case ticker plus a market suffix (``aapl.us`` for US
+# listings); a symbol that already carries a suffix is used as-is.
+#
+# History: removed 8 Nov 2026 after three failed verifications
+# (HTML instead of CSV twice, then a connection timeout — see
+# docs/global-markets-audit.md). Re-implemented 14 Nov 2026 with
+# an offline-tested parser, but the live chain stays Yahoo-only:
+# from this VM Stooq still answers with a JavaScript-challenge
+# HTML page, so the re-test must happen on a GitHub-hosted runner
+# (probe staged at ops/ready-for-browser/stooq-ci-probe.yml).
+# The parser refuses non-CSV payloads loudly — an HTML challenge
+# page is a failed fetch, never parsed as data.
+# ---------------------------------------------------------------------------
+_STOOQ_BASE_URL = "https://stooq.com/q/d/l/"
+
+
+def stooq_symbol(symbol):
+    """Map a toolkit symbol to Stooq's query symbol: lower-case,
+    with a ``.us`` suffix for a bare US ticker. A symbol that
+    already carries a suffix (``aapl.us``, ``7203.t``) is used
+    as-is, lower-cased."""
+    sym = str(symbol).strip().lower()
+    if not sym:
+        raise ValueError("Stooq symbol must not be empty")
+    if "." not in sym:
+        sym = sym + ".us"
+    return sym
+
+
+def parse_stooq_csv(text):
+    """Parse Stooq daily CSV text into (pairs, volumes).
+
+    Pure function. ``pairs`` are [(ISO date, close)] and
+    ``volumes`` is {ISO date: shares traded}. A header row is
+    required (Date,Open,High,Low,Close,Volume — extra columns are
+    ignored); a row with a missing/unparseable close is skipped,
+    a row with a missing volume is kept in pairs but omitted from
+    volumes. An HTML page, an empty file, or a file with no usable
+    rows raises ValueError — never silently treated as data.
+    """
+    import csv as _csv
+    import io as _io
+
+    stripped = (text or "").strip()
+    if not stripped or stripped.startswith("<"):
+        raise ValueError(
+            "Stooq returned no CSV (empty response or an HTML page — "
+            "Stooq serves a JavaScript challenge page to some "
+            "networks; see docs/global-markets-audit.md)")
+    rows = list(_csv.DictReader(_io.StringIO(text)))
+    if not rows:
+        raise ValueError("Stooq CSV contains no usable price rows")
+    if "Date" not in (rows[0].keys() or []) \
+            or "Close" not in (rows[0].keys() or []):
+        raise ValueError(
+            "Stooq CSV must have Date and Close columns")
+    pairs = []
+    volumes = {}
+    for row in rows:
+        date = (row.get("Date") or "").strip()
+        close_raw = (row.get("Close") or "").strip()
+        if not date or not close_raw:
+            continue
+        try:
+            close = float(close_raw)
+        except ValueError:
+            continue
+        pairs.append((date, close))
+        volume_raw = (row.get("Volume") or "").strip()
+        if volume_raw:
+            try:
+                volumes[date] = float(volume_raw)
+            except ValueError:
+                pass
+    if not pairs:
+        raise ValueError("Stooq CSV contains no usable price rows")
+    return pairs, volumes
+
+
+def fetch_stooq_bars(symbol):
+    """Daily bars from Stooq's CSV endpoint.
+
+    Returns ``(pairs, volumes)`` — pairs are [(ISO date, close)],
+    volumes is {ISO date: shares traded}. No key. Raises
+    RuntimeError on a network failure and ValueError on a
+    non-CSV/empty payload. NOT in the live chain: call only via
+    the staged runner probe or with ``include_stooq=True``.
+    """
+    text = _get_text(
+        f"{_STOOQ_BASE_URL}?s={stooq_symbol(symbol)}&i=d")
+    try:
+        return parse_stooq_csv(text)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"Stooq returned no usable CSV for {symbol}: {exc}") from exc
+
+
+def fetch_stooq_prices(symbol):
+    """Daily closes from Stooq's CSV endpoint. Returns
+    [(date, close)] — the (symbol) -> pairs shape the fallback
+    chain takes. For volumes, use :func:`fetch_stooq_bars`."""
+    pairs, _volumes = fetch_stooq_bars(symbol)
+    return pairs
+
+
+# ---------------------------------------------------------------------------
 # Unified fallback chain
 # ---------------------------------------------------------------------------
-def default_fetchers(kind="stock"):
+def default_fetchers(kind="stock", include_stooq=False):
     """Ordered (name, callable) fallback chain for a series kind.
-    kind='stock' -> Yahoo only (Stooq removed 8 Nov 2026 — see module
-    docstring). kind='crypto' -> CoinGecko,
-    then Yahoo (BTC-USD style). Anything else raises ValueError."""
+    kind='stock' -> Yahoo only by default (Stooq removed 8 Nov
+    2026 — see module docstring). Pass ``include_stooq=True`` to
+    append Stooq after Yahoo — opt-in only, pending the runner
+    probe (ops/ready-for-browser/stooq-ci-probe.yml); the live
+    chain stays Yahoo-only until that probe passes.
+    kind='crypto' -> CoinGecko, then Yahoo (BTC-USD style).
+    Anything else raises ValueError."""
     if kind == "stock":
-        return [("yahoo", fetch_yahoo_prices)]
+        chain = [("yahoo", fetch_yahoo_prices)]
+        if include_stooq:
+            chain.append(("stooq", fetch_stooq_prices))
+        return chain
     if kind == "crypto":
         return [("coingecko", fetch_coingecko_history), ("yahoo", _yahoo_crypto_adapter)]
     raise ValueError(f"unknown free-data kind {kind!r} (use 'stock' or 'crypto')")

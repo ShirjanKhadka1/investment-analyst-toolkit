@@ -1,0 +1,56 @@
+# Stooq CI probe — STAGED, not deployed.
+#
+# Purpose: measure whether Stooq's daily CSV endpoint answers from a
+# GitHub-hosted runner. Stooq was removed 8 Nov 2026 after three
+# failed verifications from a developer VM, and from this VM it still
+# answers with a JavaScript-challenge HTML page instead of CSV
+# (checked 14 Nov 2026) — so the re-test must happen on a runner,
+# the same way the Yahoo probe did (yahoo-ci-probe.yml, 3/3 OK from
+# a runner on 8 Nov 2026).
+#
+# Status (14 Nov 2026, Round 7.1): STAGED AND UNVERIFIED. The Stooq
+# provider/parser is implemented and tested offline, but it is NOT
+# in the live chain — the live stock chain stays Yahoo-only. If this
+# probe fails from a runner, Stooq stays removed and 7.1 is volume
+# + probe only. Enabling Stooq live is a separate, explicit decision
+# after a green probe; it is NOT part of this PR.
+#
+# Manual dispatch ONLY (workflow_dispatch, no schedule, no
+# push/pull_request triggers): this is a measurement, not a gate.
+# The job always exits 0 and prints a per-symbol OK/FAIL line with
+# the exact error text plus a summary count — a failing probe is
+# data, not a broken build. Do NOT turn it into a required check.
+#
+# Deploy: copy this file to .github/workflows/stooq-ci-probe.yml
+# (browser route — the API token has no workflow scope), then
+# dispatch it from the Actions tab and read the log. A
+# workflow_dispatch workflow only registers once its file is on the
+# default branch: the file must exist on main to be dispatchable.
+name: Stooq CI probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      symbols:
+        description: "Comma-separated Stooq symbols to probe (bare US tickers, e.g. SPY,AAPL)"
+        required: false
+        default: "SPY,AAPL"
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe Stooq for 2 daily series
+        env:
+          PROBE_SYMBOLS: ${{ inputs.symbols }}
+        run: |
+          python3 scripts/probe_stooq.py

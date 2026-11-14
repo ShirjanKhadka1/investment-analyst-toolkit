@@ -19,14 +19,14 @@ Re-verified 7 Nov 2026 (Phase 2, from this environment via the
 toolkit's own fetchers): Yahoo AAPL fresh through 2026-11-06;
 CoinGecko BTC through 2026-11-07; ECB fixing dated 2026-11-06
 (29 currencies); World Bank Nepal GDP through 2025
-($45,489,810,283.11). Stooq REMOVED 8 Nov 2026 (third failed verification — see docs/global-markets-audit.md).
+($45,489,810,283.11). Stooq REMOVED 8 Nov 2026 (third failed verification — see docs/global-markets-audit.md). Re-implemented 14 Nov 2026 (Round 7.1): parser + fetcher tested offline — NOT in the live chain; the live chain stays Yahoo-only until the runner probe (staged at ops/ready-for-browser/stooq-ci-probe.yml) passes. From this VM Stooq still answers with a JavaScript-challenge HTML page, not CSV (checked 14 Nov 2026).
 
 ## No-key chain (used by `toolkit/free_data.py` and `toolkit/connectors.py`)
 
 | Source | Provides | Licence / terms | Verification (28 Oct 2026) |
 |---|---|---|---|
 | Yahoo Finance chart API | Stock/ETF daily price history — UNOFFICIAL, best-effort | Public endpoint, no key. No licence published on the endpoint; use under Yahoo's terms. Redistribution TO VERIFY. Yahoo publishes no public API for this endpoint; it can be rate-limited/tarpitted by User-Agent/IP. | Working: AAPL, 251 points, last date 2026-10-27, fresh. Re-verified 7 Nov 2026: AAPL fresh through 2026-11-06. 8 Nov 2026: SPY/7203.T/EURUSD/BTC-USD all timed out from this VM's shared egress (tarpit by User-Agent — browser UA works); AAPL cached series still usable. Works from GitHub Actions runners. |
-| Stooq daily CSV | REMOVED 8 Nov 2026 | — | Third failed verification: HTML instead of CSV on 28 Oct and 7 Nov 2026; connection timeout 8 Nov 2026. Removed from toolkit/data.py, toolkit/free_data.py, toolkit/connectors.py and all tests. |
+| Stooq daily CSV | NOT LIVE (Round 7.1) — provider + parser re-implemented, tested offline with a Stooq-format fixture; live chain stays Yahoo-only until the runner probe passes | Public CSV endpoint, no key. Redistribution TO VERIFY — derived analytics only. | REMOVED 8 Nov 2026 (third failed verification: HTML instead of CSV on 28 Oct and 7 Nov 2026; connection timeout 8 Nov 2026). Re-implemented 14 Nov 2026 (Round 7.1); probe staged at ops/ready-for-browser/stooq-ci-probe.yml, UNVERIFIED. From this VM Stooq still answers with a JavaScript-challenge HTML page, not CSV (checked 14 Nov 2026). |
 | CoinGecko keyless public API | Crypto daily prices (market chart) | Documented keyless API; shared IP pool, roughly 10–30 calls/min. Respect the limit; never work around a rate limit. | Working: BTC price + 91 daily points, fresh. Re-verified 7 Nov 2026: BTC through 2026-11-07 (last price $75,912). |
 | ECB euro reference rates | Daily EUR reference fixings (latest only) | Published by the ECB as official reference rates; attribute the ECB. A fixing is not a tradable quote and not a series. | Working: 2026-10-27 fixing, 29 currencies. Re-verified 7 Nov 2026: 2026-11-06 fixing, 29 currencies (USD 1.1165). |
 | World Bank API v2 | Macro indicators by country/year | World Bank Open Data terms apply. Exact redistribution licence TO VERIFY before republishing. | Working: Nepal GDP 2025. Re-verified 7 Nov 2026: Nepal GDP 2025, $45,489,810,283.11. |
@@ -37,7 +37,8 @@ CoinGecko BTC through 2026-11-07; ECB fixing dated 2026-11-06
 | Source | Provides | Licence / terms | Verification |
 |---|---|---|---|
 | SEC EDGAR | US company filings | Public APIs, declared User-Agent required, no key. | NOT VERIFIED from this environment (HTTP 403 despite declared User-Agent). Fetcher left in place, not claimed verified, not retried aggressively. TO VERIFY from a non-VM network. |
-| FRED, Alpha Vantage, Twelve Data, FMP | Macro / prices (free tiers) | Each provider's own free-tier terms, under the user's own key only. | No key supplied, none invented. Keys come from the environment only (`toolkit/data.py`), never from this repo. |
+| FRED | Macro (free tier) | FRED Terms of Use; free API key under the user's own FRED account. Key from the environment (`FRED_API_KEY`) only, never from this repo. | Provider implemented 14 Nov 2026 (Round 7.1, `toolkit/data.py` `fetch_fred_observations`); tested offline with a fake key. Not in the no-key chain; no live call made, no key supplied. |
+| Alpha Vantage, Twelve Data, FMP | Macro / prices (free tiers) | Each provider's own free-tier terms, under the user's own key only. | No key supplied, none invented. Keys come from the environment only (`toolkit/data.py`), never from this repo. |
 
 ## NEPSE — no live feed (data finding, not an access blocker)
 

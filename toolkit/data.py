@@ -46,33 +46,109 @@ def _get_json(url, timeout=20):
         raise RuntimeError(f"Network call failed for {url}: {e.reason}") from e
 
 
+def parse_yahoo_chart(payload):
+    """Parse a Yahoo chart-API response into (pairs, volumes).
+
+    Pure function: ``payload`` is the decoded JSON of
+    ``/v8/finance/chart/{symbol}``. Returns ``(pairs, volumes)``
+    where pairs are [(ISO date, close)] exactly as
+    :func:`fetch_yahoo_prices` returns, and volumes is
+    {ISO date: shares traded} taken from the ``volume`` array Yahoo
+    sends in the same ``indicators.quote[0]`` payload. A bar whose
+    close is None is skipped (as before); a bar whose volume is
+    None is kept in pairs but omitted from volumes — a missing
+    volume is missing data, never a zero. Raises RuntimeError on an
+    unexpected payload shape.
+    """
+    import datetime
+
+    try:
+        result = payload["chart"]["result"][0]
+        stamps = result["timestamp"]
+        quote = result["indicators"]["quote"][0]
+        closes = quote["close"]
+        volumes = quote.get("volume") or []
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError("Unexpected Yahoo response") from e
+    pairs = []
+    vols = {}
+    for i, (ts, close) in enumerate(zip(stamps, closes)):
+        if close is None:
+            continue
+        date = datetime.datetime.fromtimestamp(
+            ts, datetime.timezone.utc).date().isoformat()
+        pairs.append((date, float(close)))
+        if i < len(volumes) and volumes[i] is not None:
+            vols[date] = float(volumes[i])
+    if not pairs:
+        raise RuntimeError("No prices returned in Yahoo response")
+    return pairs, vols
+
+
 def fetch_yahoo_prices(symbol, range_="1y", interval="1d"):
     """Daily closes from Yahoo Finance chart API. Returns [(date_str, close)].
 
     No API key. Dates are ISO strings from Yahoo timestamps.
+    Volume is deliberately NOT returned here: the standard model is
+    (date, close) pairs, and every consumer reads pairs. For the
+    parallel volumes field, use :func:`fetch_yahoo_bars`.
     """
-    import datetime
-
     url = (
         f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
         f"?range={range_}&interval={interval}"
     )
     data = _get_json(url)
     try:
-        result = data["chart"]["result"][0]
-        stamps = result["timestamp"]
-        closes = result["indicators"]["quote"][0]["close"]
-    except (KeyError, IndexError, TypeError) as e:
+        pairs, _volumes = parse_yahoo_chart(data)
+    except RuntimeError as e:
+        if "No prices returned" in str(e):
+            raise RuntimeError(f"No prices returned for {symbol}") from e
         raise RuntimeError(f"Unexpected Yahoo response for {symbol}") from e
-    out = []
-    for ts, close in zip(stamps, closes):
-        if close is None:
-            continue
-        date = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).date().isoformat()
-        out.append((date, float(close)))
-    if not out:
-        raise RuntimeError(f"No prices returned for {symbol}")
-    return out
+    return pairs
+
+
+def fetch_yahoo_bars(symbol, range_="1y", interval="1d"):
+    """Daily bars from Yahoo Finance chart API.
+
+    Returns ``(pairs, volumes)``: pairs are [(ISO date, close)] —
+    identical to :func:`fetch_yahoo_prices` — and volumes is
+    {ISO date: shares traded} from the same payload. Additive only:
+    nothing about the pairs shape changes. A date with no volume
+    in the payload is absent from ``volumes``.
+    """
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?range={range_}&interval={interval}"
+    )
+    data = _get_json(url)
+    try:
+        return parse_yahoo_chart(data)
+    except RuntimeError as e:
+        if "No prices returned" in str(e):
+            raise RuntimeError(f"No prices returned for {symbol}") from e
+        raise RuntimeError(f"Unexpected Yahoo response for {symbol}") from e
+
+
+def median_volume(volumes):
+    """Median of a {date: volume} mapping (or any volume iterable).
+
+    Returns a float, or None when there are no volumes. Used to turn
+    a fetched series' volumes into the ``typical_daily_volume`` the
+    exit-liquidity check needs — a volume-less series yields None,
+    and the gate fail-closes, exactly as before.
+    """
+    if not volumes:
+        return None
+    values = [float(v) for v in volumes.values()] \
+        if isinstance(volumes, dict) else [float(v) for v in volumes]
+    if not values:
+        return None
+    values.sort()
+    n = len(values)
+    mid = n // 2
+    if n % 2:
+        return values[mid]
+    return (values[mid - 1] + values[mid]) / 2.0
 
 
 def fetch_worldbank_indicator(country, indicator, per_page=100):
@@ -108,12 +184,63 @@ def fetch_fred_series(series_id, api_key):
         f"?series_id={series_id}&api_key={api_key}&file_type=json"
     )
     data = _get_json(url)
+    return parse_fred_observations(data)
+
+
+def parse_fred_observations(payload):
+    """Parse a FRED ``series/observations`` JSON payload into
+    [(date, value)] pairs. Pure function: observations whose value
+    is ``"."`` or ``""`` (FRED's missing-value markers) are skipped.
+    Raises RuntimeError when no usable observations are present.
+    """
     out = []
-    for row in data.get("observations", []):
+    for row in payload.get("observations", []):
         if row["value"] in (".", ""):
             continue
         out.append((row["date"], float(row["value"])))
+    if not out:
+        raise RuntimeError("No FRED observations in payload")
     return out
+
+
+def fetch_fred_observations(series_id, api_key=None):
+    """FRED provider (Round 7.1): macro observations, env key only.
+
+    The key comes from the ``FRED_API_KEY`` environment variable
+    unless ``api_key`` is passed explicitly — never hard-coded,
+    never bundled. With no key the call refuses cleanly with a
+    ValueError naming the variable and where to get a free key
+    (same refusal as the other keyed providers in this module).
+    Returns the standard provider model {source, series_id, values,
+    retrieved_at, provenance}; ``values`` are [(date, value)] pairs
+    in FRED's own order. This is an opt-in provider: it is NOT in
+    the no-key chain, and core examples never call it.
+    """
+    import datetime as _dt_fred
+
+    key = api_key or get_api_key(
+        "FRED_API_KEY", "FRED",
+        "https://fred.stlouisfed.org/docs/api/api_key.html")
+    url = (
+        f"https://api.stlouisfed.org/fred/series/observations"
+        f"?series_id={series_id}&api_key={key}&file_type=json"
+    )
+    data = _get_json(url)
+    values = parse_fred_observations(data)
+    return {
+        "source": "FRED",
+        "series_id": series_id,
+        "values": values,
+        "retrieved_at": _dt_fred.datetime.now(
+            _dt_fred.timezone.utc).isoformat(timespec="seconds"),
+        "provenance": {
+            "source": "FRED",
+            "series_id": series_id,
+            "last_date": values[-1][0],
+            "n_points": len(values),
+            "stale": False,
+        },
+    }
 
 
 def load_csv_prices(path, date_col="date", close_col="close"):
