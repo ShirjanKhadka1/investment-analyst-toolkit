@@ -1,0 +1,8 @@
+# Optional extra: tzdata for the daily track-record script (PR 7.0).
+# The core toolkit stays standard-library only; nothing here is a
+# runtime dependency. Install with `pip install -r requirements-tzdata.txt`
+# to run scripts/track_record_daily.py on a system with no IANA
+# time-zone database (Windows ships none). Without it, the session
+# state is UNKNOWN and the run refuses instead of guessing.
+# Pinned to the version verified 14 Nov 2026.
+tzdata==2026.6

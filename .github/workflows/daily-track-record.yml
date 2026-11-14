@@ -1,14 +1,29 @@
-# Daily track record — DEPLOYED 13 Nov 2026.
+# Daily track record — DEPLOYED 13 Nov 2026; DISABLED by the owner 2026-11-14
+# after the Round 7 overwrite incident (see docs/track-record-incidents.md).
+# Do NOT re-enable until PR 7.0 is deployed and the first clean dry run
+# verifies. Re-enable in the browser: Actions -> Daily track record ->
+# Enable workflow (the owner only).
 # Watchlist approved by the owner 13 Nov 2026 (SPY, AAPL, VT, NIFTYBEES.NS, ISF.L, EURUSD=X, BTC-USD); workflow deployment approved the same day.
 # Purpose: once a day, fetch the seven watchlist tickers, run the pre-registered direction rules, log one directional call per ticker (5-trading-day horizon, non-overlapping), settle calls whose horizon has passed, and commit results to the DATA branch (data/track-record) — NEVER to main.
-# Safety: the script writes results ONLY to the data branch (--publish-branch data/track-record, --publish). It refuses --publish-branch main outright, logs each call before its outcome, records a failed fetch as a missed day (never filled in), and is idempotent — a re-run never duplicates a call.
+# Safety (PR 7.0): the log is append-only with a hash chain (calls-v2.jsonl, the clean restart). The workflow seeds the local calls file from the data branch before running, so prior calls load; publish() refuses to push unless the remote rows are byte-identical and the diff has only additions; verify_track_record.py walks the branch history after publishing. A manual dispatch before the close is refused unless --provisional (provisional calls are labelled and never scored).
 name: Daily track record
 
 on:
   schedule:
     # 22:00 UTC daily — after the NYSE close (21:00 UTC).
     - cron: "0 22 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      provisional:
+        description: "Log calls from in-progress bars as provisional (never scored)"
+        required: false
+        default: "false"
+        type: boolean
+      as-of:
+        description: "Decision date YYYY-MM-DD (default: today, UTC)"
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -24,10 +39,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Seed prior calls from the data branch
+        run: |
+          # PR 7.0: the script can only append to what it can see.
+          # The data branch holds the log; main does not. Extract
+          # the current log (and missed-days) from the data branch
+          # into the working tree so the run loads prior calls.
+          # Genesis when the branch or the files do not exist yet.
+          # (No worktree here: publish() later checks the branch
+          # out in its own worktree, and git refuses a branch
+          # checked out in two worktrees.)
+          if git ls-remote --exit-code --heads origin data/track-record >/dev/null 2>&1; then
+            git fetch origin data/track-record
+            mkdir -p data/track-record
+            for f in calls-v2.jsonl missed_days.jsonl; do
+              if git cat-file -e "origin/data/track-record:$f" 2>/dev/null; then
+                git show "origin/data/track-record:$f" > "data/track-record/$f"
+              fi
+            done
+          else
+            echo "data/track-record does not exist yet — genesis run"
+          fi
       - name: Run the daily track-record step
         run: |
-          python3 scripts/track_record_daily.py \
-            --calls data/track-record/calls.jsonl \
-            --out data/track-record/track-record.md \
-            --publish-branch data/track-record \
-            --publish
+          ARGS="--calls data/track-record/calls-v2.jsonl --out data/track-record/track-record.md --publish-branch data/track-record --publish"
+          if [ "${{ inputs.provisional }}" = "true" ]; then ARGS="$ARGS --provisional"; fi
+          if [ -n "${{ inputs.as-of }}" ]; then ARGS="$ARGS --as-of ${{ inputs.as-of }}"; fi
+          python3 scripts/track_record_daily.py $ARGS
+      - name: Verify the branch history is append-only
+        run: |
+          # The verifier fetches the branch itself, so it reads the
+          # post-publish tip even though this checkout is main.
+          python3 scripts/verify_track_record.py --repo . --branch data/track-record --file calls-v2.jsonl
