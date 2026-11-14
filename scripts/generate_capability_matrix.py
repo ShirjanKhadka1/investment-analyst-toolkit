@@ -17,6 +17,11 @@ Status meanings (world-market side first; NEPSE-only items say so):
   the reason — usually a programme rule (research-only, no execution,
   no credentials, stdlib-only, model-light).
 
+Real-data evaluated column: "yes" means the capability was evaluated
+on real (non-synthetic) market data, with the run date and the model
+card that evidences it (see REAL_DATA below). Everything else is
+"no": synthetic-only evaluations and rows proven by unit tests alone.
+
 Counts in the doc are computed from this table, never typed.
 
 Usage:
@@ -164,12 +169,20 @@ REPOS = [
           "implemented",
           "toolkit/performance.py, toolkit/montecarlo.py.",
           "tests/test_phase4_engines.py"),
-         ("Screener criteria grammar + audit log",
+         ("Parameterised screener criteria + audit log",
           "implemented",
           ("toolkit/screener.py: validated criteria spec (setups, "
            "min_price, lookback, min_volume, as_of) plus a JSONL "
            "audit log recording symbol, setup, criteria, as-of date "
            "and match for every scan; point-in-time clean."),
+          "tests/test_screener.py"),
+        ("User-defined rule expressions",
+          "partial",
+          ("The screener accepts caller-supplied criteria VALUES "
+           "(setups, min_price, lookback, min_volume, as_of) but NOT "
+           "new rule types or new setup names: unknown keys and "
+           "unknown setups are refused loudly. No user-defined rule "
+           "expression language exists."),
           "tests/test_screener.py"),
          ("Connector catalogue (201 connectors)",
           "partial",
@@ -530,6 +543,58 @@ REPOS = [
      ]),
 ]
 
+# Real-data evaluation evidence: capability -> (run date, model card).
+# Only the five rows below were evaluated on real (non-synthetic)
+# market data, each with a dated model card. Everything else is "no":
+# the cross-sectional ranking, event studies and floorsheet rows were
+# evaluated on bundled SYNTHETIC fixtures only; the forecast ledger
+# was verified by unit tests (the 34 migrated development-period
+# forecasts are real rows, but no scored evaluation ran through the
+# ledger); the track-record rows have real calls logged but no scored
+# evaluation yet (first settlements 2026-11-19/20); all other rows
+# are proven by unit tests alone. Keys must match a capability string
+# in REPOS exactly; _validate_real_data() raises on an orphan key so
+# a rename cannot silently flip a row to "no".
+REAL_DATA = {
+    ("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
+     "scored)"):
+        ("2026-11-14", "docs/volatility-forecast-model-card.md"),
+    ("Probabilistic direction models (calibrated probabilities, "
+     "walk-forward scored vs coin-flip/base-rate/direction-rule "
+     "baselines, ensembles)"):
+        ("2026-11-14", "docs/direction-models-model-card.md"),
+    "Regime classifier + signal diagnostics":
+        ("2026-11-14", "docs/direction-models-model-card.md"),
+    ("Forecast evaluation harness (walk-forward + "
+     "purged/embargoed splits, Brier/log score/QLIKE, "
+     "calibration curves, bootstrap-CI comparison, count of "
+     "models tried)"):
+        ("2026-11-14", "docs/forecast-harness-model-card.md"),
+    "Experiment workflow / recorder (config + model + metrics per run)":
+        ("2026-11-14", "docs/forecast-harness-model-card.md"),
+}
+
+
+def _real_data_cell(capability):
+    """Render the 'Real-data evaluated' cell for one capability."""
+    entry = REAL_DATA.get(capability)
+    if entry is None:
+        return "no"
+    date, card = entry
+    return f"yes — {date}, [{card}](../{card})"
+
+
+def _validate_real_data():
+    """Every REAL_DATA key must be a capability in REPOS."""
+    known = {capability for _n, _r, _l, rows in REPOS
+             for capability, _s, _e, _t in rows}
+    orphans = sorted(set(REAL_DATA) - known)
+    if orphans:
+        raise ValueError(
+            "REAL_DATA keys with no matching capability row: "
+            + ", ".join(orphans))
+
+
 # Ranked build plan: impact for a world-market user (1-5) divided by
 # effort (1-5). Rank is the tie-break (dependency order) when ratios
 # are equal. These eight items are NOT started — this table is the plan,
@@ -677,6 +742,7 @@ def write_readme_block(root=ROOT):
 
 def render():
     """Render the matrix doc from REPOS + BUILD_PLAN. Pure function."""
+    _validate_real_data()
     total, implemented, partial, not_planned = _counts()
     lines = []
     lines.append("# Capability Matrix — 15 reference repos vs this toolkit")
@@ -705,6 +771,11 @@ def render():
                  "evidence column gives the reason, usually a programme "
                  "rule: research-only, no execution, no credentials, "
                  "stdlib-only, model-light.")
+    lines.append("- **Real-data evaluated** — \"yes\" means the "
+                 "capability was evaluated on real (non-synthetic) "
+                 "market data, with the run date and the model card "
+                 "that evidences it. \"no\" means the only evidence "
+                 "is unit tests or a synthetic-data evaluation.")
     lines.append("- AGPL and unlicensed repos are ideas only: nothing was "
                  "copied from them. Apache-2.0/MIT code is never pasted "
                  "without attribution plus a LICENSES.md entry.")
@@ -724,12 +795,14 @@ def render():
     for _name, repo, licence, rows in REPOS:
         lines.append(f"## {repo} ({licence})")
         lines.append("")
-        lines.append("| Capability | Status | Evidence / reason | Test |")
-        lines.append("|---|---|---|---|")
+        lines.append("| Capability | Status | Evidence / reason | Test | "
+                     "Real-data evaluated |")
+        lines.append("|---|---|---|---|---|")
         for capability, status, evidence, test in rows:
             test_cell = (f"[{test}](../{test})" if test else "—")
             lines.append(f"| {capability} | {status} | {evidence} | "
-                         f"{test_cell} |")
+                         f"{test_cell} | "
+                         f"{_real_data_cell(capability)} |")
         lines.append("")
     lines.append("## Ranked build plan")
     lines.append("")
