@@ -332,10 +332,39 @@ REPOS = [
           "tests/test_cross_sectional.py"),
          (("Experiment workflow / recorder (config + model + metrics "
           "per run)"),
-          "partial",
-          ("toolkit/decision_log.py is the run recorder; there is no "
-          "config/model/metrics experiment tracker."),
-          "tests/test_decision_log.py"),
+          "implemented",
+          ("toolkit/forecast_harness.py run_full_evaluation() + "
+           "record_harness_experiment(): every run records its config "
+           "(splits, seed, resamples, models, train_size, horizon, "
+           "purge, embargo), the model count and the per-model "
+           "metrics + verdicts as one append-only JSONL line; "
+           "toolkit/predictive.py record_experiment() records "
+           "walk-forward reports the same way."),
+          "tests/test_forecast_harness.py"),
+         (("Forecast evaluation harness (walk-forward + "
+           "purged/embargoed splits, Brier/log score/QLIKE, "
+           "calibration curves, bootstrap-CI comparison, count of "
+           "models tried)"),
+          "implemented",
+          ("toolkit/forecast_harness.py: walk_forward_splits "
+           "(purge 5 / embargo 5), log_score, calibration_curve "
+           "(10 bins with counts), paired_bootstrap_ci (10,000 "
+           "resamples, seed 20261114), evaluate_price_models / "
+           "evaluate_volatility_models / run_full_evaluation (11 "
+           "models tried, protocol "
+           "docs/forecast-harness-eval-protocol.md)."),
+          "tests/test_forecast_harness.py"),
+         (("Append-only forecast ledger (forecast rows never change, "
+           "scores appended, hash-chained, verified)"),
+          "implemented",
+          ("toolkit/forecast_ledger.py: forecast rows never change, "
+           "scores are separate appended rows referencing the "
+           "forecast id, hash chain reused from "
+           "toolkit/decision_log.py (canonical_row_bytes/row_hash), "
+           "verify_ledger catches edits, orphan scores and duplicate "
+           "scores; migration of the 34 scored development-period "
+           "forecasts in docs/forecast-ledger-migration.md."),
+          "tests/test_forecast_ledger.py"),
          ("Model zoo (LightGBM / LSTM / Transformers / GATs)",
           "not planned",
           ("Model-light by design: baselines are naive, moving average, "
@@ -364,11 +393,33 @@ REPOS = [
           "factsheet archetypes."),
           "tests/test_report.py"),
          ("Regime classifier + signal diagnostics",
-          "partial",
-          ("Volatility regime labelling exists "
-          "(toolkit/predictive.py volatility_regime); there is no "
-          "signal-diagnostics suite."),
-          "tests/test_phase4_engines.py"),
+          "implemented",
+          ("Regime detection (volatility_regime window=20, CUSUM "
+           "change-point alarms, HMM-lite two-state calm/volatile "
+           "transition counts) plus a signal-diagnostics suite "
+           "(Brier / log score vs coin-flip, base-rate and "
+           "direction-rule baselines, reliability bins, expanding "
+           "Platt calibration) in toolkit/direction_models.py, "
+           "evaluated walk-forward per "
+           "docs/direction-models-eval-protocol.md "
+           "(docs/direction-models-model-card.md)."),
+          "tests/test_direction_models.py"),
+         (("Probabilistic direction models (calibrated probabilities, "
+           "walk-forward scored vs coin-flip/base-rate/direction-rule "
+           "baselines, ensembles)"),
+          "implemented",
+          ("Logistic gradient-descent, Gaussian naive Bayes and a "
+           "fixed-weight score model (plus a regime-conditioned "
+           "logistic variant and equal / performance-weighted "
+           "ensembles) in toolkit/direction_models.py, each issuing "
+           "P(up next day) with expanding Platt calibration, scored "
+           "walk-forward by Brier (primary) and log score against "
+           "the coin-flip, base-rate and pre-registered direction-"
+           "rule baselines per "
+           "docs/direction-models-eval-protocol.md "
+           "(docs/direction-models-model-card.md). Stdlib only; no "
+           "LightGBM / LSTM / Transformers / GATs / scikit-learn."),
+          "tests/test_direction_models.py"),
          (("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
            "scored)"),
           "implemented",
