@@ -1,0 +1,14 @@
+# SYNTHETIC — invented floorsheet rows for tests and demos only, never real market data.
+# Broker numbers are invented; quantities, prices and values are made up.
+# NEPSE floorsheet data is user-supplied CSV only by design; no live feed exists or is claimed.
+date,broker,symbol,side,quantity,price
+2026-11-13,58,SYNTHETIC-A,buy,100,500
+2026-11-13,58,SYNTHETIC-A,buy,50,510
+2026-11-13,45,SYNTHETIC-A,sell,120,505
+2026-11-13,21,SYNTHETIC-A,buy,200,495
+2026-11-13,21,SYNTHETIC-A,sell,80,500
+2026-11-13,45,SYNTHETIC-A,buy,30,520
+2026-11-13,58,SYNTHETIC-B,sell,500,200
+2026-11-13,45,SYNTHETIC-B,buy,400,205
+2026-11-13,21,SYNTHETIC-B,buy,100,210
+2026-11-13,21,SYNTHETIC-B,sell,50,195
