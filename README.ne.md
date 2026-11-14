@@ -15,6 +15,10 @@ python -m toolkit.terminal demo.csv
 indicators, setups, इमानदार Time-Machine सम्भावना (odds) र risk gate मा
 बदल्छ — र हरेक सङ्ख्या पुनः उत्पादन (reproduce) गर्न सकिन्छ।
 
+> **NEPSE, native (मूल बजार):** स्रोतसहितका शुल्कहरू (broker slabs, SEBON, DP, CGT), मितिअनुसार लागू हुने नियमहरू, Time Machine र zero-LLM rules mode — NEPSE नै परीक्षण गरिएको, पूर्वनिर्धारित (default) बजार हो, र NEPSE data डिजाइनद्वारा CSV-मात्र हो।
+>
+> **विश्व बजारहरू, समर्थित:** अमेरिका, भारत, बेलायत, क्रिप्टो र FX — स्रोतसहितका market profile हरू, SEC EDGAR fundamentals र keyless public connector हरू मार्फत; परीक्षण गरिएको वा प्रयोगात्मक भनेर [`docs/global-evidence.md`](docs/global-evidence.md) मा चिन्ह लगाइएको छ।
+
 यो फाइल अङ्ग्रेजी README को सुरुआती भाग (hook, install, पहिलो run, के हो /
 के होइन, licence) को नेपाली अनुवाद हो। पूरा विवरण अङ्ग्रेजी
 [README.md](README.md) मा छ। कुनै प्राविधिक शब्दको राम्रो नेपाली पर्याय
