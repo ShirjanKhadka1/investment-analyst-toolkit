@@ -2,3 +2,8 @@
 # the on-disk bytes match git blob hashes
 # (see tests/test_direction_rules.py::test_rule_code_hash_matches_git_hash_object).
 *.py text eol=lf
+
+# Track-record logs are LF on every platform, so the byte-prefix
+# publish invariant and the history verifier read identical bytes
+# wherever they run (PR 7.0).
+*.jsonl text eol=lf
