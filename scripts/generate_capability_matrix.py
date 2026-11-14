@@ -106,10 +106,11 @@ REPOS = [
           "toolkit/timemachine.py, daily bars, NEPSE-style CSVs.",
           "tests/test_timemachine.py"),
          ("Scanner rule table + named setups",
-          "partial",
-          ("The scanner lives in nepali-capital-market-research; "
-          "toolkit/terminal.py reimplements its five named setups."),
-          "tests/test_terminal.py"),
+          "implemented",
+          ("Multi-symbol universe scan in toolkit/screener.py reuses "
+           "the five named setups in toolkit/terminal.py "
+           "(evaluate_setups) over a caller-supplied universe."),
+          "tests/test_screener.py"),
          ("Exit plan before entry + R arithmetic + risk gate",
           "implemented",
           "toolkit/position_plan.py.",
@@ -164,10 +165,12 @@ REPOS = [
           "toolkit/performance.py, toolkit/montecarlo.py.",
           "tests/test_phase4_engines.py"),
          ("Screener criteria grammar + audit log",
-          "partial",
-          ("Named setups exist in toolkit/terminal.py; no criteria "
-          "grammar or audit log in this repo."),
-          "tests/test_terminal.py"),
+          "implemented",
+          ("toolkit/screener.py: validated criteria spec (setups, "
+           "min_price, lookback, min_volume, as_of) plus a JSONL "
+           "audit log recording symbol, setup, criteria, as-of date "
+           "and match for every scan; point-in-time clean."),
+          "tests/test_screener.py"),
          ("Connector catalogue (201 connectors)",
           "partial",
           ("toolkit/connectors.py fallback chain + toolkit/free_data.py "
