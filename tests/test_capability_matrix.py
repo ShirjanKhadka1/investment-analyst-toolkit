@@ -6,7 +6,7 @@ these tests pin the generator's contract, not the prose:
 - the summary counts equal the rows in the table;
 - every "implemented" row links a test file that exists;
 - every linked test file exists;
-- the build plan lists exactly the seven named items, in rank order;
+- the build plan lists exactly the eight named items, in rank order;
 - the doc contains no marketing words;
 - the stale-doc check works: the qa gate fails when the doc differs
   from a fresh render, and passes when it matches.
@@ -35,6 +35,7 @@ EXPECTED_BUILD_PLAN = (
     "Universe screener",
     "Second price source",
     "Volatility forecasting",
+    "Opt-in macro providers (FRED/ECB/IMF)",
     "News and macro feed",
     "Derivatives and fixed income",
     "Local dashboard",
@@ -93,7 +94,7 @@ def test_statuses_are_only_the_three_allowed():
             assert status in ("implemented", "partial", "not planned")
 
 
-def test_build_plan_lists_the_seven_named_items_in_rank_order():
+def test_build_plan_lists_the_eight_named_items_in_rank_order():
     items = [item for item, _i, _e, _w in gen.BUILD_PLAN]
     assert items == list(EXPECTED_BUILD_PLAN)
     doc = gen.render()
@@ -103,7 +104,7 @@ def test_build_plan_lists_the_seven_named_items_in_rank_order():
         list(EXPECTED_BUILD_PLAN)
     ratios = [float(ratio) for _r, _i, _a, _b, ratio in ranks]
     assert ratios == sorted(ratios, reverse=True)
-    assert [int(r) for r, *_rest in ranks] == [1, 2, 3, 4, 5, 6, 7]
+    assert [int(r) for r, *_rest in ranks] == [1, 2, 3, 4, 5, 6, 7, 8]
 
 
 def test_build_plan_ratios_match_impact_over_effort():
