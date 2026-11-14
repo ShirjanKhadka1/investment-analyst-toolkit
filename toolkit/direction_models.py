@@ -330,12 +330,23 @@ def cusum_alarms(returns, k_mult=CUSUM_K_MULT, h_mult=CUSUM_H_MULT):
     ``h = h_mult * sigma`` where sigma is the population std of the
     given returns. Cumulative sums S+ / S- reset to 0 on an alarm.
     Returns {"n_alarms", "alarm_indices", "k", "h"}. A constant
-    series (sigma 0) raises instead of alarming on noise.
+    series (sigma 0) raises instead of alarming on noise. The zero
+    check uses a 1e-12 floor, not exact equality: on Python < 3.12
+    the plain ``sum()`` of fifty 0.01s is 0.5000000000000001, not
+    0.5, so a constant series computes a phantom sigma of ~1e-18
+    and would otherwise slip past an exact-zero check (3.12's
+    compensated ``sum()`` returns exactly 0.5, which is why this
+    only failed on 3.10/3.11 in CI). The mean and std here use
+    ``math.fsum`` (correctly rounded on every version) so the
+    sigma of a constant series is exactly 0.0 everywhere.
     """
     returns = validate_series("returns", returns, min_length=2)
-    sigma = _population_std(returns)
-    if sigma == 0:
-        raise ValueError("cusum_alarms needs non-constant returns")
+    n = len(returns)
+    mean = math.fsum(returns) / n
+    sigma = math.sqrt(math.fsum((x - mean) ** 2 for x in returns) / n)
+    if sigma <= 1e-12:
+        raise ValueError("cusum_alarms needs non-constant returns "
+                         "(return std is numerically zero)")
     k = k_mult * sigma
     h = h_mult * sigma
     s_pos = s_neg = 0.0
