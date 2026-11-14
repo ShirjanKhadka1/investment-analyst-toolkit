@@ -21,6 +21,17 @@ Rules that make this honest:
   date >= call date + horizon). Settling early is refused.
 - Point-in-time: a call is scored from the first close *after* its
   date, so same-day news cannot leak into the score.
+- Append-only with a hash chain (PR 7.0, after the November 2026
+  overwrite incident): every row stores ``prev_hash`` — the sha256
+  of the previous row's canonical JSON bytes (the first row stores
+  ``"genesis"``). Settlement and baseline updates APPEND a new row
+  (``record_type`` ``"settlement"`` / ``"baseline"``) instead of
+  rewriting the call row, so a published log only ever grows.
+  ``load_calls`` merges those rows back into their call for
+  readers. ``verify_chain`` fails loudly on any broken link, which
+  is how a tampered old row is caught. Old rows without
+  ``prev_hash`` (written before PR 7.0) still read fine — the
+  chain check starts at the first row that carries one.
 """
 
 from __future__ import annotations
@@ -32,18 +43,28 @@ from datetime import date, timedelta
 from pathlib import Path
 
 __all__ = [
+    "GENESIS_PREV_HASH",
     "SCHEMA_VERSION",
     "append_reflection",
+    "canonical_row_bytes",
     "load_calls",
     "load_reflections",
+    "load_rows",
     "render_scoreboard_md",
+    "row_hash",
     "scoreboard",
     "settle_call",
     "update_call",
+    "verify_chain",
     "write_call",
 ]
 
-SCHEMA_VERSION = "1.4.0"
+SCHEMA_VERSION = "1.5.0"
+
+# prev_hash of the first row in a log. A row without prev_hash was
+# written before PR 7.0; the chain check starts at the first row
+# that carries one (see verify_chain).
+GENESIS_PREV_HASH = "genesis"
 
 _REQUIRED = ("date", "symbol", "exchange", "thesis", "horizon_days",
              "expected", "sources", "confidence")
@@ -61,6 +82,89 @@ def _call_id(call):
     """Deterministic id: sha256 of the call's content (no timestamps)."""
     payload = json.dumps(call, sort_keys=True, default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def canonical_row_bytes(row):
+    """Canonical bytes of one log row: compact JSON, sorted keys.
+
+    The hash chain hashes THESE bytes, not the literal file line
+    (the file is written with default separators; the canonical
+    form is what both the writer and the verifier hash, so
+    whitespace can never break a link).
+    """
+    return json.dumps(row, sort_keys=True, separators=(",", ":"),
+                      default=str).encode("utf-8")
+
+
+def row_hash(row):
+    """sha256 hex of a row's canonical bytes."""
+    return hashlib.sha256(canonical_row_bytes(row)).hexdigest()
+
+
+def load_rows(path):
+    """Read all raw rows from a JSONL log, in file order, unmerged.
+
+    Missing file -> empty list. Unlike ``load_calls``, settlement
+    and baseline rows are returned as their own rows here — this is
+    the view the chain check and the publish invariant use.
+    """
+    path = Path(path)
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in
+            path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def _chain_prev_hash(path):
+    """prev_hash for a new row: the hash of the last row, or genesis."""
+    rows = load_rows(path)
+    if not rows:
+        return GENESIS_PREV_HASH
+    return row_hash(rows[-1])
+
+
+def _append_row(path, row):
+    """Append one row, chaining it to the previous row. Returns it."""
+    row = dict(row)
+    row["prev_hash"] = _chain_prev_hash(path)
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
+    return row
+
+
+def verify_chain(path):
+    """Check the hash chain of a log. Returns a list of problems.
+
+    Empty list means the chain holds. Checks, per row in order:
+    a row carrying ``prev_hash`` must link to the hash of the row
+    before it (the first row links to ``"genesis"``), and a call
+    row's ``call_id`` must still match its content — so editing
+    even the last row is caught. Rows written before PR 7.0 carry
+    no ``prev_hash`` and are skipped for the link check, but they
+    still anchor the next row's link.
+    """
+    rows = load_rows(path)
+    problems = []
+    expected = GENESIS_PREV_HASH
+    for i, row in enumerate(rows):
+        if "prev_hash" in row and row["prev_hash"] != expected:
+            problems.append(
+                f"row {i}: prev_hash mismatch — expected "
+                f"{expected[:12]}…, found "
+                f"{str(row['prev_hash'])[:12]}… "
+                f"(row {i - 1} changed, or this row was inserted)")
+        if row.get("record_type", "call") == "call" \
+                and "call_id" in row:
+            want = _call_id({k: v for k, v in row.items()
+                             if k != "call_id"})
+            if want != row["call_id"]:
+                problems.append(
+                    f"row {i}: call_id mismatch — the call's content "
+                    "changed after it was logged")
+        expected = row_hash(row)
+    return problems
 
 
 def write_call(path, call):
@@ -112,6 +216,10 @@ def write_call(path, call):
     record = {"schema_version": SCHEMA_VERSION,
               "exchange": call["exchange"],
               "status": "open", **call}
+    record["record_type"] = "call"
+    # Chain link first: the call_id covers it, so moving a call to a
+    # different position in the log changes its id.
+    record["prev_hash"] = _chain_prev_hash(path)
     record["call_id"] = _call_id({k: v for k, v in record.items()
                                   if k != "call_id"})
     path = Path(path)
@@ -122,29 +230,40 @@ def write_call(path, call):
 
 
 def load_calls(path):
-    """Read all calls from a JSONL log. Missing file -> empty list.
+    """Read all calls from a JSONL log, settlement/baselines merged.
+
+    Missing file -> empty list. Settlement rows (``record_type``
+    ``"settlement"``) and baseline rows (``"baseline"``) are folded
+    into their call by ``call_id`` — the returned list holds one
+    entry per call, in log order, so existing readers (scoreboard,
+    render, the daily script) see settled calls exactly as before.
+    The raw rows stay untouched; use ``load_rows`` for them.
 
     Legacy read default: a record written before the exchange
     requirement (Round 3) has no ``exchange`` field; it reads back
     as ``NEPSE``. Writes never default — see ``write_call``.
     """
-    path = Path(path)
-    if not path.exists():
-        return []
-    calls = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.strip():
-            call = json.loads(line)
+    calls = {}
+    order = []
+    for row in load_rows(path):
+        kind = row.get("record_type", "call")
+        if kind == "call":
+            call = dict(row)
             call.setdefault("exchange", "NEPSE")
-            calls.append(call)
-    return calls
-
-
-def _write_all(path, calls):
-    path = Path(path)
-    with path.open("w", encoding="utf-8") as fh:
-        for call in calls:
-            fh.write(json.dumps(call, sort_keys=True, default=str) + "\n")
+            calls[call["call_id"]] = call
+            order.append(call["call_id"])
+            continue
+        if kind not in ("settlement", "baseline"):
+            continue  # unknown row kind: ignore, never crash a read
+        target = calls.get(row.get("call_id"))
+        if target is None:
+            continue  # orphan update for a call not in this log
+        for key, value in row.items():
+            if key not in ("record_type", "prev_hash", "call_id"):
+                target[key] = value
+        if kind == "settlement":
+            target["status"] = "settled"
+    return [calls[call_id] for call_id in order]
 
 
 # Fields the daily track-record script may add to a SETTLED call after
@@ -163,19 +282,17 @@ def update_call(path, call_id, **fields):
     naive direction. Returns the updated call. A call is never
     backfilled this way — baselines are scored outcomes, not edits
     to the prediction.
+
+    Append-only (PR 7.0): the baselines APPEND a ``"baseline"``
+    row chained to the previous row. The call row itself is never
+    rewritten.
     """
     unknown = sorted(set(fields) - set(_UPDATEABLE))
     if unknown:
         raise ValueError(f"only {_UPDATEABLE} may be updated, "
                          f"not {unknown}")
-    if "naive_expected" in fields \
-            and fields["naive_expected"] not in ("up", "down"):
-        raise ValueError("naive_expected must be 'up' or 'down', got "
-                         f"{fields['naive_expected']!r}")
-    for name in ("naive_hit", "bnh_hit"):
-        if name in fields and not isinstance(fields[name], bool):
-            raise ValueError(f"{name} must be a boolean, "
-                             f"got {fields[name]!r}")
+    _check_baselines(fields.get("naive_expected"),
+                     fields.get("naive_hit"), fields.get("bnh_hit"))
     calls = load_calls(path)
     target = None
     for call in calls:
@@ -187,23 +304,45 @@ def update_call(path, call_id, **fields):
     if target.get("status") != "settled":
         raise ValueError(f"baselines are scored outcomes — call {call_id} "
                          "is still open")
-    target.update(fields)
-    _write_all(path, calls)
-    return target
+    _append_row(path, {"record_type": "baseline", "call_id": call_id,
+                       **fields})
+    return next(c for c in load_calls(path)
+                if c.get("call_id") == call_id)
+
+
+def _check_baselines(naive_expected, naive_hit, bnh_hit):
+    """Validate baseline outcomes (shared by settle/update)."""
+    if naive_expected is not None \
+            and naive_expected not in ("up", "down"):
+        raise ValueError("naive_expected must be 'up' or 'down', got "
+                         f"{naive_expected!r}")
+    for name, value in (("naive_hit", naive_hit), ("bnh_hit", bnh_hit)):
+        if value is not None and not isinstance(value, bool):
+            raise ValueError(f"{name} must be a boolean, got {value!r}")
 
 
 def settle_call(path, call_id, realised_close, entry_close,
-                index_return, index_source, as_of):
+                index_return, index_source, as_of,
+                naive_expected=None, naive_hit=None, bnh_hit=None):
     """Settle one open call after its horizon. Returns the settled call.
 
-    ``realised_close`` / ``entry_close`` are the realised close at the
-    horizon and the first close after the call date; ``index_return``
+    ``realised_close`` / ``entry_close`` are the realised close at
+    the horizon and the first close after the call date; ``index_return``
     is the NEPSE index return over the same window as a fraction, and
     ``index_source`` names where that index series came from (a
     labelled source, or a clearly-labelled synthetic demo series —
     never an invented history). ``as_of`` is the settlement date.
-    Refuses: unknown call_id, already-settled call, settlement before
-    the horizon has passed, missing index source, non-positive prices.
+    The optional baseline outcomes (``naive_expected``,
+    ``naive_hit``, ``bnh_hit``) ride on the same settlement row
+    when the caller already knows them; otherwise ``update_call``
+    appends them later. Refuses: unknown call_id, already-settled
+    call, settlement before the horizon has passed, missing index
+    source, non-positive prices.
+
+    Append-only (PR 7.0): settlement APPENDS a ``"settlement"``
+    row chained to the previous row. The call row itself is never
+    rewritten — ``load_calls`` folds the settlement back into the
+    call for readers.
     """
     calls = load_calls(path)
     target = None
@@ -258,14 +397,22 @@ def settle_call(path, call_id, realised_close, entry_close,
     else:
         p_up = None
     brier = (p_up - outcome_up) ** 2 if p_up is not None else None
-    target.update({"status": "settled", "settled_date": settle_date.isoformat(),
-                   "realised_close": float(realised_close),
-                   "entry_close": float(entry_close),
-                   "realised_return": realised, "index_return": float(index_return),
-                   "index_source": index_source, "alpha": alpha,
-                   "hit": bool(hit), "brier": brier})
-    _write_all(path, calls)
-    return target
+    row = {"record_type": "settlement", "call_id": call_id,
+           "settled_date": settle_date.isoformat(),
+           "realised_close": float(realised_close),
+           "entry_close": float(entry_close),
+           "realised_return": realised, "index_return": float(index_return),
+           "index_source": index_source, "alpha": alpha,
+           "hit": bool(hit), "brier": brier}
+    if naive_expected is not None or naive_hit is not None \
+            or bnh_hit is not None:
+        _check_baselines(naive_expected, naive_hit, bnh_hit)
+        row["naive_expected"] = naive_expected
+        row["naive_hit"] = naive_hit
+        row["bnh_hit"] = bnh_hit
+    _append_row(path, row)
+    return next(c for c in load_calls(path)
+                if c.get("call_id") == call_id)
 
 
 def scoreboard(calls):
