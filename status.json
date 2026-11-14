@@ -7,6 +7,6 @@
   "coverage_fail_under": 80,
   "tests_passed": 918,
   "tests_total": 918,
-  "coverage_percent": 91,
+  "coverage_percent": 92,
   "coverage_note": "measured by coverage.py in this run"
 }
