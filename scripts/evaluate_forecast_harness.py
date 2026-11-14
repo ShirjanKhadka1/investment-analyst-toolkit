@@ -43,6 +43,14 @@ TRAIN_SIZE = 252
 CARD_PATH = ROOT / "docs" / "forecast-harness-model-card.md"
 EXPERIMENTS_PATH = ROOT / "docs" / "forecast-harness-experiments.jsonl"
 
+# Pooled mean QLIKE from docs/volatility-forecast-model-card.md
+# (PR 7.2) — the reproduction reference for the volatility re-run
+# below. When the Yahoo 2y window is unchanged the re-run should
+# reproduce these values; when it has moved, the values move with
+# it and the card says so.
+VOL_72_POOLED_QLIKE = {"naive": -7.9652, "ewma": -8.0264,
+                       "garch_lite": -8.0643}
+
 
 def _fmt(value, places=4):
     if value is None:
@@ -176,10 +184,10 @@ def render_card(run_date, per_symbol_data, evaluation, purged,
                  "QLIKE lower than naive AND the 95% paired-bootstrap "
                  "CI entirely below zero, else \"no edge\". The 7.2 "
                  "card's numbers came from its own fetch window; this "
-                 "re-run uses today's 2y window, so the values differ "
-                 "slightly — the rule is the same, and any verdict "
-                 "change would be published here, not resolved "
-                 "silently.\n")
+                 "re-run fetches the 2y window fresh, so the values "
+                 "are whatever today's window gives. The rule is the "
+                 "same, and any verdict change would be published "
+                 "here, not resolved silently.\n")
     for symbol in SYMBOLS:
         vol = evaluation["per_symbol"][symbol]["volatility"]
         scores = vol["scores"]
@@ -205,14 +213,29 @@ def render_card(run_date, per_symbol_data, evaluation, purged,
                      f"{_fmt_ci(m['ci_95'])} | "
                      f"{m['mean_mse_variance']:.3e} | {m['verdict']} |")
     parts.append("\n".join(lines) + "\n")
+    diffs = {name: m["mean_qlike"] - VOL_72_POOLED_QLIKE[name]
+             for name, m in comp["models"].items()}
+    if all(abs(d) < 0.00005 for d in diffs.values()):
+        parts.append("Reproduction check: the pooled mean QLIKE values "
+                     "reproduce the 7.2 card to 4 decimals — the 2y "
+                     "window is unchanged from the 7.2 fetch.\n")
+    else:
+        parts.append("Reproduction check: the pooled mean QLIKE values "
+                     "differ from the 7.2 card by "
+                     + ", ".join(f"{name} {d:+.4f}"
+                                 for name, d in sorted(diffs.items()))
+                     + " — the 2y window has moved since the 7.2 "
+                     "fetch. The verdicts above are this run's, by "
+                     "the same rule.\n")
     parts.append("## Purged / embargoed second split check "
                  "(purge 5, embargo 5)\n")
     parts.append("Same origins, training window drops its last 5 "
                  "observations and the test observation is delayed 5 "
                  "observations after the origin. Verdicts below use "
-                 "the same decision rule. A model that beats the "
-                 "baseline only on the unpurged split would have "
-                 "that fact reported here.\n")
+                 "the same decision rule. If a model's verdict differs "
+                 "between the two splits, both tables show it — a win "
+                 "on one split alone never changes the primary "
+                 "verdict.\n")
     lines = ["| Model | SPY | AAPL | VT | Overall |",
              "| --- | --- | --- | --- | --- |"]
     for name in fh.price_models():
