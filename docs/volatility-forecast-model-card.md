@@ -13,7 +13,14 @@ secondary, verdict by the pooled mean-QLIKE difference with a 95%
 paired-bootstrap CI (2000 resamples, seed 20261114). A model beats
 the baseline only if its pooled mean QLIKE is lower AND the CI lies
 entirely below zero; otherwise "no edge". No parameter was tuned
-after seeing results. Reproduce with:
+after seeing results. **Amendment 2026-11-14:** the 80% / 95%
+interval-coverage targets and the explicit model count (2) were
+added to the protocol by the user's binding constraint update AFTER
+the QLIKE evaluation had already run, and the coverage computation
+was then run fresh on the same window and folds. Coverage is a
+separate target check — it never rewrites the QLIKE verdict, which
+was pre-registered before the first run and stands unchanged.
+Reproduce with:
 
 ```text
 python3 scripts/evaluate_volatility_forecast.py
@@ -52,6 +59,35 @@ Per symbol (mean QLIKE; lower is better):
 Both models beat the baseline on every symbol individually as well
 as pooled, and both also have lower pooled MSE on variance — but MSE
 did not decide the verdict; QLIKE did, per the protocol.
+
+## Interval coverage — 80% target met, 95% target missed
+
+Forecast intervals are `±z·σ̂` from each model's variance forecast
+(`z ≈ 1.28` for 80%, `z ≈ 1.645` for 95%, under normal log returns).
+Pooled empirical coverage over the same 744 folds, with the
+coverage run fresh after the 2026-11-14 protocol amendment:
+
+| Model | Coverage 80% (target 80%) | Coverage 95% (target 95%) |
+| --- | --- | --- |
+| naive (baseline) | 80.5% (599/744) | 87.2% (649/744) |
+| EWMA (λ = 0.94) | 81.6% (607/744) | 88.3% (657/744) |
+| GARCH-lite (α = 0.08, β = 0.90) | 84.0% (625/744) | 90.5% (673/744) |
+
+**Verdict on coverage, stated plainly: the 80% target is met by all
+three models, and the 95% target is missed by all three.** The
+normal-based 95% intervals under-cover by 4.5–7.8 points: realised
+daily returns have heavier tails than the normal assumption the
+intervals are built on, so extreme days land outside the interval
+more often than 5% of the time. GARCH-lite covers best at both
+levels (84.0% / 90.5%) and EWMA second, but neither reaches 95%.
+Per symbol the pattern is the same — 95% coverage runs 87–92%
+everywhere (SPY 86.7–89.9%, AAPL 87.9–91.5%, VT 87.1–89.9%) — so
+this is not one bad symbol, it is the normal-tail assumption. This
+does not change the QLIKE verdicts above: coverage is a separate
+target check per the amended protocol, and both models still beat
+the baseline on QLIKE. What it does mean is that these intervals
+must not be quoted as 95% intervals in practice — at 95% nominal
+they deliver roughly 88–90% actual coverage on this window.
 
 ## Reading (and not over-reading) this
 

@@ -356,3 +356,118 @@ def test_forecasts_adapt_after_a_volatility_shift():
     after = wf["folds"][130]["forecasts"]["ewma"]  # origin 230, post-shift
     assert after > before
     assert after > wf["folds"][99]["forecasts"]["naive"]
+
+
+# ---------------------------------------------------------------------------
+# Interval coverage (protocol amendment 2026-11-14): known-answer cases
+# ---------------------------------------------------------------------------
+
+
+def test_z_values_are_the_standard_normal_quantiles():
+    # Phi^-1(0.90) and Phi^-1(0.975) to 6 decimal places.
+    assert vol.z_value(0.80) == pytest.approx(1.281552, abs=1e-6)
+    assert vol.z_value(0.95) == pytest.approx(1.644854, abs=1e-6)
+    assert vol.Z_80 == pytest.approx(1.2815515655446004)
+    assert vol.Z_95 == pytest.approx(1.6448536269514722)
+
+
+def test_z_value_rejects_unsupported_levels():
+    with pytest.raises(ValueError):
+        vol.z_value(0.90)
+    with pytest.raises(ValueError):
+        vol.z_value(0.99)
+
+
+def test_inside_interval_known_answers():
+    # sigma = sqrt(0.0004) = 0.02. 80% half-width = 1.2816 * 0.02
+    # = 0.02563; 95% half-width = 1.6449 * 0.02 = 0.03290.
+    assert vol.inside_interval(0.02, 0.0004, 0.80) is True
+    assert vol.inside_interval(-0.02, 0.0004, 0.80) is True
+    assert vol.inside_interval(0.03, 0.0004, 0.80) is False
+    assert vol.inside_interval(0.03, 0.0004, 0.95) is True
+    assert vol.inside_interval(0.04, 0.0004, 0.95) is False
+    # A return exactly on the boundary counts as inside (the boundary
+    # is built from the same sqrt, so the comparison is exact).
+    assert vol.inside_interval(
+        vol.Z_80 * math.sqrt(0.0004), 0.0004, 0.80) is True
+    assert vol.inside_interval(
+        vol.Z_95 * math.sqrt(0.0004), 0.0004, 0.95) is True
+
+
+def test_inside_interval_rejects_non_positive_variance():
+    with pytest.raises(ValueError):
+        vol.inside_interval(0.01, 0.0, 0.80)
+    with pytest.raises(ValueError):
+        vol.inside_interval(0.01, -0.0004, 0.95)
+
+
+def test_coverage_aggregation_known_answer():
+    # 4 folds, EWMA forecast variance 0.0004 (sigma 0.02) every fold.
+    # Realised variances: 0.02^2 (inside both), 0.03^2 (inside 95%
+    # only), 0.04^2 (inside neither), 0.01^2 (inside both).
+    # EWMA coverage: 80% = 2/4, 95% = 3/4. Naive forecasts 0.0016
+    # (sigma 0.04): 80% half-width 0.0513, 95% half-width 0.0658 —
+    # all four returns inside both levels. GARCH-lite forecasts
+    # 0.0001 (sigma 0.01): 80% half-width 0.0128, 95% 0.0164 —
+    # only the 0.01 return inside both.
+    pairs = [
+        (0.0004, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+        (0.0009, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+        (0.0016, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+        (0.0001, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+    ]
+    out = vol.score_interval_coverage(_folds_from_forecasts(pairs))
+    assert out["n_folds"] == 4
+    assert out["n_symbols"] == 1
+    assert out["models"]["ewma"]["coverage_80"] == pytest.approx(0.5)
+    assert out["models"]["ewma"]["coverage_95"] == pytest.approx(0.75)
+    assert out["models"]["naive"]["coverage_80"] == pytest.approx(1.0)
+    assert out["models"]["naive"]["coverage_95"] == pytest.approx(1.0)
+    assert out["models"]["garch_lite"]["coverage_80"] == pytest.approx(0.25)
+    assert out["models"]["garch_lite"]["coverage_95"] == pytest.approx(0.25)
+
+
+def test_coverage_pools_across_symbols_and_reports_per_symbol():
+    pairs = [
+        (0.0004, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+        (0.0009, {"naive": 0.0016, "ewma": 0.0004, "garch_lite": 0.0001}),
+    ]
+    wf = _folds_from_forecasts(pairs)
+    out = vol.score_interval_coverage([wf, wf])
+    assert out["n_folds"] == 4
+    assert out["n_symbols"] == 2
+    assert out["models"]["ewma"]["coverage_80"] == pytest.approx(0.5)
+    assert len(out["per_symbol"]) == 2
+    assert out["per_symbol"][0]["ewma"]["coverage_80"] == pytest.approx(0.5)
+
+
+def test_coverage_is_a_separate_check_from_the_qlike_verdict():
+    # EWMA beats the baseline on QLIKE here while its 80% coverage
+    # misses the target. Realised variance 0.0004 (|r| = 0.02) every
+    # fold; EWMA forecasts 0.0002 (sigma 0.0141, QLIKE -6.52 vs the
+    # naive's -6.19 at forecast 0.0016) but its 80% half-width
+    # (1.2816 * 0.0141 = 0.0181) is below |r| = 0.02, so 80%
+    # coverage is 0.0 — while the 95% half-width (0.0233) still
+    # covers. The QLIKE verdict must still read "beats baseline":
+    # coverage is reported, never used to rewrite the verdict.
+    pairs = [(0.0004, {"naive": 0.0016, "ewma": 0.0002,
+                       "garch_lite": 0.0016}) for _ in range(50)]
+    wf = _folds_from_forecasts(pairs)
+    verdict = vol.compare_volatility_models(wf, resamples=200)
+    coverage = vol.score_interval_coverage(wf)
+    assert verdict["models"]["ewma"]["verdict"] == "beats baseline"
+    assert coverage["models"]["ewma"]["coverage_80"] == pytest.approx(0.0)
+    assert coverage["models"]["ewma"]["coverage_80"] < 0.80
+    assert coverage["models"]["ewma"]["coverage_95"] == pytest.approx(1.0)
+
+
+def test_coverage_uses_only_the_fold_fields():
+    # score_interval_coverage needs no field beyond realised_variance
+    # and forecasts (the realised magnitude is sqrt(realised_variance)).
+    with pytest.raises(ValueError):
+        vol.score_interval_coverage([])
+    wf = _folds_from_forecasts(
+        [(0.0004, {"naive": 0.0004, "ewma": 0.0004,
+                   "garch_lite": 0.0004})])
+    out = vol.score_interval_coverage(wf)
+    assert out["models"]["ewma"]["coverage_80"] == pytest.approx(1.0)

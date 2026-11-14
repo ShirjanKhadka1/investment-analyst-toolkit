@@ -7,6 +7,32 @@ are bad, the bad result is published, not re-tuned away. Model rules
 (MASTER-ROADMAP.md): a model must beat its baseline out of sample or
 be labelled "no edge".
 
+## Amendment note — 2026-11-14 (transparency)
+
+The interval-coverage targets and the explicit model count in this
+protocol were added by the user's binding constraint update AFTER
+the QLIKE evaluation had already run. The coverage computation was
+then run fresh on the same data window and the same folds. The
+QLIKE verdict (both models beat the baseline) was pre-registered
+before the first run and stands unchanged — coverage is a separate
+target check added afterwards, not a rewrite of that verdict, and
+the original pre-registered sections below are unaltered except for
+the two additions named here (this note and the "Interval coverage
+targets" section, plus the explicit model-count line).
+
+## Pre-registered summary (everything fixed before the first run)
+
+- **Models:** EWMA (λ = 0.94) and GARCH-lite (α = 0.08, β = 0.90).
+- **Number of models to be tried: 2** (plus the naive baseline, which
+  is not a tried model). No parameter search was run and none will
+  be run for this PR.
+- **Loss functions:** QLIKE primary, MSE on variance secondary.
+- **Baseline:** naive 20-day realised volatility carried forward.
+- **Splits:** expanding walk-forward from 252 returns, 248 folds per
+  symbol, symbols SPY / AAPL / VT, Yahoo 2y log returns.
+- **Interval-coverage targets:** 80% and 95% (added by the
+  2026-11-14 amendment; see "Interval coverage targets" below).
+
 ## Universe and data
 
 - Symbols: **SPY, AAPL, VT** — liquid US equities from the programme's
@@ -73,6 +99,28 @@ return series the floor never binds.
   completeness; it does **not** decide the verdict, because MSE on
   squared single-day returns is dominated by a few large moves.
 - Scores are reported per symbol and pooled across symbols.
+
+## Interval coverage targets (added by the 2026-11-14 amendment)
+
+For each out-of-sample fold, each model builds a forecast interval
+from its one-day-ahead variance forecast `σ̂²`: the interval is
+`±z·σ̂` around zero, where `σ̂ = sqrt(σ̂²)` and `z` is the standard
+normal quantile — `z ≈ 1.28` for 80% (`Phi^-1(0.90)`) and
+`z ≈ 1.645` for 95% (`Phi^-1(0.975)`) — under normal log returns.
+The realised next-day return `r` is inside the interval when
+`|r| ≤ z·σ̂`. Pooled empirical coverage is the fraction of the 744
+pooled folds inside the interval, reported per model (EWMA,
+GARCH-lite, naive baseline) against the nominal targets of **80%**
+and **95%**.
+
+Coverage is a **separate target check, not a verdict rule**: it is
+reported alongside the QLIKE verdict and never rewrites it. A model
+can beat the baseline on QLIKE while missing a coverage target, or
+hit a coverage target while failing QLIKE — both facts are published
+as they are. The coverage targets were added after the QLIKE
+evaluation had already run (see the amendment note at the top), so
+they are not pre-registered in the same sense as the QLIKE rule;
+the coverage computation itself was run fresh after the amendment.
 
 ## Decision rule (the verdict, fixed before running)
 

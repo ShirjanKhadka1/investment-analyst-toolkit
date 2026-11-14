@@ -36,6 +36,10 @@ naive realised-vol baseline only if its pooled out-of-sample mean
 QLIKE is lower AND the 95% paired-bootstrap CI on the mean QLIKE
 difference lies entirely below zero; otherwise it is labelled
 "no edge". The verdict strings in this module are exactly those two.
+Interval coverage (80% / 95%) was added by the protocol amendment
+of 2026-11-14 as a separate target check: pooled empirical coverage
+of the +/-z * sigma forecast intervals against the nominal levels.
+Coverage is reported, never used to rewrite the QLIKE verdict.
 """
 from __future__ import annotations
 
@@ -56,6 +60,15 @@ BOOTSTRAP_SEED = 20261114
 # Numerical guard for QLIKE's logarithm, documented in the protocol.
 # On real return series the floor never binds.
 VARIANCE_FLOOR = 1e-12
+
+# Forecast-interval z-values (standard normal quantiles), fixed by the
+# protocol amendment of 2026-11-14: the 80% interval is +/-z_80 * sigma
+# with z_80 = Phi^-1(0.90), the 95% interval is +/-z_95 * sigma with
+# z_95 = Phi^-1(0.975), under normal log returns. sigma is the square
+# root of the model's one-day-ahead variance forecast.
+Z_80 = 1.2815515655446004
+Z_95 = 1.6448536269514722
+COVERAGE_LEVELS = (0.80, 0.95)
 
 MODELS = ("naive", "ewma", "garch_lite")
 
@@ -189,6 +202,103 @@ def forecast_variance(model, returns, **params):
             init_window=params.get("init_window", INIT_WINDOW))
     raise ValueError(f"unknown volatility model {model!r}; "
                      f"expected one of {MODELS}")
+
+
+def z_value(level):
+    """Standard-normal z for a two-sided forecast interval level.
+
+    Only the protocol's two levels are defined: 0.80 -> z ~= 1.28
+    (Phi^-1(0.90)) and 0.95 -> z ~= 1.645 (Phi^-1(0.975)). Any other
+    level raises instead of silently interpolating a quantile.
+    """
+    if level == 0.80:
+        return Z_80
+    if level == 0.95:
+        return Z_95
+    raise ValueError(
+        f"unsupported coverage level {level!r}; expected 0.80 or 0.95")
+
+
+def inside_interval(realised_return, forecast_variance, level):
+    """True if the realised return falls inside the model's forecast
+    interval for ``level``: |r| <= z * sqrt(forecast variance).
+
+    The interval is centred at zero (log returns are treated as
+    zero-mean for a one-day horizon, the same convention as the
+    realised-variance target). A return exactly on the boundary
+    counts as inside.
+    """
+    if forecast_variance <= 0:
+        raise ValueError(
+            f"forecast_variance must be > 0, got {forecast_variance}")
+    return abs(realised_return) <= z_value(level) * math.sqrt(
+        forecast_variance)
+
+
+def score_interval_coverage(walk_forward_results,
+                            levels=COVERAGE_LEVELS):
+    """Pooled empirical interval coverage per model.
+
+    For each fold the model's forecast interval is built from its
+    one-day-ahead variance forecast (sigma = sqrt(forecast)) and the
+    realised return's magnitude |r| = sqrt(realised_variance) — the
+    folds store realised variance r^2, whose square root is exactly
+    |r|, so no extra field is needed and no sign information is lost
+    (coverage only depends on |r|). Coverage for a level is the
+    fraction of folds whose realised return falls inside the
+    interval. Reported pooled across symbols and per symbol; the
+    targets are the nominal levels themselves (80% / 95%).
+
+    Accepts one walk-forward result dict or a list of them (one per
+    symbol). Returns {"n_folds", "n_symbols", "levels", "models":
+    {model: {"coverage_80", "coverage_95", "n"}}, "per_symbol":
+    [{...per-result coverage...}]}. Coverage is a separate target
+    check: it never rewrites the QLIKE verdict produced by
+    compare_volatility_models.
+    """
+    if isinstance(walk_forward_results, dict):
+        results = [walk_forward_results]
+    else:
+        results = list(walk_forward_results)
+    if not results:
+        raise ValueError("no walk-forward results to score")
+    for level in levels:
+        z_value(level)  # raises on an unsupported level
+    models = results[0]["models"]
+    for result in results:
+        if result["models"] != models:
+            raise ValueError("all results must cover the same models")
+        if not result["folds"]:
+            raise ValueError("no folds to score")
+    n_folds = sum(len(r["folds"]) for r in results)
+    out_models = {}
+    for model in models:
+        entry = {"n": n_folds}
+        for level in levels:
+            hits = 0
+            for result in results:
+                for fold in result["folds"]:
+                    realised_return = math.sqrt(fold["realised_variance"])
+                    if inside_interval(realised_return,
+                                       fold["forecasts"][model], level):
+                        hits += 1
+            entry[f"coverage_{int(level * 100)}"] = hits / n_folds
+        out_models[model] = entry
+    per_symbol = []
+    for result in results:
+        per = {"n": len(result["folds"])}
+        for model in models:
+            for level in levels:
+                hits = sum(
+                    1 for fold in result["folds"]
+                    if inside_interval(math.sqrt(fold["realised_variance"]),
+                                       fold["forecasts"][model], level))
+                per.setdefault(model, {})[f"coverage_{int(level * 100)}"] = (
+                    hits / len(result["folds"]))
+        per_symbol.append(per)
+    return {"n_folds": n_folds, "n_symbols": len(results),
+            "levels": list(levels), "models": out_models,
+            "per_symbol": per_symbol}
 
 
 def qlike(realised_variance, forecast_variance):

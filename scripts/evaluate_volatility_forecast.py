@@ -7,7 +7,12 @@ EWMA (lam 0.94) and GARCH-lite (alpha 0.08, beta 0.90) vs the naive
 trailing-20-day realised-vol baseline, scored by QLIKE (primary) and
 MSE on variance (secondary), verdict by the protocol decision rule
 (pooled mean QLIKE lower AND the 95% paired-bootstrap CI entirely
-below zero, else "no edge").
+below zero, else "no edge"). Interval coverage (80% / 95%) is
+computed as a separate target check per the protocol amendment of
+2026-11-14: for each fold the model's forecast interval is
++/-z * sigma from its variance forecast, and pooled empirical
+coverage is reported against the nominal 80% / 95% targets. Coverage
+never rewrites the QLIKE verdict.
 
 Stdlib only. Network is used ONLY for the Yahoo fetch; a fetch
 failure aborts the run instead of inventing prices. This script is
@@ -54,6 +59,7 @@ def main():
                        for model, s in scores.items()},
         })
     comparison = volatility.compare_volatility_models(results)
+    coverage = volatility.score_interval_coverage(results)
     out = {
         "protocol": "docs/volatility-forecast-eval-protocol.md",
         "run_date": date.today().isoformat(),
@@ -73,8 +79,22 @@ def main():
                     "ci_95": list(m["ci_95"]),
                     "mean_mse_variance": m["mean_mse_variance"],
                     "verdict": m["verdict"],
+                    "coverage_80":
+                        coverage["models"][model]["coverage_80"],
+                    "coverage_95":
+                        coverage["models"][model]["coverage_95"],
                 }
                 for model, m in comparison["models"].items()
+            },
+            "coverage": {
+                "levels": coverage["levels"],
+                "n_folds": coverage["n_folds"],
+                "per_symbol": [
+                    {"symbol": symbol,
+                     **{model: per[model]
+                        for model in per if model != "n"}}
+                    for symbol, per in zip(SYMBOLS, coverage["per_symbol"])
+                ],
             },
         },
     }
