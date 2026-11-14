@@ -57,7 +57,7 @@ import sys
 import tempfile
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -300,9 +300,19 @@ def _session_close_utc(profile_key, bar_date):
     profile = get_profile(profile_key)
     hour, minute = (int(part) for part in
                     profile.session_close.split(":"))
+    try:
+        tzinfo = ZoneInfo(profile.timezone)
+    except ZoneInfoNotFoundError:
+        # Windows ships no IANA time-zone database, so zoneinfo
+        # finds nothing there; the tzdata package supplies it.
+        raise RuntimeError(
+            f"No time-zone database found for "
+            f"'{profile.timezone}': this system ships no IANA "
+            f"time-zone data. Install it with `pip install tzdata`."
+        ) from None
     local_close = datetime.combine(
         _parse_day(bar_date), time(hour, minute),
-        tzinfo=ZoneInfo(profile.timezone))
+        tzinfo=tzinfo)
     return local_close.astimezone(timezone.utc)
 
 

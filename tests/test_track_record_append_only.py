@@ -500,3 +500,22 @@ def test_verify_script_fails_on_a_history_that_rewrites_a_row(tmp_path):
                                      fetch=False)
     assert problems != []
     assert "removed or changed" in problems[0]
+
+
+def test_missing_tzdata_raises_clear_error(monkeypatch):
+    """A system with no IANA time-zone database gets a clear error.
+
+    Windows ships no tz database, so ZoneInfo finds nothing there
+    (16 Windows CI failures on PR 7.0). The session-close check
+    must name the cause and the remedy instead of surfacing the
+    bare ZoneInfoNotFoundError.
+    """
+    from zoneinfo import ZoneInfoNotFoundError
+
+    def _no_tzdata(name):
+        raise ZoneInfoNotFoundError(
+            f"No time zone found with key {name}")
+
+    monkeypatch.setattr(_daily, "ZoneInfo", _no_tzdata)
+    with pytest.raises(RuntimeError, match="tzdata"):
+        _daily._session_close_utc("us", "2026-11-12")
