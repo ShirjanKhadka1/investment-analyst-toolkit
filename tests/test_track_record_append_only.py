@@ -10,6 +10,8 @@ bare origin — never the real data branch.
 """
 import importlib.util
 import json
+import os
+import shutil
 import subprocess
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -118,6 +120,31 @@ def _paths(tmp_path):
         "missed": tmp_path / "missed_days.jsonl",
         "bars": tmp_path / "bars",
     }
+
+
+def _bash_exe():
+    """The bash that ships with Git (deterministic on Windows).
+
+    Plain ``bash`` on the PATH is unreliable on the Windows
+    runner: the seed step intermittently exits 1 with no stderr
+    (seen on Windows 3.11 and 3.12 across runs — the same test
+    passes on 3.12 in one run and fails on 3.12 in another —
+    while Linux and macOS are always green). The failure is in
+    the shell-invocation layer, not the script: every git call in
+    the script is guarded or would print an error, so a silent
+    exit 1 cannot come from the script itself. Git's own bash is
+    locatable from the git executable the test already shells out
+    to, so resolve it from there on Windows; plain ``bash``
+    elsewhere.
+    """
+    if os.name == "nt":
+        git = shutil.which("git")
+        if git:
+            candidate = (Path(git).resolve().parent.parent / "bin"
+                         / "bash.exe")
+            if candidate.is_file():
+                return str(candidate)
+    return "bash"
 
 
 def _run(paths, as_of, series, now, provisional=False):
@@ -385,16 +412,19 @@ def test_workflow_seed_loads_prior_calls_end_to_end(tmp_path):
     # by an if, so a git failure still exits 0 — which puts the
     # failure in the invocation layer, not the script. The script
     # text below is unchanged; only how it is handed to bash.
-    # The failure is also surfaced with its stderr now, so any
-    # residual failure is diagnosable instead of silent.
+    # The bash is Git's own (see _bash_exe): plain `bash` on the
+    # PATH resolves unreliably on the Windows runner. The failure
+    # is surfaced with both stdout and stderr now, so any residual
+    # failure is diagnosable instead of silent.
     seed_file = tmp_path / "seed.sh"
     with seed_file.open("w", encoding="utf-8", newline="\n") as fh:
         fh.write(seed + "\n")
-    proc = subprocess.run(["bash", str(seed_file)], cwd=runner,
+    proc = subprocess.run([_bash_exe(), str(seed_file)], cwd=runner,
                           capture_output=True, check=False)
     assert proc.returncode == 0, (
         "seed step failed: "
-        + proc.stderr.decode(errors="replace"))
+        + proc.stderr.decode(errors="replace")
+        + proc.stdout.decode(errors="replace"))
     seeded = runner / "data" / "track-record" / "calls-v2.jsonl"
     assert seeded.read_bytes() == snapshot
 
