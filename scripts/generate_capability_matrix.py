@@ -373,11 +373,33 @@ REPOS = [
           "factsheet archetypes."),
           "tests/test_report.py"),
          ("Regime classifier + signal diagnostics",
-          "partial",
-          ("Volatility regime labelling exists "
-          "(toolkit/predictive.py volatility_regime); there is no "
-          "signal-diagnostics suite."),
-          "tests/test_phase4_engines.py"),
+          "implemented",
+          ("Regime detection (volatility_regime window=20, CUSUM "
+           "change-point alarms, HMM-lite two-state calm/volatile "
+           "transition counts) plus a signal-diagnostics suite "
+           "(Brier / log score vs coin-flip, base-rate and "
+           "direction-rule baselines, reliability bins, expanding "
+           "Platt calibration) in toolkit/direction_models.py, "
+           "evaluated walk-forward per "
+           "docs/direction-models-eval-protocol.md "
+           "(docs/direction-models-model-card.md)."),
+          "tests/test_direction_models.py"),
+         (("Probabilistic direction models (calibrated probabilities, "
+           "walk-forward scored vs coin-flip/base-rate/direction-rule "
+           "baselines, ensembles)"),
+          "implemented",
+          ("Logistic gradient-descent, Gaussian naive Bayes and a "
+           "fixed-weight score model (plus a regime-conditioned "
+           "logistic variant and equal / performance-weighted "
+           "ensembles) in toolkit/direction_models.py, each issuing "
+           "P(up next day) with expanding Platt calibration, scored "
+           "walk-forward by Brier (primary) and log score against "
+           "the coin-flip, base-rate and pre-registered direction-"
+           "rule baselines per "
+           "docs/direction-models-eval-protocol.md "
+           "(docs/direction-models-model-card.md). Stdlib only; no "
+           "LightGBM / LSTM / Transformers / GATs / scikit-learn."),
+          "tests/test_direction_models.py"),
          (("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
            "scored)"),
           "implemented",
