@@ -14,6 +14,8 @@ republished dataset.
 | `ecb_eurofxref_2026-11-06.xml` | https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml | 2026-11-07 | Full ECB eurofxref daily document, fixing dated 2026-11-06, 29 currencies. Saved unmodified. |
 | `coingecko_btc_market_chart_2026-11-07.json` | https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1 | 2026-11-07 | Full CoinGecko market_chart response for bitcoin, 288 points covering 2026-11-06–2026-11-07. Saved unmodified. |
 
+| `stooq_aapl_daily_2026-11-07.csv` | Stooq-format CSV (Date,Open,High,Low,Close,Volume) for AAPL, 5 trading days 2026-11-02–2026-11-06 | 2026-11-14 (built for Round 7.1) | SYNTHETIC: closes/volumes copied from the Yahoo AAPL fixture above; open/high/low set equal to close. Stooq itself could not be fetched from this VM (JavaScript-challenge HTML page, not CSV — checked 14 Nov 2026). Test input only, not a Stooq download. |
+
 ## Synthetic (labelled, invented for tests — never real market data)
 
 | Fixture | What it is |

@@ -349,6 +349,18 @@ REPOS = [
           "(toolkit/predictive.py volatility_regime); there is no "
           "signal-diagnostics suite."),
           "tests/test_phase4_engines.py"),
+         (("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
+           "scored)"),
+          "implemented",
+          ("EWMA (lam 0.94) and GARCH-lite (alpha 0.08, beta 0.90, "
+           "omega anchored to the training-sample variance) 1-day-ahead "
+           "variance forecasts in toolkit/volatility.py, walk-forward "
+           "scored (QLIKE primary) against a naive trailing-20-day "
+           "realised-vol baseline per "
+           "docs/volatility-forecast-eval-protocol.md; both beat the "
+           "baseline out of sample on SPY/AAPL/VT "
+           "(docs/volatility-forecast-model-card.md)."),
+          "tests/test_volatility.py"),
      ]),
     ("skfolio",
      "skfolio/skfolio", "BSD-3-Clause",
@@ -437,7 +449,7 @@ REPOS = [
 
 # Ranked build plan: impact for a world-market user (1-5) divided by
 # effort (1-5). Rank is the tie-break (dependency order) when ratios
-# are equal. These seven items are NOT started — this table is the plan,
+# are equal. These eight items are NOT started — this table is the plan,
 # not the work.
 BUILD_PLAN = [
     ("Universe screener",
@@ -456,6 +468,13 @@ BUILD_PLAN = [
      "and toolkit/options.py (implied volatility): EWMA/GARCH-lite "
      "forecasts with walk-forward evaluation."),
      ),
+    ("Opt-in macro providers (FRED/ECB/IMF)",
+     3, 2,
+     ("PLANNED, not implemented: the FRED / ECB / IMF / SEC row stays "
+     "partial (SEC EDGAR is implemented; FRED, ECB and IMF are not). "
+     "An env-key FRED provider was built in Round 7.1 and then "
+     "dropped by a binding constraint update, so FRED stays on the "
+     "plan; keyed providers stay out of the no-key chain.")),
     ("News and macro feed",
      4, 3,
      ("Feeds the analyst agents: the EDGAR + free-data patterns exist, "
