@@ -129,7 +129,10 @@ def _append_row(path, row):
     row["prev_hash"] = _chain_prev_hash(path)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
+    # newline="\n": text mode translates "\n" to CRLF on Windows,
+    # but the publish invariant compares bytes and git stores LF —
+    # the log must be LF on every OS (PR 7.0 Windows fix).
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(row, sort_keys=True, default=str) + "\n")
     return row
 
@@ -224,7 +227,8 @@ def write_call(path, call):
                                   if k != "call_id"})
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
+    # newline="\n": see _append_row — the log must be LF on every OS.
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(record, sort_keys=True, default=str) + "\n")
     return record
 
@@ -505,7 +509,8 @@ def append_reflection(path, call_id, text, author="portfolio-manager"):
               "author": author, "text": str(text).strip()}
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
+    # newline="\n": see _append_row — the log must be LF on every OS.
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(record, sort_keys=True) + "\n")
     return record
 

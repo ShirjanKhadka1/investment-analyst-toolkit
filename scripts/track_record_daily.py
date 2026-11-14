@@ -167,7 +167,10 @@ def _record_missed(missed_path, as_of, symbol, reason):
               "reason": reason}
     path = Path(missed_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as fh:
+    # newline="\n": text mode translates "\n" to CRLF on Windows,
+    # but the publish invariant compares bytes and git stores LF —
+    # the log must be LF on every OS (PR 7.0 Windows fix).
+    with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(record, sort_keys=True) + "\n")
     return record
 
@@ -625,9 +628,10 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
         missed_path.parent.mkdir(parents=True, exist_ok=True)
         missed_path.touch()
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
-        track_record_mod.render_track_record_md(all_calls),
-        encoding="utf-8")
+    # newline="\n" (as for the JSONL logs): the published file must
+    # read identically on every OS.
+    with out_path.open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(track_record_mod.render_track_record_md(all_calls))
     rows = load_rows(calls_path)
     head_hash = row_hash(rows[-1]) if rows else None
     return {"as_of": as_of.isoformat(), "calls_logged": logged,
@@ -710,11 +714,17 @@ def publish(outputs, branch, repo_root=None):
             # invariant below must read the true remote tip.
             subprocess.run(["git", "fetch", "origin", branch], cwd=root,
                            check=True, capture_output=True)
-            subprocess.run(["git", "worktree", "add", str(worktree),
+            # -c core.autocrlf=false: the worktree checkout must not
+            # convert LF to CRLF (Windows runners default
+            # autocrlf=true). The publish invariant compares bytes,
+            # so the remote tip must read exactly as stored.
+            subprocess.run(["git", "-c", "core.autocrlf=false",
+                            "worktree", "add", str(worktree),
                             branch], cwd=root, check=True,
                            capture_output=True)
         else:
-            subprocess.run(["git", "worktree", "add", "-b", branch,
+            subprocess.run(["git", "-c", "core.autocrlf=false",
+                            "worktree", "add", "-b", branch,
                             str(worktree)], cwd=root, check=True,
                            capture_output=True)
         _check_publish_invariant(outputs, worktree)

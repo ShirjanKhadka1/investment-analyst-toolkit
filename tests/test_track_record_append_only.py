@@ -20,10 +20,12 @@ from toolkit.decision_log import (
     GENESIS_PREV_HASH,
     _append_row,
     _call_id,
+    append_reflection,
     load_calls,
     load_rows,
     row_hash,
     verify_chain,
+    write_call,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -376,8 +378,23 @@ def test_workflow_seed_loads_prior_calls_end_to_end(tmp_path):
         'if git cat-file -e "origin/data/track-record:$f" 2>/dev/null; '
         'then git show "origin/data/track-record:$f" '
         '> "data/track-record/$f"; fi; done; fi')
-    subprocess.run(["bash", "-c", seed], cwd=runner, check=True,
-                   capture_output=True)
+    # Run the step from a file, not `bash -c`: passing the script as
+    # a -c argument goes through Windows CreateProcess quoting, and
+    # on the Windows runner that invocation exits 1 with no stderr.
+    # The script itself cannot exit 1 — every git call is guarded
+    # by an if, so a git failure still exits 0 — which puts the
+    # failure in the invocation layer, not the script. The script
+    # text below is unchanged; only how it is handed to bash.
+    # The failure is also surfaced with its stderr now, so any
+    # residual failure is diagnosable instead of silent.
+    seed_file = tmp_path / "seed.sh"
+    with seed_file.open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write(seed + "\n")
+    proc = subprocess.run(["bash", str(seed_file)], cwd=runner,
+                          capture_output=True, check=False)
+    assert proc.returncode == 0, (
+        "seed step failed: "
+        + proc.stderr.decode(errors="replace"))
     seeded = runner / "data" / "track-record" / "calls-v2.jsonl"
     assert seeded.read_bytes() == snapshot
 
@@ -519,3 +536,31 @@ def test_missing_tzdata_raises_clear_error(monkeypatch):
     monkeypatch.setattr(_daily, "ZoneInfo", _no_tzdata)
     with pytest.raises(RuntimeError, match="tzdata"):
         _daily._session_close_utc("us", "2026-11-12")
+
+
+def test_jsonl_writers_use_lf_line_endings(tmp_path):
+    """JSONL logs are LF on every OS (PR 7.0 Windows fix).
+
+    The publish invariant compares bytes and git stores LF — but
+    text-mode appends translate "\\n" to CRLF on Windows, so the
+    local log no longer matched the published blob and the
+    byte-prefix check failed (Windows CI failure on PR #30).
+    Every JSONL writer must force LF.
+    """
+    calls = tmp_path / "calls.jsonl"
+    _append_row(calls, {"record_type": "note", "x": 1})
+    write_call(calls, {
+        "date": "2026-11-06", "symbol": "SPY", "exchange": "NYSE",
+        "thesis": "test", "horizon_days": 5, "expected": "up",
+        "sources": ["test"], "confidence": 0.5,
+        "entry_close": 100.0})
+    assert b"\r" not in calls.read_bytes()
+    assert calls.read_bytes().endswith(b"\n")
+
+    missed = tmp_path / "missed_days.jsonl"
+    _daily._record_missed(missed, date(2026, 11, 6), "SPY", "no data")
+    assert b"\r" not in missed.read_bytes()
+
+    reflections = tmp_path / "reflections.jsonl"
+    append_reflection(reflections, "some-call-id", "test reflection")
+    assert b"\r" not in reflections.read_bytes()
