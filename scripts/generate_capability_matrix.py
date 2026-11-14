@@ -281,6 +281,14 @@ REPOS = [
           ("toolkit/connectors.py + toolkit/data_layer.py; CSV loader "
           "toolkit/nepse_loader.py."),
           "tests/test_connectors.py"),
+         (("NEPSE floorsheet CSV importer + broker-flow analytics"),
+          "implemented",
+          ("User-supplied floorsheet CSV only (no live feed exists or "
+            "is claimed): schema-validated loader plus top buyers / "
+            "sellers per symbol, net flow per broker and concentration "
+            "(top-3 share, HHI) in toolkit/nepse_floorsheet.py; bundled "
+            "SYNTHETIC demo CSV."),
+          "tests/test_cross_sectional.py"),
          ("Event-driven backtester with look-ahead-bias guards",
           "partial",
           ("toolkit/backtest.py is signal-based with no-lookahead "
@@ -310,6 +318,18 @@ REPOS = [
           "the baseline subset; the full 158-factor set is not "
           "implemented."),
           "tests/test_quant.py"),
+         (("Cross-sectional ranking (momentum/value/quality proxies, "
+           "decile tests net of costs)"),
+          "implemented",
+          ("Momentum (126-bar, skip 21), value (earnings yield, "
+            "book-to-price) and quality (ROE, gross margin) proxies "
+            "from EDGAR via toolkit/edgar.py, cross-sectional "
+            "z-scores, deciles, top-minus-bottom spreads net of costs "
+            "(NEPSE sourced schedule / explicit cost_fraction) with a "
+            "seeded-bootstrap verdict in toolkit/cross_sectional.py; "
+            "pre-registered protocol + model card (all four rules "
+            "\"no edge\" on the synthetic evaluation)."),
+          "tests/test_cross_sectional.py"),
          (("Experiment workflow / recorder (config + model + metrics "
           "per run)"),
           "implemented",
@@ -412,6 +432,18 @@ REPOS = [
            "baseline out of sample on SPY/AAPL/VT "
            "(docs/volatility-forecast-model-card.md)."),
           "tests/test_volatility.py"),
+         (("Event studies (NEPSE corporate actions on user CSVs + "
+           "global earnings)"),
+          "implemented",
+          ("Market-model (or mean-adjusted) abnormal returns, "
+            "estimation [-250, -31], event [-5, +5], CAR/CAAR with "
+            "t-test AND seeded-bootstrap p in toolkit/event_study.py; "
+            "NEPSE dividend/bonus/right/book-closure events from "
+            "user-supplied CSVs (CSV-only by design) plus global "
+            "earnings on caller-supplied dates; bundled SYNTHETIC demo "
+            "CSV; model card reports no significant abnormal return "
+            "on the synthetic evaluation."),
+          "tests/test_cross_sectional.py"),
      ]),
     ("skfolio",
      "skfolio/skfolio", "BSD-3-Clause",
