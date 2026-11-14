@@ -519,13 +519,15 @@ def test_verify_script_fails_on_a_history_that_rewrites_a_row(tmp_path):
     assert "removed or changed" in problems[0]
 
 
-def test_missing_tzdata_raises_clear_error(monkeypatch):
-    """A system with no IANA time-zone database gets a clear error.
+def test_missing_tzdata_refuses_run(monkeypatch, tmp_path):
+    """A system with no IANA time-zone database: the session state
+    is UNKNOWN and the run refuses — it never guesses.
 
     Windows ships no tz database, so ZoneInfo finds nothing there
-    (16 Windows CI failures on PR 7.0). The session-close check
-    must name the cause and the remedy instead of surfacing the
-    bare ZoneInfoNotFoundError.
+    (16 Windows CI failures on PR 7.0). The run must refuse with
+    RefusedRunError, naming the optional tzdata extra — even with
+    --provisional, since a bar whose completeness cannot be
+    determined cannot be logged, provisionally or otherwise.
     """
     from zoneinfo import ZoneInfoNotFoundError
 
@@ -534,8 +536,76 @@ def test_missing_tzdata_raises_clear_error(monkeypatch):
             f"No time zone found with key {name}")
 
     monkeypatch.setattr(_daily, "ZoneInfo", _no_tzdata)
-    with pytest.raises(RuntimeError, match="tzdata"):
-        _daily._session_close_utc("us", "2026-11-12")
+    paths = _paths(tmp_path)
+    series = _series("2026-11-06")
+    with pytest.raises(RefusedRunError, match="tzdata"):
+        _run(paths, "2026-11-06", series, _at(22, day="2026-11-06"))
+    assert not paths["calls"].exists()  # refused run writes nothing
+    with pytest.raises(RefusedRunError, match="tzdata"):
+        _run(paths, "2026-11-06", series, _at(22, day="2026-11-06"),
+             provisional=True)
+    assert not paths["calls"].exists()
+
+
+def test_verifier_passes_on_crlf_copy_of_valid_log(tmp_path):
+    """The history verifier compares canonical rows, not raw bytes.
+
+    A valid log whose line endings were converted to CRLF (e.g. a
+    Windows checkout) still passes — the rows are identical, only
+    the line endings differ. Rewriting a row in the CRLF history
+    still fails: the canonical comparison does not weaken the
+    "no row removed or changed" guarantee.
+    """
+    origin = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True,
+                   capture_output=True)
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "clone", str(origin), str(repo)], check=True,
+                   capture_output=True)
+    for key, value in (("user.name", "test"),
+                       ("user.email", "test@example.invalid"),
+                       ("core.autocrlf", "false")):
+        subprocess.run(["git", "-C", str(repo), "config", key, value],
+                       check=True, capture_output=True)
+    log = repo / "calls-v2.jsonl"
+
+    def write_crlf(rows):
+        log.write_bytes(b"".join(
+            (json.dumps(r, sort_keys=True) + "\r\n").encode("utf-8")
+            for r in rows))
+
+    def commit(message):
+        subprocess.run(["git", "-C", str(repo), "add", "calls-v2.jsonl"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", str(repo), "commit", "-m", message],
+                       check=True, capture_output=True)
+        # The clone of an empty repo has no local branch name yet;
+        # push the current HEAD as main.
+        subprocess.run(["git", "-C", str(repo), "push", "origin",
+                        "HEAD:main"],
+                       check=True, capture_output=True)
+
+    rows = [_chain_row(GENESIS_PREV_HASH, 1)]
+    rows.append(_chain_row(row_hash(rows[0]), 2))
+    write_crlf(rows)
+    commit("v1: two rows, CRLF")
+    assert verify_chain(log) == []
+    rows.append(_chain_row(row_hash(rows[1]), 3))
+    write_crlf(rows)
+    commit("v2: append one row, CRLF")
+    assert verify_chain(log) == []
+    assert _verify.check_history(repo, "main", "calls-v2.jsonl",
+                                 fetch=False) == []
+
+    # v3 rewrites row 1 (same position, different content, still
+    # CRLF): the verifier must still fail.
+    rows[0] = _chain_row(GENESIS_PREV_HASH, 99)
+    write_crlf(rows)
+    commit("v3: rewrite an earlier row, CRLF")
+    problems = _verify.check_history(repo, "main", "calls-v2.jsonl",
+                                     fetch=False)
+    assert problems != []
+    assert "removed or changed" in problems[0]
 
 
 def test_jsonl_writers_use_lf_line_endings(tmp_path):

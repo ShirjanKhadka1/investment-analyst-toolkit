@@ -35,7 +35,7 @@ python -m toolkit.terminal demo.csv
 
 No `pip install` step: the toolkit is standard-library only, so there is nothing to install beyond Python 3.10+ itself. No API key, no account, no network. Timed 2026-11-07 on this machine: a clean clone plus the command above took **2.3 seconds** end to end. (Your machine and network will differ; the point is that the only wait is the clone.)
 
-One exception, Windows only: the daily track-record script needs the IANA time-zone database, which Windows does not ship — on Windows, `pip install tzdata` first (data only; the toolkit itself stays standard-library only).
+One exception, Windows only: the daily track-record script needs the IANA time-zone database, which Windows does not ship — on Windows, install the optional tzdata extra first: `pip install -r requirements-tzdata.txt` (data only; the toolkit itself stays standard-library only). Without it the session state is unknown and the run refuses instead of guessing.
 
 ## Watch it run (10 seconds)
 
@@ -528,7 +528,7 @@ Every public function has at least one test, including an edge-case test
 (zero revenue, negative equity, growth >= discount rate). If a test fails,
 the toolkit is wrong — open an issue.
 
-Tests: 731/731 tests passing (2026-11-14, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 25 new (LLM provider layer: schema failure, caps, retry limit, key redaction, canned provider responses) + 12 new (capability matrix generator + qa gate) + 3 new (Python 3.10 tomllib fallback in qa.py: guarded import + regression tests) + 35 new (portfolio strategy backtester: costs from market profiles, walk-forward, bootstrap, tear sheet, numpy-identical tests) + 25 new (Python 3.10 stdlib-import guard: AST checker, qa gate, generate_status.py tomllib fallback, POSIX path rendering) + 6 new (append-only track record: three consecutive runs + settlement, pre-close refusal, provisional never scores, excluded never blocks, tamper detection, branch-history verifier, workflow seed end to end) + 1 new (missing tzdata: clear error when the IANA time-zone database is absent, Windows). + 1 new (LF line endings: JSONL writers force LF and the publish worktree checks out with autocrlf=false, Windows).
+Tests: 732/732 tests passing (2026-11-14, fresh clone, Python 3.12, pytest 9.2.0): 623 before + 25 new (LLM provider layer: schema failure, caps, retry limit, key redaction, canned provider responses) + 12 new (capability matrix generator + qa gate) + 3 new (Python 3.10 tomllib fallback in qa.py: guarded import + regression tests) + 35 new (portfolio strategy backtester: costs from market profiles, walk-forward, bootstrap, tear sheet, numpy-identical tests) + 25 new (Python 3.10 stdlib-import guard: AST checker, qa gate, generate_status.py tomllib fallback, POSIX path rendering) + 6 new (append-only track record: three consecutive runs + settlement, pre-close refusal, provisional never scores, excluded never blocks, tamper detection, branch-history verifier, workflow seed end to end) + 1 new (missing tzdata: session state unknown, run refuses, Windows). + 1 new (LF line endings: JSONL writers force LF and the publish worktree checks out with autocrlf=false, Windows). + 1 new (history verifier passes on a CRLF-converted copy of a valid log, Windows).
 Quality gates (Phase 7): `ruff check` clean across the whole repo (toolkit/, tests/, scripts/), `mypy` clean under default
 settings (see mypy.ini — untyped code is unchecked by default mypy, so
 this is a guardrail, not full type safety), coverage 91% total with a

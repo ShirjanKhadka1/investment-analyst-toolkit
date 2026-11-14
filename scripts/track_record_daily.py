@@ -293,12 +293,18 @@ def _call_due(calls, symbol, as_of, profile_key, observed_dates):
 
 
 def _session_close_utc(profile_key, bar_date):
-    """UTC instant when the exchange session for ``bar_date`` closed.
+    """UTC instant when the exchange session for ``bar_date`` closed,
+    or None when that instant cannot be computed.
 
     The profile's ``session_close`` is a local time and its
     ``timezone`` an IANA name, so the conversion is DST-aware for
     the bar's own date (a November bar closes at 21:00 UTC in New
     York; a July bar at 20:00 UTC).
+
+    None means the system has no IANA time-zone database (Windows
+    ships none), so the session state is UNKNOWN: the caller must
+    refuse, never guess. The tzdata package is an optional extra
+    (requirements-tzdata.txt) that supplies the database.
     """
     profile = get_profile(profile_key)
     hour, minute = (int(part) for part in
@@ -306,13 +312,9 @@ def _session_close_utc(profile_key, bar_date):
     try:
         tzinfo = ZoneInfo(profile.timezone)
     except ZoneInfoNotFoundError:
-        # Windows ships no IANA time-zone database, so zoneinfo
-        # finds nothing there; the tzdata package supplies it.
-        raise RuntimeError(
-            f"No time-zone database found for "
-            f"'{profile.timezone}': this system ships no IANA "
-            f"time-zone data. Install it with `pip install tzdata`."
-        ) from None
+        # No time-zone database on this system: UNKNOWN, not an
+        # error to paper over — the caller refuses the run.
+        return None
     local_close = datetime.combine(
         _parse_day(bar_date), time(hour, minute),
         tzinfo=tzinfo)
@@ -320,7 +322,10 @@ def _session_close_utc(profile_key, bar_date):
 
 
 def _bar_complete(symbol, profile_key, bar_date, now):
-    """True when the bar dated ``bar_date`` is complete at ``now``.
+    """True when the bar dated ``bar_date`` is complete at ``now``,
+    False when it is still in progress, None when the session
+    state is UNKNOWN (no time-zone database, so the session close
+    cannot be computed).
 
     Equities/ETFs: the exchange session for the bar's date must
     have closed by ``now`` (UTC). Crypto and FX have no daily
@@ -329,7 +334,10 @@ def _bar_complete(symbol, profile_key, bar_date, now):
     """
     if profile_key in ("crypto", "fx"):
         return _parse_day(bar_date) < now.date()
-    return now >= _session_close_utc(profile_key, bar_date)
+    close = _session_close_utc(profile_key, bar_date)
+    if close is None:
+        return None
+    return now >= close
 
 
 def _settle_due_calls(calls_path, calls, symbol, profile_key, bars,
@@ -440,7 +448,17 @@ def _decide_call(calls_path, calls, symbol, profile_key, bars, as_of,
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     last_date, _last_close = closes[-1]
-    if _bar_complete(symbol, profile_key, last_date, now):
+    complete = _bar_complete(symbol, profile_key, last_date, now)
+    if complete is None:
+        # Session state unknown (no time-zone database): refuse,
+        # do not guess — not even as a provisional call.
+        raise RefusedRunError(
+            f"refusing to log {symbol} for {as_of}: session state "
+            f"unknown for bar {last_date} — no time-zone database "
+            "found for the session. Install the optional tzdata "
+            "extra (`pip install -r requirements-tzdata.txt`) and "
+            "re-run.")
+    if complete:
         entry_bars = closes
         bar_complete = True
         is_provisional = False
@@ -564,10 +582,14 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
                            str(result.get("source", "unknown")), profile_key)
 
     # Refusal check — a call due from an incomplete bar refuses the
-    # whole run unless --provisional. Nothing has been logged yet.
-    # Crypto/FX never refuse: their in-progress bar is dropped and
-    # the call uses the last complete bar (no close to wait for).
+    # whole run unless --provisional, and a call whose session
+    # state is UNKNOWN (no time-zone database) refuses outright:
+    # provisional cannot rescue a bar whose completeness cannot be
+    # determined. Nothing has been logged yet. Crypto/FX never
+    # refuse: their in-progress bar is dropped and the call uses
+    # the last complete bar (no close to wait for).
     refused = []
+    unknown = []
     provisional_for = {}
     for symbol, (_bars, pit_bars, _source, profile_key) in fetched.items():
         if not pit_bars:
@@ -579,7 +601,11 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
         if not _call_due(calls, symbol, as_of, profile_key, observed):
             continue
         bar_date = pit_bars[-1]["date"]
-        if _bar_complete(symbol, profile_key, bar_date, now):
+        complete = _bar_complete(symbol, profile_key, bar_date, now)
+        if complete is True:
+            continue
+        if complete is None:
+            unknown.append(symbol)
             continue
         if profile_key in ("crypto", "fx"):
             continue  # in-progress bar is dropped; last complete bar
@@ -587,6 +613,13 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
             provisional_for[symbol] = True
         else:
             refused.append((symbol, bar_date))
+    if unknown:
+        raise RefusedRunError(
+            f"refusing run for {as_of}: session state unknown for "
+            f"{', '.join(unknown)} — no time-zone database found "
+            "for the session's time zone. Install the optional "
+            "tzdata extra (`pip install -r requirements-tzdata.txt`) "
+            "and re-dispatch.")
     if refused:
         detail = "; ".join(
             f"{symbol} (bar {bar_date} not complete at "

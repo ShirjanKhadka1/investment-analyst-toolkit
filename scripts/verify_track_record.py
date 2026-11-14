@@ -2,8 +2,9 @@
 an earlier row (PR 7.0, after the November 2026 overwrite incident).
 
 The track-record log is append-only: every commit's version of the
-file must start with the previous version's bytes, and the tip's
-hash chain must verify (see ``toolkit.decision_log.verify_chain``).
+file must start with the previous version's rows, compared
+canonically (see ``_canonical_rows``), and the tip's hash chain
+must verify (see ``toolkit.decision_log.verify_chain``).
 This script checks both, oldest commit first. It is wired as a
 post-publish step in ``.github/workflows/daily-track-record.yml``.
 
@@ -27,6 +28,7 @@ the first violation. Stdlib only.
 """
 
 import argparse
+import json
 import subprocess
 import sys
 import tempfile
@@ -34,7 +36,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from toolkit.decision_log import verify_chain
+from toolkit.decision_log import canonical_row_bytes, verify_chain
 
 DEFAULT_BRANCH = "data/track-record"
 # Path of the log WITHIN the data branch (the branch root holds the
@@ -60,12 +62,30 @@ def _file_at(repo, commit, path):
     return proc.stdout
 
 
+def _canonical_rows(data):
+    """Canonical row bytes for each JSONL row in ``data``.
+
+    Line endings, key order and spacing are ignored: two versions
+    of a row that differ only in those compare equal, so a log
+    checked out with CRLF endings still verifies. A row whose
+    content changed still differs — the "no row removed or
+    changed" guarantee is preserved.
+    """
+    rows = []
+    for line in data.decode("utf-8").splitlines():
+        if not line.strip():
+            continue
+        rows.append(canonical_row_bytes(json.loads(line)))
+    return rows
+
+
 def check_history(repo, branch=DEFAULT_BRANCH, path=DEFAULT_FILE,
                   fetch=True):
     """Return a list of problems found in the branch history.
 
-    Empty list means clean: every version of ``path`` is a
-    byte-prefix of the next, and the tip's hash chain verifies.
+    Empty list means clean: every version of ``path`` starts with
+    the previous version's canonical rows, and the tip's hash
+    chain verifies.
     """
     repo = Path(repo)
     if fetch:
@@ -78,19 +98,25 @@ def check_history(repo, branch=DEFAULT_BRANCH, path=DEFAULT_FILE,
     if not commits:
         return [(f"no commits touch {path} on origin/{branch} — "
                  "the log file was never published")]
-    previous = b""
+    previous = []
     for commit in commits:
-        current = _file_at(repo, commit, path)
-        if not current.startswith(previous):
+        try:
+            current = _canonical_rows(_file_at(repo, commit, path))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            problems.append(
+                f"commit {commit[:7]}: {path} is not valid JSONL: "
+                f"{exc}")
+            return problems
+        if current[:len(previous)] != previous:
             problems.append(
                 f"commit {commit[:7]} removed or changed an earlier "
                 f"row of {path}: its version does not start with the "
-                "previous version's bytes")
+                "previous version's rows")
             return problems  # one violation is enough to fail
         previous = current
     with tempfile.NamedTemporaryFile(suffix=".jsonl",
                                     delete=False) as tmp:
-        tmp.write(previous)
+        tmp.write(_file_at(repo, commits[-1], path))
         tmp_path = tmp.name
     try:
         for problem in verify_chain(tmp_path):
@@ -121,7 +147,8 @@ def main(argv=None):
             print(f"  - {problem}")
         return 1
     print(f"OK: {args.file} on {args.branch} is append-only "
-          "(every version is a prefix of the next; tip chain holds)")
+          "(every version's rows are a prefix of the next; "
+          "tip chain holds)")
     return 0
 
 
