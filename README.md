@@ -729,6 +729,9 @@ hold recommendation; NEPSE stays CSV-only.
   recorded blocker) and no Cloudflare cron backup (Cloudflare access
   unverified, recorded blocker); failures are visible in the public
   workflow log and in the `STALE_OR_FAILED` labels themselves.
+
+The reports in `reports/daily/` are a demonstration stream, not part of the pre-registered track record — see [`reports/daily/README.md`](reports/daily/README.md).
+
 - Tests: 66/66 passed (52 at v0.5.1 + 14 new data-layer/GATE 3 tests),
   verified 28 Oct 2026 in a fresh venv. GitHub Actions CI runs the same
   suite on Python 3.10/3.11/3.12.
