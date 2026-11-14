@@ -165,10 +165,11 @@ Impact for a world-market user (1–5) divided by effort (1–5). Rank is the ti
 | 1 | Universe screener | 5 | 2 | 2.50 | Highest impact per effort: the named-setup rules already exist (toolkit/terminal.py) and the scanner table exists in the satellite repo; a universe scan is a small step from both. |
 | 2 | Second price source | 4 | 2 | 2.00 | Data reliability for world markets: the fallback chain in toolkit/connectors.py already supports a second source; adding one more keyless source is bounded work. |
 | 3 | Volatility forecasting | 3 | 2 | 1.50 | Builds directly on toolkit/performance.py (rolling volatility) and toolkit/options.py (implied volatility): EWMA/GARCH-lite forecasts with walk-forward evaluation. |
-| 4 | News and macro feed | 4 | 3 | 1.33 | Feeds the analyst agents: the EDGAR + free-data patterns exist, but a feed needs source selection, freshness rules and a sentiment-evaluation step. |
-| 5 | Derivatives and fixed income | 4 | 4 | 1.00 | Extends toolkit/options.py (Black-Scholes, Greeks) to futures and bonds (duration/convexity, yield curve); a larger, self-contained build. |
-| 6 | Local dashboard | 3 | 3 | 1.00 | A local HTML view over the terminal output; new surface, no new maths — behind derivatives because the maths matters more than the surface. |
-| 7 | Pages demo with real global data | 3 | 4 | 0.75 | Last on purpose: it depends on the second price source and on the freshness discipline being proven, or it would publish stale data as if it were live. |
+| 4 | Opt-in macro providers (FRED/ECB/IMF) | 3 | 2 | 1.50 | PLANNED, not implemented: the FRED / ECB / IMF / SEC row stays partial (SEC EDGAR is implemented; FRED, ECB and IMF are not). An env-key FRED provider was built in Round 7.1 and then dropped by a binding constraint update, so FRED stays on the plan; keyed providers stay out of the no-key chain. |
+| 5 | News and macro feed | 4 | 3 | 1.33 | Feeds the analyst agents: the EDGAR + free-data patterns exist, but a feed needs source selection, freshness rules and a sentiment-evaluation step. |
+| 6 | Derivatives and fixed income | 4 | 4 | 1.00 | Extends toolkit/options.py (Black-Scholes, Greeks) to futures and bonds (duration/convexity, yield curve); a larger, self-contained build. |
+| 7 | Local dashboard | 3 | 3 | 1.00 | A local HTML view over the terminal output; new surface, no new maths — behind derivatives because the maths matters more than the surface. |
+| 8 | Pages demo with real global data | 3 | 4 | 0.75 | Last on purpose: it depends on the second price source and on the freshness discipline being proven, or it would publish stale data as if it were live. |
 
 ## Notes
 

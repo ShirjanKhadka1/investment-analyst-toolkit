@@ -46,6 +46,45 @@ def _get_json(url, timeout=20):
         raise RuntimeError(f"Network call failed for {url}: {e.reason}") from e
 
 
+def parse_yahoo_chart(payload):
+    """Parse a Yahoo chart-API response into (pairs, volumes).
+
+    Pure function: ``payload`` is the decoded JSON of
+    ``/v8/finance/chart/{symbol}``. Returns ``(pairs, volumes)``
+    where pairs are [(ISO date, close)] exactly as
+    :func:`fetch_yahoo_prices` returns, and volumes is
+    {ISO date: shares traded} taken from the ``volume`` array Yahoo
+    sends in the same ``indicators.quote[0]`` payload. A bar whose
+    close is None is skipped (as before); a bar whose volume is
+    None is kept in pairs but omitted from volumes — a missing
+    volume is missing data, never a zero. Raises RuntimeError on an
+    unexpected payload shape.
+    """
+    import datetime
+
+    try:
+        result = payload["chart"]["result"][0]
+        stamps = result["timestamp"]
+        quote = result["indicators"]["quote"][0]
+        closes = quote["close"]
+        volumes = quote.get("volume") or []
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError("Unexpected Yahoo response") from e
+    pairs = []
+    vols = {}
+    for i, (ts, close) in enumerate(zip(stamps, closes)):
+        if close is None:
+            continue
+        date = datetime.datetime.fromtimestamp(
+            ts, datetime.timezone.utc).date().isoformat()
+        pairs.append((date, float(close)))
+        if i < len(volumes) and volumes[i] is not None:
+            vols[date] = float(volumes[i])
+    if not pairs:
+        raise RuntimeError("No prices returned in Yahoo response")
+    return pairs, vols
+
+
 def fetch_yahoo_prices(symbol, range_="1y", interval="1d"):
     """Daily closes from Yahoo Finance chart API. Returns [(date_str, close)].
 
@@ -73,6 +112,50 @@ def fetch_yahoo_prices(symbol, range_="1y", interval="1d"):
     if not out:
         raise RuntimeError(f"No prices returned for {symbol}")
     return out
+
+
+def fetch_yahoo_bars(symbol, range_="1y", interval="1d"):
+    """Daily bars from Yahoo Finance chart API.
+
+    Returns ``(pairs, volumes)``: pairs are [(ISO date, close)] —
+    identical to :func:`fetch_yahoo_prices` — and volumes is
+    {ISO date: shares traded} from the same payload. Additive only:
+    nothing about the pairs shape changes. A date with no volume
+    in the payload is absent from ``volumes``.
+    """
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+        f"?range={range_}&interval={interval}"
+    )
+    data = _get_json(url)
+    try:
+        return parse_yahoo_chart(data)
+    except RuntimeError as e:
+        if "No prices returned" in str(e):
+            raise RuntimeError(f"No prices returned for {symbol}") from e
+        raise RuntimeError(f"Unexpected Yahoo response for {symbol}") from e
+
+
+def median_volume(volumes):
+    """Median of a {date: volume} mapping (or any volume iterable).
+
+    Returns a float, or None when there are no volumes. Used to turn
+    a fetched series' volumes into the ``typical_daily_volume`` the
+    exit-liquidity check needs — a volume-less series yields None,
+    and the gate fail-closes, exactly as before.
+    """
+    if not volumes:
+        return None
+    values = [float(v) for v in volumes.values()] \
+        if isinstance(volumes, dict) else [float(v) for v in volumes]
+    if not values:
+        return None
+    values.sort()
+    n = len(values)
+    mid = n // 2
+    if n % 2:
+        return values[mid]
+    return (values[mid - 1] + values[mid]) / 2.0
 
 
 def fetch_worldbank_indicator(country, indicator, per_page=100):
