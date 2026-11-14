@@ -346,6 +346,18 @@ REPOS = [
           "(toolkit/predictive.py volatility_regime); there is no "
           "signal-diagnostics suite."),
           "tests/test_phase4_engines.py"),
+         (("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
+           "scored)"),
+          "implemented",
+          ("EWMA (lam 0.94) and GARCH-lite (alpha 0.08, beta 0.90, "
+           "omega anchored to the training-sample variance) 1-day-ahead "
+           "variance forecasts in toolkit/volatility.py, walk-forward "
+           "scored (QLIKE primary) against a naive trailing-20-day "
+           "realised-vol baseline per "
+           "docs/volatility-forecast-eval-protocol.md; both beat the "
+           "baseline out of sample on SPY/AAPL/VT "
+           "(docs/volatility-forecast-model-card.md)."),
+          "tests/test_volatility.py"),
      ]),
     ("skfolio",
      "skfolio/skfolio", "BSD-3-Clause",
