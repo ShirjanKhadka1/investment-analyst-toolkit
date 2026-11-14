@@ -57,6 +57,16 @@ def main():
             "last_date": pairs[-1][0],
             "n_test": wf["n_test"],
             "up_rate": sum(outcomes) / len(outcomes) if outcomes else None,
+            "mean_brier": {
+                m: dm.brier_score([f["probs"][m] for f in wf["folds"]],
+                                  outcomes)
+                for m in dm.EVALUATED_MODELS
+            },
+            "mean_brier_baselines": {
+                b: dm.brier_score([f["baselines"][b] for f in wf["folds"]],
+                                  outcomes)
+                for b in dm.BASELINES
+            },
             "n_high_regime_folds": sum(
                 1 for f in wf["folds"] if f["regime"] == "high"),
             "cusum_alarms_full_series": cusum["n_alarms"],
