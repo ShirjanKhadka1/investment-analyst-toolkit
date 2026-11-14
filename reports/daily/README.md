@@ -3,6 +3,18 @@
 > Research only. Not investment advice. Nothing here is a recommendation
 > to buy, sell, or invest in any security. No trade is made by this system.
 
+## Demonstration stream — read this first
+
+The forecasts in this directory are a **demonstration stream**. They are
+**NOT part of the pre-registered track record**: the only pre-registered,
+scored series is `data/track-record/calls-v2.jsonl` on the
+`data/track-record` branch, under fixed rules with a 5-day horizon and a
+headline withheld until 100 settled calls. They are **NOT validated** — no
+claim about their accuracy is made until at least 100 forecasts have been
+scored. They are **NOT investment advice**. A next-step price forecast
+implies a direction (above or below the last close); it is not a buy/sell
+recommendation, and no trade is made by this system.
+
 This directory holds the output of the scheduled workflow
 `.github/workflows/scheduled-update.yml`, which runs daily at
 **01:00 UTC (06:45 NPT)** and can also be run on demand (manual dispatch,
