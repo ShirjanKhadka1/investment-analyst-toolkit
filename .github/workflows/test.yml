@@ -25,7 +25,7 @@
 # and the default shallow checkout would make that scan vacuous.
 # =====================================================================
 # Phase 7: OS x Python matrix + quality gates.
-# Matrix job (pytest only) runs on Linux/macOS/Windows — the
+# Matrix job (pytest only) runs on Linux/macOS/Windows —
 # macOS/Windows combinations are CI-only: they were never run
 # locally, and their first GitHub run is the proof. Quality and
 # smoke jobs stay on ubuntu-latest, where they were verified.
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install "pytest==9.2.0"
+      - run: pip install "pytest==9.2.0" "tzdata==2026.6"
       - run: python -m pytest tests/ -q
   quality:
     runs-on: ubuntu-latest
