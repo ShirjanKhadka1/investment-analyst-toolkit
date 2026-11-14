@@ -69,8 +69,8 @@ REPOS = [
           ("toolkit/pit_store.py: a query as of a date sees only "
           "records published by that date."),
           "tests/test_pit_store.py"),
-         (("Immutable run bundles + change ledger (what changed since "
-          "the last run)"),
+         (("Tamper-evident run bundles + change ledger (what changed "
+          "since the last run)"),
           "implemented",
           ("toolkit/decision_log.py logs every call before its outcome "
           "as a hash-chained append-only row (prev_hash per row); "
@@ -79,7 +79,10 @@ REPOS = [
           "additions; scripts/verify_track_record.py walks the "
           "branch history and fails if any commit changed an earlier "
           "row; toolkit/track_record.py settles it; reflections are "
-          "append-only."),
+          "append-only. The chain is tamper-evident: it makes a "
+          "rewrite visible, it does not prevent one — the repo owner "
+          "could still rewrite the branch, and the public git history "
+          "plus the verifier is what exposes a changed earlier row."),
           "tests/test_decision_log.py"),
          (("Missing-data abstention (mark missing, never silent "
           "zero-fill)"),

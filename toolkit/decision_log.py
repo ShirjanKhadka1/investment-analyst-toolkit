@@ -273,7 +273,7 @@ def load_calls(path):
 # Fields the daily track-record script may add to a SETTLED call after
 # settlement: the baseline outcomes, computed from the same window.
 # Nothing else may be updated — a call's identity, direction, entry
-# and horizon are immutable once logged.
+# and horizon are fixed once logged and never edited in place.
 _UPDATEABLE = ("naive_expected", "naive_hit", "bnh_hit")
 
 

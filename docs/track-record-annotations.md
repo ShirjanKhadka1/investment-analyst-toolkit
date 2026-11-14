@@ -78,5 +78,9 @@ commissioning and is not scored. Its rows are listed in
 - The log is append-only with a hash chain (`prev_hash` on every
   row). The publish step refuses to push unless the remote rows
   are byte-identical and the diff has only additions.
+- The hash chain is tamper-evident: it makes a rewrite visible, it
+  does not prevent one. The repo owner could still rewrite the
+  branch; the public git history plus `scripts/verify_track_record.py`
+  is what exposes a changed earlier row.
 - `scripts/verify_track_record.py` walks the branch history and
   fails if any commit removed or changed an earlier row.
