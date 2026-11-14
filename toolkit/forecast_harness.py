@@ -40,7 +40,7 @@ from __future__ import annotations
 import json
 import math
 import random
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from .checks import validate_series
@@ -70,6 +70,7 @@ __all__ = [
     "BOOTSTRAP_RESAMPLES",
     "BOOTSTRAP_SEED",
     "CALIBRATION_BINS",
+    "DAILY_PROTOCOL_CUTOFF",
     "EMBARGO",
     "MIN_SCORED_FOR_CLAIM",
     "PRICE_BASELINE",
@@ -98,6 +99,16 @@ EMBARGO = 5
 CALIBRATION_BINS = 10
 MIN_SCORED_FOR_CLAIM = 100
 PRICE_BASELINE = "naive"
+# Cutoff for the reports/daily protocol count (H2,
+# docs/forecast-scoring-protocol.md): the ISO date (YYYY-MM-DD)
+# PR #36 merges. Only forecasts with predicted_at on or after
+# this date count toward the 100-forecast claim threshold; the
+# 34 scored forecasts made before it are the labelled
+# development period and never count. None until the PR merges —
+# no post-protocol period exists yet, so the counted record is
+# empty. Set this to the merge date when PR #36 merges; never
+# guess a date in advance.
+DAILY_PROTOCOL_CUTOFF = None
 # Log-score clip: a numerical guard so log(0) is never taken, not a
 # tuning choice (protocol-fixed).
 _LOG_CLIP = 1e-15
@@ -513,8 +524,34 @@ def read_daily_predictions(path):
             path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def _predicted_date(value):
+    """Date of a prediction row's predicted_at, as a date.
+
+    Accepts the ledger's compact UTC stamp ("20261114T000000Z"),
+    an ISO date ("2026-11-14") or datetime, and a date. Raises
+    ValueError on anything else — a row that cannot be dated
+    cannot be placed inside or outside the counted period.
+    """
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if len(text) >= 8 and text[:8].isdigit():
+            return date(int(text[0:4]), int(text[4:6]),
+                        int(text[6:8]))
+        if len(text) >= 10:
+            try:
+                return date.fromisoformat(text[:10])
+            except ValueError:
+                pass
+    raise ValueError(
+        f"predicted_at must be a date or timestamp, got {value!r}")
+
+
 def score_daily_predictions(rows, resamples=BOOTSTRAP_RESAMPLES,
-                            seed=BOOTSTRAP_SEED):
+                            seed=BOOTSTRAP_SEED, cutoff=None):
     """Score the reports/daily next-step forecasts (H2 protocol).
 
     rows: prediction dicts with forecast, last_close, actual (when
@@ -526,13 +563,41 @@ def score_daily_predictions(rows, resamples=BOOTSTRAP_RESAMPLES,
     up-day base rate. Claim is "insufficient n — no claim" until
     100 forecasts are scored; after that the verdict rule is the
     pooled MAE lower than baseline AND the CI entirely below zero.
+
+    cutoff: ISO date string ("YYYY-MM-DD") or a date, or None.
+    When given, only rows with predicted_at on or after the cutoff
+    are counted (made/scored/pending) and scored — rows before it
+    are the development period and never count toward the
+    100-forecast threshold. Pass DAILY_PROTOCOL_CUTOFF (the date
+    PR #36 merges) for the protocol count. When None, every row
+    counts: that is the development-period record, not the
+    protocol-counted record. A row with a missing or unparseable
+    predicted_at raises ValueError when a cutoff is given.
     """
     if not isinstance(rows, list):
         raise ValueError(  # noqa: TRY004 — toolkit convention is
             # ValueError for all input validation (decision_log.py).
             "rows must be a list of prediction dicts")
-    made = len(rows)
-    scored = [r for r in rows if r.get("actual") is not None]
+    if cutoff is None:
+        counted = list(rows)
+        cutoff_iso = None
+    else:
+        if isinstance(cutoff, datetime):
+            cutoff_date = cutoff.date()
+        elif isinstance(cutoff, date):
+            cutoff_date = cutoff
+        elif isinstance(cutoff, str):
+            cutoff_date = _predicted_date(cutoff)
+        else:
+            raise ValueError(
+                f"cutoff must be an ISO date string or a date, "
+                f"got {cutoff!r}")
+        cutoff_iso = cutoff_date.isoformat()
+        counted = [r for r in rows
+                   if _predicted_date(r.get("predicted_at"))
+                   >= cutoff_date]
+    made = len(counted)
+    scored = [r for r in counted if r.get("actual") is not None]
     pending = made - len(scored)
 
     def _score(subset):
@@ -580,6 +645,7 @@ def score_daily_predictions(rows, resamples=BOOTSTRAP_RESAMPLES,
         claim = verdict
     return {"counts": {"made": made, "scored": len(scored),
                        "pending": pending},
+            "cutoff": cutoff_iso,
             "min_scored_for_claim": MIN_SCORED_FOR_CLAIM,
             "claim": claim, "verdict": verdict,
             "resamples": resamples, "seed": seed,

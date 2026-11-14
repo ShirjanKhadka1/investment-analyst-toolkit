@@ -202,7 +202,9 @@ Same origins, training window drops its last 5 observations and the test observa
 
 ## Daily stream scoring (docs/forecast-scoring-protocol.md)
 
-Forecasts made: **36**, scored: **34**, pending: **2**. Claim: **insufficient n — no claim** (no claim until 100 scored forecasts; the 34 scored forecasts in the file are the labelled development period, not a validation set).
+Development period (the file as it stands; the 34 scored forecasts never count toward the threshold): Forecasts made: **36**, scored: **34**, pending: **2**. The 34 scored forecasts in the file were made before this protocol existed and are the labelled development period, not a validation set.
+
+Protocol-counted record (forecasts with `predicted_at` on or after the date PR #36 merges — the cutoff is not yet set, so no post-protocol period exists): Forecasts made: **0**, scored: **0**, pending: **0**. Claim: **insufficient n — no claim** (0/100 new scored forecasts; 100 NEW scored forecasts made after the protocol merges are needed before any claim).
 
 | | MAE | RMSE | Baseline MAE | Baseline RMSE | MAE diff | 95% CI | Direction acc. | Base rate |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |

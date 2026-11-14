@@ -41,10 +41,23 @@ a **separate development period**, labelled as such. They are
 autonomous pipeline before this protocol existed, under no
 pre-registered rule, and they must not be presented as validation
 evidence for any model. They are scored here so the record is
-complete and honest, and they count toward the 100-forecast
-threshold below only as scored forecasts in the ledger — the
-threshold is about the size of the scored record, not a claim
-that the development period validates anything.
+complete and honest — and they **never count** toward the
+100-forecast threshold below.
+
+## The cutoff — what counts toward the threshold
+
+Only forecasts with `predicted_at` on or after the **cutoff**
+count toward the threshold: **100 NEW scored forecasts**, made
+after this protocol merges. The cutoff is the date PR #36
+merges, held in `toolkit/forecast_harness.py` as
+`DAILY_PROTOCOL_CUTOFF` (currently unset — `None` — until
+the PR merges; set it to the merge date when it merges, never
+a guessed date). `score_daily_predictions` takes the cutoff as
+a parameter and filters by `predicted_at >= cutoff`; rows
+before it are the development period and are excluded from the
+counted record entirely (made, scored and pending). Until the
+cutoff is set, the counted record is **0/100 new scored
+forecasts**.
 
 ## Metrics (per symbol and pooled)
 
@@ -68,16 +81,18 @@ that the development period validates anything.
 ## Rules
 
 - **No claim — no "beats baseline", no accuracy headline — until
-  at least 100 scored forecasts.** Until then the output reports
-  the numbers with the label **"insufficient n — no claim"**.
+  at least 100 NEW scored forecasts** (with `predicted_at` on or
+  after the cutoff). Until then the output reports the numbers
+  with the label **"insufficient n — no claim"**.
 - **Failures stay in:** every scored row counts, including rows
   labelled `failed`; no row is dropped or re-scored.
 - **Derived metrics only.** The scoring reads the ledger; it does
   not republish the raw price series.
 - **Per-symbol and pooled** are both reported; a pooled win that
   comes from one symbol alone is stated as such.
-- **The verdict rule, fixed here:** once 100 forecasts are
-  scored, the daily stream "beats baseline" only if its pooled
+- **The verdict rule, fixed here:** once 100 NEW forecasts are
+  scored (predicted_at on or after the cutoff), the daily stream
+  "beats baseline" only if its pooled
   mean MAE is lower than the no-change baseline's AND the 95%
   bootstrap CI on the mean MAE difference lies entirely below
   zero. Otherwise "no edge".

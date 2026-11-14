@@ -6,6 +6,7 @@ scripts/evaluate_forecast_harness.py.
 """
 import math
 import random
+from datetime import date
 
 import pytest
 
@@ -321,9 +322,10 @@ def test_run_full_evaluation_overall_needs_every_symbol():
 
 # --- daily-stream scoring ----------------------------------------------------
 
-def _daily_row(symbol, forecast, last_close, actual=None, correct=None):
+def _daily_row(symbol, forecast, last_close, actual=None, correct=None,
+               predicted_at="20261114T000000Z"):
     row = {"symbol": symbol, "forecast": forecast, "last_close": last_close,
-           "model": "naive", "predicted_at": "20261114T000000Z",
+           "model": "naive", "predicted_at": predicted_at,
            "predicted_for": "next_step"}
     if actual is not None:
         row.update({"actual": actual, "actual_date": "2026-11-14",
@@ -367,6 +369,53 @@ def test_score_daily_predictions_no_edge_when_forecast_is_baseline():
                        correct=False) for i in range(100)]
     out = fh.score_daily_predictions(rows, resamples=200, seed=5)
     assert out["claim"] == "no edge"
+
+
+def test_score_daily_predictions_cutoff_excludes_development_period():
+    # Rows before the cutoff are the development period: scored or
+    # not, they never count toward the 100-forecast threshold.
+    # Rows on or after it count. Synthetic cutoff 2026-11-15.
+    before = [
+        _daily_row("AAPL", 100.0, 99.0, actual=101.0, correct=True,
+                   predicted_at="20261114T000000Z"),
+        _daily_row("AAPL", 100.0, 99.0, actual=98.0, correct=False,
+                   predicted_at="20261113T000000Z"),
+    ]
+    after = [
+        _daily_row("MSFT", 200.0, 199.0, actual=201.0, correct=True,
+                   predicted_at="20261115T000000Z"),
+        _daily_row("MSFT", 200.0, 199.0,
+                   predicted_at="20261116T000000Z"),
+    ]
+    out = fh.score_daily_predictions(before + after, resamples=200,
+                                     seed=5, cutoff="2026-11-15")
+    assert out["cutoff"] == "2026-11-15"
+    assert out["counts"] == {"made": 2, "scored": 1, "pending": 1}
+    assert out["pooled"]["n_scored"] == 1
+    assert set(out["per_symbol"]) == {"MSFT"}
+    # The pre-cutoff scored rows do not leak into the metrics.
+    assert out["pooled"]["mae"] == pytest.approx(1.0)
+    # A date object works the same as the ISO string.
+    out_date = fh.score_daily_predictions(
+        before + after, resamples=200, seed=5, cutoff=date(2026, 11, 15))
+    assert out_date["counts"] == {"made": 2, "scored": 1, "pending": 1}
+    # No cutoff: the same rows count as the development record.
+    dev = fh.score_daily_predictions(before + after, resamples=200, seed=5)
+    assert dev["cutoff"] is None
+    assert dev["counts"] == {"made": 4, "scored": 3, "pending": 1}
+
+
+def test_score_daily_predictions_cutoff_refuses_undated_rows():
+    rows = [_daily_row("AAPL", 100.0, 99.0, actual=101.0, correct=True)]
+    rows[0].pop("predicted_at")
+    with pytest.raises(ValueError):
+        fh.score_daily_predictions(rows, resamples=200, seed=5,
+                                   cutoff="2026-11-15")
+    bad = [_daily_row("AAPL", 100.0, 99.0, actual=101.0, correct=True,
+                      predicted_at="not-a-date")]
+    with pytest.raises(ValueError):
+        fh.score_daily_predictions(bad, resamples=200, seed=5,
+                                   cutoff="2026-11-15")
 
 
 def test_read_daily_predictions_round_trips(tmp_path):

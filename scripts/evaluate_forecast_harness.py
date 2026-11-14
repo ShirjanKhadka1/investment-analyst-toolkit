@@ -98,7 +98,7 @@ def _prob_table(price_eval):
 
 
 def render_card(run_date, per_symbol_data, evaluation, purged,
-                daily, experiments_path):
+                daily, counted, experiments_path):
     """Render docs/forecast-harness-model-card.md from run values."""
     parts = []
     parts.append("# Forecast-harness model card (PR 8.1)\n")
@@ -251,14 +251,41 @@ def render_card(run_date, per_symbol_data, evaluation, purged,
     parts.append("## Daily stream scoring "
                  "(docs/forecast-scoring-protocol.md)\n")
     counts = daily["counts"]
-    parts.append(f"Forecasts made: **{counts['made']}**, scored: "
+    parts.append(f"Development period (the file as it stands; the "
+                 f"{counts['scored']} scored forecasts never count "
+                 f"toward the threshold): Forecasts made: "
+                 f"**{counts['made']}**, scored: "
                  f"**{counts['scored']}**, pending: "
-                 f"**{counts['pending']}**. Claim: "
-                 f"**{daily['claim']}** (no claim until "
-                 f"{daily['min_scored_for_claim']} scored forecasts; "
-                 "the 34 scored forecasts in the file are the "
-                 "labelled development period, not a validation "
-                 "set).\n")
+                 f"**{counts['pending']}**. The {counts['scored']} "
+                 f"scored forecasts in the file were made before "
+                 f"this protocol existed and are the labelled "
+                 f"development period, not a validation set.\n")
+    ccounts = counted["counts"]
+    if counted["cutoff"] is None:
+        parts.append(f"Protocol-counted record (forecasts with "
+                     f"`predicted_at` on or after the date PR #36 "
+                     f"merges — the cutoff is not yet set, so no "
+                     f"post-protocol period exists): Forecasts made: "
+                     f"**{ccounts['made']}**, scored: "
+                     f"**{ccounts['scored']}**, pending: "
+                     f"**{ccounts['pending']}**. Claim: "
+                     f"**{counted['claim']}** "
+                     f"({ccounts['scored']}/100 new scored forecasts; "
+                     f"100 NEW scored forecasts made after the "
+                     f"protocol merges are needed before any "
+                     f"claim).\n")
+    else:
+        parts.append(f"Protocol-counted record (forecasts with "
+                     f"`predicted_at` on or after "
+                     f"{counted['cutoff']}, the date PR #36 merged): "
+                     f"Forecasts made: **{ccounts['made']}**, scored: "
+                     f"**{ccounts['scored']}**, pending: "
+                     f"**{ccounts['pending']}**. Claim: "
+                     f"**{counted['claim']}** "
+                     f"({ccounts['scored']}/100 new scored forecasts; "
+                     f"100 NEW scored forecasts made after the "
+                     f"protocol merges are needed before any "
+                     f"claim).\n")
     pooled = daily["pooled"]
     if pooled["n_scored"]:
         lines = [("| | MAE | RMSE | Baseline MAE | Baseline RMSE | "
@@ -314,9 +341,16 @@ def main():
     rows = fh.read_daily_predictions(
         ROOT / "reports" / "daily" / "predictions.jsonl")
     daily = fh.score_daily_predictions(rows)
+    if fh.DAILY_PROTOCOL_CUTOFF is None:
+        # Protocol not merged yet: no post-protocol period
+        # exists, so the counted record is empty.
+        counted = fh.score_daily_predictions([])
+    else:
+        counted = fh.score_daily_predictions(
+            rows, cutoff=fh.DAILY_PROTOCOL_CUTOFF)
     run_date = date.today().isoformat()
     card = render_card(run_date, per_symbol_data, evaluation, purged,
-                       daily, EXPERIMENTS_PATH)
+                       daily, counted, EXPERIMENTS_PATH)
     CARD_PATH.write_text(card, encoding="utf-8")
     record = fh.record_harness_experiment(
         f"forecast-harness-{run_date}", evaluation, EXPERIMENTS_PATH)
@@ -342,6 +376,7 @@ def main():
                    "ci_95": list(m["ci_95"]), "verdict": m["verdict"]}
             for name, m in evaluation["pooled_volatility"]["models"].items()},
         "daily": daily,
+        "counted": counted,
         "card": str(CARD_PATH),
         "experiment_record": record["name"],
     }
