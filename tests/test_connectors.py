@@ -533,7 +533,7 @@ def test_fetch_macro_empty_values_is_unavailable():
 def test_list_connectors_covers_all_sources_with_terms():
     rows = list_connectors()
     names = [r["name"] for r in rows]
-    assert names == ["csv", "yahoo", "stooq", "coingecko", "ecb", "worldbank"]
+    assert names == ["csv", "yahoo", "coingecko", "ecb", "worldbank"]
     for row in rows:
         assert row["licence_terms"].strip(), f"{row['name']} has no terms note"
         assert row["sla_seconds"] > 0

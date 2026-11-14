@@ -35,7 +35,7 @@ Sources, in priority order (see DATA_SOURCES.md for the audit trail):
    works from GitHub Actions runners). It is never relied on alone —
    the chain reports every failed attempt instead of inventing data.
    Round 7.1: Yahoo also returns per-bar volume in the same
-   payload; the connector carries it as an additive ``volumes``
+   payload; a ``BarsConnector`` carries it as an additive ``volumes``
    field on the model — the (date, close) pairs shape is unchanged.
 2b. Stooq daily CSV (Round 7.1 — IMPLEMENTED, NOT LIVE): parser +
    fetcher in ``toolkit/free_data.py``, tested offline against a
@@ -43,7 +43,8 @@ Sources, in priority order (see DATA_SOURCES.md for the audit trail):
    in the live chain (``default_price_chain`` stays Yahoo-only):
    enabling it live waits for the runner probe staged at
    ``ops/ready-for-browser/stooq-ci-probe.yml`` to pass. Opt in
-   with ``include_stooq=True``.
+   with ``include_stooq=True`` on ``default_price_chain_with_bars``
+   / ``default_fetchers``.
 3. SEC EDGAR (US fundamentals, no key; see ``toolkit/edgar.py``).
 4. CoinGecko keyless public API (crypto daily prices, no key).
 5. ECB euro reference rates (daily FX fixings, latest only).
@@ -100,18 +101,22 @@ __all__ = [
     "CACHE_TTL_SECONDS",
     "FRESHNESS_SLA_SECONDS",
     "TRADING_WEEKDAYS",
+    "BarsConnector",
     "Connector",
     "ConnectorUnavailable",
     "DiskCache",
     "default_price_chain",
+    "default_price_chain_with_bars",
     "evaluate_freshness",
     "fetch_fx_rates",
     "fetch_macro",
     "fetch_prices",
+    "fetch_prices_with_volumes",
     "fetch_stooq_bars",
     "fetch_stooq_prices",
     "fetch_with_retry",
     "list_connectors",
+    "list_connectors_with_opt_ins",
     "median_volume",
 ]
 
@@ -222,21 +227,12 @@ _SOURCE_KINDS = {
 def _normalise_model(model):
     """Restore tuple pairs/values after a JSON round-trip through the
     cache: JSON stores tuples as lists, but the live path returns
-    list-of-tuples, and the standard model must be one shape.
-    ``volumes`` (a {date: volume} dict) survives JSON unchanged —
-    string keys, numeric values — and is coerced to floats here so
-    a cached model has exactly the live model's shape."""
+    list-of-tuples, and the standard model must be one shape."""
     model = dict(model)
     for key in ("pairs", "values"):
         rows = model.get(key)
         if isinstance(rows, list):
             model[key] = [tuple(row) for row in rows]
-    vols = model.get("volumes")
-    if isinstance(vols, dict):
-        try:
-            model["volumes"] = {str(d): float(v) for d, v in vols.items()}
-        except (TypeError, ValueError):
-            model.pop("volumes", None)
     return model
 
 
@@ -581,18 +577,9 @@ class Connector:
     does the vendor call and nothing else; this class adds cache,
     retry, validation, the freshness gate and provenance, so the core
     never touches a vendor API and never sees a raw payload.
-
-    ``fetch_bars`` is optional: a callable
-    ``(symbol) -> (pairs, volumes)`` where volumes is {date: shares}.
-    When given, the returned model gains an additive ``volumes`` key
-    (and provenance gains ``n_volumes``) — the pairs shape is
-    unchanged, and a connector without ``fetch_bars`` returns no
-    ``volumes`` key at all. A volume-less series is not an error:
-    callers that need volume (e.g. the exit-liquidity gate) treat a
-    missing ``volumes`` as missing data and fail closed.
     """
 
-    def __init__(self, name, fetch_pairs, fetch_bars=None):
+    def __init__(self, name, fetch_pairs):
         if name not in _SOURCE_KINDS:
             raise ValueError(f"unknown connector {name!r}")
         self.name = name
@@ -601,7 +588,6 @@ class Connector:
         self.ttl_seconds = CACHE_TTL_SECONDS[name]
         self.terms = _CONNECTOR_TERMS[name]
         self._fetch_pairs = fetch_pairs
-        self._fetch_bars = fetch_bars
 
     def fetch(self, symbol, *, cache=None, today=None, max_age_days=7,
               sleep=time.sleep):
@@ -610,12 +596,9 @@ class Connector:
         The model is the same shape ``toolkit/free_data.py`` returns:
         {symbol, kind, source, pairs, provenance, tried}. Provenance
         carries source, retrieved_at, last_date, age_days, n_points,
-        stale=False and cache_hit. When this connector was built with
-        ``fetch_bars``, the model additionally carries ``volumes``
-        ({date: shares traded}) and provenance carries ``n_volumes``.
-        Raises StaleDataError when the series is older than
-        max_age_days, ConnectorUnavailable on any other failure.
-        A 403/429 is never retried.
+        stale=False and cache_hit. Raises StaleDataError when the
+        series is older than max_age_days, ConnectorUnavailable on
+        any other failure. A 403/429 is never retried.
         """
         today = today or _dt.date.today()
         cache_key = f"{self.name}:{symbol}"
@@ -641,25 +624,12 @@ class Connector:
                         model["provenance"]["retrieved_at"] = _now_utc_iso()
                         model["tried"] = []
                         return model
-        if self._fetch_bars is not None:
-            def _fetch():
-                pairs, volumes = self._fetch_bars(symbol)
-                return pairs, volumes
-
-            try:
-                (pairs, volumes), attempts = fetch_with_retry(
-                    _fetch, sleep=sleep)
-            except Exception as exc:
-                raise ConnectorUnavailable(
-                    f"{self.name}: fetch failed for {symbol}: {exc}") from exc
-        else:
-            volumes = None
-            try:
-                pairs, attempts = fetch_with_retry(
-                    lambda: self._fetch_pairs(symbol), sleep=sleep)
-            except Exception as exc:
-                raise ConnectorUnavailable(
-                    f"{self.name}: fetch failed for {symbol}: {exc}") from exc
+        try:
+            pairs, attempts = fetch_with_retry(
+                lambda: self._fetch_pairs(symbol), sleep=sleep)
+        except Exception as exc:
+            raise ConnectorUnavailable(
+                f"{self.name}: fetch failed for {symbol}: {exc}") from exc
         try:
             pairs = validate_price_pairs(
                 f"prices from {self.name}", pairs)
@@ -689,9 +659,6 @@ class Connector:
             },
             "tried": [],
         }
-        if volumes is not None:
-            model["volumes"] = {str(d): float(v) for d, v in volumes.items()}
-            model["provenance"]["n_volumes"] = len(model["volumes"])
         if cache is not None:
             cache.put(cache_key, model, self.ttl_seconds,
                       last_date=pairs[-1][0])
@@ -733,6 +700,53 @@ class CsvConnector(Connector):
             ) from exc
 
 
+class BarsConnector(Connector):
+    """A Connector that also fetches per-bar volumes — additive only.
+
+    Built on :class:`Connector` without changing it: ``fetch`` first
+    runs the standard pairs fetch (cache, retry, validation, the
+    freshness gate and provenance — byte-identical behaviour to
+    ``Connector.fetch``), then fetches the same series as bars and
+    attaches an additive ``volumes`` key ({date: shares traded}) plus
+    ``n_volumes`` in provenance. A live fetch therefore makes two
+    vendor calls (pairs, then bars) — the price of not touching
+    ``Connector.fetch``. When the bars fetch fails, the pairs model
+    stands alone with no ``volumes`` key: a volume-less series is
+    not an error, and callers that need volume (e.g. the
+    exit-liquidity gate) treat a missing ``volumes`` as missing data
+    and fail closed. Volumes are restricted to dates present in the
+    pairs, so the model never claims a volume for a date it has no
+    price for. A cached model that already carries ``volumes``
+    returns as-is — volumes survive the cache round-trip because
+    :func:`_normalise_model` passes the dict through unchanged.
+    """
+
+    def __init__(self, name, fetch_pairs, fetch_bars):
+        super().__init__(name, fetch_pairs)
+        self._fetch_bars = fetch_bars
+
+    def fetch(self, symbol, *, cache=None, today=None, max_age_days=7,
+              sleep=time.sleep):
+        model = super().fetch(symbol, cache=cache, today=today,
+                              max_age_days=max_age_days, sleep=sleep)
+        if "volumes" in model:
+            return model  # cache hit: volumes survived the round-trip
+        try:
+            (_bars_pairs, volumes), _attempts = fetch_with_retry(
+                lambda: self._fetch_bars(symbol), sleep=sleep)
+        except Exception:  # noqa: BLE001 — a failed bars fetch must
+            # degrade to the pairs model, never break the standard fetch.
+            return model  # bars unavailable: pairs model stands alone
+        pair_dates = {d for d, _ in model["pairs"]}
+        model["volumes"] = {str(d): float(v) for d, v in volumes.items()
+                            if str(d) in pair_dates}
+        model["provenance"]["n_volumes"] = len(model["volumes"])
+        if cache is not None:
+            cache.put(f"{self.name}:{symbol}", model, self.ttl_seconds,
+                      last_date=model["pairs"][-1][0])
+        return model
+
+
 def _yahoo_pairs(symbol):
     return fetch_yahoo_prices(symbol)
 
@@ -760,24 +774,15 @@ def _yahoo_crypto_pairs(symbol):
     return fetch_yahoo_prices(sym)
 
 
-def default_price_chain(kind="stock", csv_path=None, csv_source=None,
-                        include_stooq=False):
+def default_price_chain(kind="stock", csv_path=None, csv_source=None):
     """Ordered connectors for a series kind. kind='stock' -> CSV (if
     given), Yahoo. kind='crypto' -> CSV (if given), CoinGecko,
-    Yahoo (BTC-USD style). Anything else raises ValueError.
-
-    The Yahoo connector carries per-bar volumes (additive ``volumes``
-    on the model). Stooq is NOT in the live chain: pass
-    ``include_stooq=True`` to append it after Yahoo — opt-in only,
-    pending the runner probe (Round 7.1)."""
+    Yahoo (BTC-USD style). Anything else raises ValueError."""
     chain = []
     if csv_path is not None:
         chain.append(CsvConnector(csv_path, csv_source or "caller-supplied CSV"))
     if kind == "stock":
-        chain += [Connector("yahoo", _yahoo_pairs, fetch_bars=_yahoo_bars)]
-        if include_stooq:
-            chain += [Connector("stooq", _stooq_pairs,
-                                fetch_bars=_stooq_bars)]
+        chain += [Connector("yahoo", _yahoo_pairs)]
     elif kind == "crypto":
         chain += [Connector("coingecko", _coingecko_pairs),
                   Connector("yahoo", _yahoo_crypto_pairs)]
@@ -788,7 +793,7 @@ def default_price_chain(kind="stock", csv_path=None, csv_source=None,
 
 def fetch_prices(symbol, kind="stock", csv_path=None, csv_source=None,
                  cache=None, today=None, max_age_days=7, sleep=time.sleep,
-                 chain=None, include_stooq=False):
+                 chain=None):
     """Try the connector chain in order; return the first FRESH series.
 
     Returns the standard model {symbol, kind, source, pairs,
@@ -798,15 +803,9 @@ def fetch_prices(symbol, kind="stock", csv_path=None, csv_source=None,
     fresh, never invents a price. Retries are bounded and transient
     only (see :func:`fetch_with_retry`); a 403/429 is a recorded
     failure, not a prompt to hammer the source again.
-
-    The Yahoo model carries an additive ``volumes`` key ({date:
-    shares traded}); a model from a volume-less source has no such
-    key. ``include_stooq=True`` appends Stooq after Yahoo — opt-in
-    only, pending the runner probe; the live chain stays Yahoo-only.
     """
     connectors = chain if chain is not None else default_price_chain(
-        kind, csv_path=csv_path, csv_source=csv_source,
-        include_stooq=include_stooq)
+        kind, csv_path=csv_path, csv_source=csv_source)
     tried = []
     for conn in connectors:
         try:
@@ -823,6 +822,56 @@ def fetch_prices(symbol, kind="stock", csv_path=None, csv_source=None,
     raise RuntimeError(
         f"All data sources failed or stale for {symbol} ({kind}). "
         f"Attempts: {tried}. No fresh data was returned.")
+
+
+def default_price_chain_with_bars(kind="stock", csv_path=None, csv_source=None,
+                                  include_stooq=False):
+    """Ordered connectors for a series kind, with per-bar volumes.
+
+    Same order as :func:`default_price_chain`, but the Yahoo connector
+    (and Stooq, when opted in) is a :class:`BarsConnector`, so the
+    model carries an additive ``volumes`` key. Stooq is NOT in the
+    live chain: pass ``include_stooq=True`` to append it after Yahoo
+    — opt-in only, pending the runner probe (Round 7.1). The plain
+    :func:`default_price_chain` stays Yahoo-only and volume-less.
+    """
+    chain = []
+    if csv_path is not None:
+        chain.append(CsvConnector(csv_path, csv_source or "caller-supplied CSV"))
+    if kind == "stock":
+        chain += [BarsConnector("yahoo", _yahoo_pairs, _yahoo_bars)]
+        if include_stooq:
+            chain += [BarsConnector("stooq", _stooq_pairs, _stooq_bars)]
+    elif kind == "crypto":
+        chain += [Connector("coingecko", _coingecko_pairs),
+                  BarsConnector("yahoo", _yahoo_crypto_pairs, _yahoo_bars)]
+    else:
+        raise ValueError(f"unknown price kind {kind!r} (use 'stock' or 'crypto')")
+    return chain
+
+
+def fetch_prices_with_volumes(symbol, kind="stock", csv_path=None, csv_source=None,
+                              cache=None, today=None, max_age_days=7,
+                              sleep=time.sleep, chain=None, include_stooq=False):
+    """Try the volume-carrying connector chain in order; return the first FRESH series.
+
+    Same fallback semantics as :func:`fetch_prices` (stale/failed
+    sources recorded in ``tried``, RuntimeError listing every attempt
+    when all fail) over :func:`default_price_chain_with_bars` — the
+    loop itself is delegated to :func:`fetch_prices`, so the two
+    functions cannot drift apart. The returned model is the standard
+    model plus an additive ``volumes`` key when the serving source
+    carries bars; a model from a volume-less source (CSV, CoinGecko)
+    has no such key. ``include_stooq=True`` appends Stooq after Yahoo
+    — opt-in only, pending the runner probe.
+    """
+    connectors = chain if chain is not None else default_price_chain_with_bars(
+        kind, csv_path=csv_path, csv_source=csv_source,
+        include_stooq=include_stooq)
+    return fetch_prices(symbol, kind=kind, csv_path=csv_path,
+                        csv_source=csv_source, cache=cache, today=today,
+                        max_age_days=max_age_days, sleep=sleep,
+                        chain=connectors)
 
 
 # ---------------------------------------------------------------------------
@@ -906,7 +955,7 @@ def list_connectors():
     licence/terms note. A connector with no terms note cannot exist
     — the registry test enforces it."""
     rows = []
-    for name in ("csv", "yahoo", "stooq", "coingecko", "ecb", "worldbank"):
+    for name in ("csv", "yahoo", "coingecko", "ecb", "worldbank"):
         kind = _SOURCE_KINDS[name]
         rows.append({
             "name": name,
@@ -915,4 +964,24 @@ def list_connectors():
             "ttl_seconds": CACHE_TTL_SECONDS[name],
             "licence_terms": _CONNECTOR_TERMS[name],
         })
+    return rows
+
+
+def list_connectors_with_opt_ins():
+    """Registry table plus opt-in connectors not yet in the live chain.
+
+    :func:`list_connectors` lists the live chain only. Stooq is
+    implemented and registered (kind, SLA, TTL, licence terms) but
+    NOT live — it appears here, not there, until the runner probe
+    passes. A connector with no terms note cannot exist — the
+    registry test enforces it.
+    """
+    rows = list_connectors()
+    rows.append({
+        "name": "stooq",
+        "kind": _SOURCE_KINDS["stooq"],
+        "sla_seconds": FRESHNESS_SLA_SECONDS[_SOURCE_KINDS["stooq"]],
+        "ttl_seconds": CACHE_TTL_SECONDS["stooq"],
+        "licence_terms": _CONNECTOR_TERMS["stooq"],
+    })
     return rows

@@ -434,7 +434,7 @@ REPOS = [
 
 # Ranked build plan: impact for a world-market user (1-5) divided by
 # effort (1-5). Rank is the tie-break (dependency order) when ratios
-# are equal. These seven items are NOT started — this table is the plan,
+# are equal. These eight items are NOT started — this table is the plan,
 # not the work.
 BUILD_PLAN = [
     ("Universe screener",
@@ -453,6 +453,13 @@ BUILD_PLAN = [
      "and toolkit/options.py (implied volatility): EWMA/GARCH-lite "
      "forecasts with walk-forward evaluation."),
      ),
+    ("Opt-in macro providers (FRED/ECB/IMF)",
+     3, 2,
+     ("PLANNED, not implemented: the FRED / ECB / IMF / SEC row stays "
+     "partial (SEC EDGAR is implemented; FRED, ECB and IMF are not). "
+     "An env-key FRED provider was built in Round 7.1 and then "
+     "dropped by a binding constraint update, so FRED stays on the "
+     "plan; keyed providers stay out of the no-key chain.")),
     ("News and macro feed",
      4, 3,
      ("Feeds the analyst agents: the EDGAR + free-data patterns exist, "

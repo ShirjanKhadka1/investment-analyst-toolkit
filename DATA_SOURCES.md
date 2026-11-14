@@ -37,8 +37,7 @@ CoinGecko BTC through 2026-11-07; ECB fixing dated 2026-11-06
 | Source | Provides | Licence / terms | Verification |
 |---|---|---|---|
 | SEC EDGAR | US company filings | Public APIs, declared User-Agent required, no key. | NOT VERIFIED from this environment (HTTP 403 despite declared User-Agent). Fetcher left in place, not claimed verified, not retried aggressively. TO VERIFY from a non-VM network. |
-| FRED | Macro (free tier) | FRED Terms of Use; free API key under the user's own FRED account. Key from the environment (`FRED_API_KEY`) only, never from this repo. | Provider implemented 14 Nov 2026 (Round 7.1, `toolkit/data.py` `fetch_fred_observations`); tested offline with a fake key. Not in the no-key chain; no live call made, no key supplied. |
-| Alpha Vantage, Twelve Data, FMP | Macro / prices (free tiers) | Each provider's own free-tier terms, under the user's own key only. | No key supplied, none invented. Keys come from the environment only (`toolkit/data.py`), never from this repo. |
+| FRED, Alpha Vantage, Twelve Data, FMP | Macro / prices (free tiers) | Each provider's own free-tier terms, under the user's own key only. | No key supplied, none invented. Keys come from the environment only (`toolkit/data.py`), never from this repo. |
 
 ## NEPSE — no live feed (data finding, not an access blocker)
 
