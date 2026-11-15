@@ -13,9 +13,16 @@ chosen from today's liquid names, so past losers that delisted
 are absent and every result here is survivorship-conditioned.
 
 Stdlib only. Network is used ONLY for the Yahoo/EDGAR fetch under
-``--refresh``; the default run reads the cache file
+``--refresh``; the default run reads the local cache file
 ``data/real-data-eval-2026-11-15.json`` instead of the network,
-so the run is reproducible offline. The EDGAR fetch needs a
+so the run is reproducible offline. That raw cache is LOCAL-ONLY
+(gitignored, never committed — data policy is derived metrics
+only); reproduce it with ``scripts/fetch_real_data_eval.py``.
+The committed record is
+``data/real-data-eval-2026-11-15/derived-metrics.json`` (this
+script's JSON output for the 2026-11-15 run) plus
+``data/real-data-eval-2026-11-15/manifest.json`` (source data
+with its SHA-256). The EDGAR fetch needs a
 declared User-Agent with a contact email (SEC fair-access rule):
 set ``EDGAR_CONTACT_EMAIL`` — the script refuses to fetch EDGAR
 without it, and the address is never written to the repo. This

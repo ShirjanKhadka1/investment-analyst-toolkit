@@ -96,12 +96,18 @@ survivorship-conditioned, not as unbiased history.
   networks carry no GrossProfit concept: their quality score
   uses ROE only, and the card states the per-symbol concept
   coverage.
-- **Cache:** the fetched prices and point-in-time fundamentals
-  are written to `data/real-data-eval-2026-11-15.json` by the
-  evaluation script (`--refresh`), and the default run reads
+- **Cache (local-only, NOT committed):** the fetched prices and
+  point-in-time fundamentals are written to
+  `data/real-data-eval-2026-11-15.json` by
+  `scripts/fetch_real_data_eval.py` (the evaluation script's
+  `--refresh` does the same fetch), and the default run reads
   the cache instead of the network, so the run is reproducible
-  offline. The cache records the fetch date, the source of
-  every value and the CIK per ticker. The EDGAR fetch needs a
+  offline. The raw cache is gitignored — data policy is derived
+  metrics only. The committed record is
+  `data/real-data-eval-2026-11-15/derived-metrics.json` plus
+  `data/real-data-eval-2026-11-15/manifest.json`, which records
+  the fetch date, the source of every value, the CIK per ticker
+  and the SHA-256 of the raw cache as fetched. The EDGAR fetch needs a
   declared User-Agent with a contact email (SEC fair-access
   rule); the script reads it from the `EDGAR_CONTACT_EMAIL`
   environment variable and refuses to fetch EDGAR without it.
@@ -217,15 +223,18 @@ deliverable either way.
 ## Reproducibility
 
 ```text
+EDGAR_CONTACT_EMAIL=<contact> python3 scripts/fetch_real_data_eval.py       # re-fetch the raw data locally (gitignored, never committed)
 EDGAR_CONTACT_EMAIL=<contact> python3 scripts/evaluate_real_data.py --refresh   # fetch + cache + evaluate
-python3 scripts/evaluate_real_data.py                                            # evaluate from the cache
+python3 scripts/evaluate_real_data.py                                            # evaluate from the local cache
 ```
 
 The script prints one JSON document: universe, fetch date,
 per-symbol series lengths and date ranges, harness results,
 direction results, ranking spreads and verdicts, event-study
 per-event and aggregate results, and the per-symbol
-fundamentals coverage. The four new model cards
+fundamentals coverage. That JSON is committed as
+`data/real-data-eval-2026-11-15/derived-metrics.json` (the raw
+cache itself is never committed); the four new model cards
 (`docs/forecast-harness-real-data-model-card.md`,
 `docs/direction-models-real-data-model-card.md`,
 `docs/cross-sectional-real-data-model-card.md`,
