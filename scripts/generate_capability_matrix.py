@@ -544,6 +544,29 @@ REPOS = [
            "prototype: it renders fixture/synthetic runs only, never "
            "a live agent run."),
           "tests/test_workspace_ui.py"),
+         (("Live mode + recorded-run replay (SSE server, replay page, "
+           "run diff, cost/latency meter)"),
+          "implemented",
+          ("toolkit/live_server.py: a stdlib-only localhost server "
+           "(http.server) serving the workspace UI at / and streaming "
+           "a run's events as Server-Sent Events at /events — recorded "
+           "mode streams an events.jsonl in order, tail mode follows "
+           "appended lines until run_finished; a missing/empty file "
+           "never crashes it. toolkit/live_replay.py: a static "
+           "recorded-run replay page (docs/workspace-replay.html) "
+           "reusing the U.2 renderer, labelled \"recorded demo\" with "
+           "the run date and the fake provider; a deterministic run "
+           "diff (added/removed/changed + per-step status changes) "
+           "between the U.1 fixture and a second fixture "
+           "(examples/agent-run-events-2.jsonl); a cost/latency meter "
+           "from tool_call/tool_result timestamps — $0.00 for the fake "
+           "provider, a per-token rate only when the caller supplies "
+           "one. Fixture-driven prototype: the server streams "
+           "fixture/recorded event files only, never a live agent "
+           "run. Export: scripts/serve_workspace.py and "
+           "scripts/render_replay.py; screenshots at 375px and 1280px "
+           "in examples/."),
+          "tests/test_live_replay.py"),
          ("Point-in-time / look-ahead discipline",
           "implemented",
           ("toolkit/pit_store.py; direction-rule code is pinned by git "
