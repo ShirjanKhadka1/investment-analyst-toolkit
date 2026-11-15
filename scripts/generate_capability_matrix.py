@@ -512,6 +512,23 @@ REPOS = [
            "(scripts/run_fake_agent_events.py) writes a real "
            "examples/agent-run-events.jsonl with no network and no LLM."),
           "tests/test_events.py"),
+         (("Static agent workspace UI (single self-contained HTML "
+           "rendered from events.jsonl)"),
+          "implemented",
+          ("toolkit/workspace_ui.py: a pure function of (events, "
+           "reference_time) renders one self-contained HTML file — "
+           "plan rail, agent lanes with status chips, live feed with "
+           "collapsible tool calls, evidence panel, bull/bear debate "
+           "columns, risk-gate card with an unmissable veto banner on "
+           "BLOCK, memo with citations. Same log renders byte-identical "
+           "HTML; a number with no matching evidence_ref renders as "
+           "UNKNOWN. No JavaScript, no external reference, no build "
+           "step; mobile-first, dark mode via prefers-color-scheme, "
+           "native <details>/<summary>, no tabindex. Export: "
+           "scripts/render_workspace.py; the committed example "
+           "examples/agent-run-workspace.html is rendered from the U.1 "
+           "fixture with a fixed reference time."),
+          "tests/test_workspace_ui.py"),
          ("Point-in-time / look-ahead discipline",
           "implemented",
           ("toolkit/pit_store.py; direction-rule code is pinned by git "

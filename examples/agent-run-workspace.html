@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent workspace — run u1-fixture-run</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI",
+  sans-serif; line-height: 1.5; color: #1a1a1a; background: #ffffff; }
+a { color: #0b5cad; }
+a:focus-visible, summary:focus-visible {
+  outline: 3px solid #0b5cad; outline-offset: 2px; }
+.skip-link { position: absolute; left: -9999px; }
+.skip-link:focus { position: static; display: block; padding: 0.5rem 1rem;
+  background: #0b5cad; color: #ffffff; }
+header, main, footer, nav, aside, section { padding: 1rem; }
+header { border-bottom: 2px solid #1a1a1a; }
+h1 { font-size: 1.4rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.1rem; margin: 0 0 0.5rem; }
+.chip { display: inline-block; padding: 0.05rem 0.45rem; border-radius: 1rem;
+  border: 1px solid currentColor; font-size: 0.85rem; font-weight: 600; }
+.chip-done, .chip-pass { color: #145a1b; background: #e2f3e5; }
+.chip-failed, .chip-block { color: #7a1010; background: #fbe3e3; }
+.chip-progress { color: #6b4e00; background: #fff3c4; }
+.chip-pending { color: #444444; background: #eeeeee; }
+.chip-unknown { color: #5b2d8e; background: #efe6f7; }
+.veto-banner { background: #7a1010; color: #ffffff; padding: 1rem;
+  font-size: 1.15rem; font-weight: 700; border: 3px solid #000000; }
+.veto-banner p { margin: 0.25rem 0 0; font-weight: 400; font-size: 1rem; }
+ul { margin: 0.25rem 0; padding-left: 1.25rem; }
+details { border: 1px solid #cccccc; border-radius: 0.25rem;
+  padding: 0.5rem; margin: 0.5rem 0; }
+summary { cursor: pointer; font-weight: 600; }
+.feed-row { border-bottom: 1px solid #dddddd; padding: 0.4rem 0; }
+.feed-row time, .stamp { color: #555555; font-size: 0.85rem; }
+.empty { color: #555555; font-style: italic; }
+.debate-cols { display: grid; gap: 1rem; }
+.lane { border: 1px solid #cccccc; border-radius: 0.25rem;
+  padding: 0.75rem; margin: 0.5rem 0; }
+@media (min-width: 900px) {
+  main { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; }
+  .debate-cols { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-color-scheme: dark) {
+  body { color: #eaeaea; background: #121212; }
+  a { color: #8ec2ff; }
+  a:focus-visible, summary:focus-visible { outline-color: #8ec2ff; }
+  header { border-bottom-color: #eaeaea; }
+  .chip-done, .chip-pass { color: #b8e6bf; background: #173d1e; }
+  .chip-failed, .chip-block { color: #ffc4c4; background: #4a1212; }
+  .chip-progress { color: #ffe08a; background: #4a3a00; }
+  .chip-pending { color: #dddddd; background: #333333; }
+  .chip-unknown { color: #ddc8f5; background: #33194d; }
+  .veto-banner { background: #a31616; border-color: #ffffff; }
+  details, .lane { border-color: #555555; }
+  .feed-row { border-bottom-color: #333333; }
+  .feed-row time, .stamp, .empty { color: #bbbbbb; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+<header>
+<h1>Agent workspace — run u1-fixture-run</h1>
+<p>Team: nepse_rules · Symbol: DEMO · Status: <span class="chip chip-done">ok</span></p>
+</header>
+<nav id="plan-rail" aria-label="Plan">
+<h2 id="plan-heading">Plan</h2>
+<ol>
+<li>technical <span class="chip chip-done">done</span></li>
+<li>fundamentals <span class="chip chip-done">done</span></li>
+<li>sentiment <span class="chip chip-done">done</span></li>
+<li>broker_flow <span class="chip chip-done">done</span></li>
+<li>macro <span class="chip chip-done">done</span></li>
+<li>corporate_actions <span class="chip chip-done">done</span></li>
+</ol>
+</nav>
+<main id="main">
+<section id="live-feed" aria-labelledby="live-feed-heading">
+<h2 id="live-feed-heading">Live feed</h2>
+<div class="feed-row"><strong>run_started</strong> <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<div class="feed-row"><strong>plan</strong> <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<div class="feed-row"><strong>step_started</strong> technical <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>technical_read — technical <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>step_started</strong> fundamentals <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>sector_fundamentals_check — fundamentals <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>step_started</strong> sentiment <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>sentiment_score — sentiment <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>evidence_ref</strong> sentiment <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<div class="feed-row"><strong>evidence_ref</strong> sentiment <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<div class="feed-row"><strong>step_started</strong> broker_flow <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>broker_flow_read — broker_flow <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>step_started</strong> macro <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>macro_checklist — macro <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>step_started</strong> corporate_actions <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+<details>
+<summary>corporate_action_flags — corporate_actions <time datetime="2026-11-14T12:00:00Z">12s ago</time></summary>
+<p>Result: <span class="chip chip-done">ok</span></p>
+</details>
+<div class="feed-row"><strong>run_finished</strong> <time datetime="2026-11-14T12:00:00Z">12s ago</time></div>
+</section>
+<section id="agent-lanes" aria-labelledby="agent-lanes-heading">
+<h2 id="agent-lanes-heading">Agent lanes</h2>
+<div class="lane">
+<h3>technical <span class="chip chip-done">done</span></h3>
+<ul>
+<li>technical_read</li>
+</ul>
+</div>
+<div class="lane">
+<h3>fundamentals <span class="chip chip-done">done</span></h3>
+<ul>
+<li>sector_fundamentals_check</li>
+</ul>
+</div>
+<div class="lane">
+<h3>sentiment <span class="chip chip-done">done</span></h3>
+<ul>
+<li>sentiment_score</li>
+</ul>
+</div>
+<div class="lane">
+<h3>broker_flow <span class="chip chip-done">done</span></h3>
+<ul>
+<li>broker_flow_read</li>
+</ul>
+</div>
+<div class="lane">
+<h3>macro <span class="chip chip-done">done</span></h3>
+<ul>
+<li>macro_checklist</li>
+</ul>
+</div>
+<div class="lane">
+<h3>corporate_actions <span class="chip chip-done">done</span></h3>
+<ul>
+<li>corporate_action_flags</li>
+</ul>
+</div>
+</section>
+<section id="debate" aria-labelledby="debate-heading">
+<h2 id="debate-heading">Bull / bear debate</h2>
+<p class="empty">No debate turns recorded yet.</p>
+</section>
+<section id="risk-gates" aria-labelledby="risk-gates-heading">
+<h2 id="risk-gates-heading">Risk gates — 0 passed, 0 blocked</h2>
+<p class="empty">No gate results recorded yet.</p>
+</section>
+<section id="memo" aria-labelledby="memo-heading">
+<h2 id="memo-heading">Memo</h2>
+<p class="empty">No memo sections recorded yet.</p>
+</section>
+</main>
+<aside id="evidence-panel" aria-label="Evidence">
+<h2 id="evidence-heading">Evidence</h2>
+<ol>
+<li id="evidence-0">Paper A — DEMO (sentiment)</li>
+<li id="evidence-1">Paper B — DEMO (sentiment)</li>
+</ol>
+</aside>
+<footer>
+<p>Rendered from events.jsonl (schema 1.0.0) — static, no live data.</p>
+</footer>
+</body>
+</html>
