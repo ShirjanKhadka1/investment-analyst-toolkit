@@ -30,8 +30,13 @@ PER_FILE = re.compile(r"tests/(test_[A-Za-z0-9_]+\.py)[` ]+(?:\(|, )(\d+) tests"
 
 
 def run(cmd, root):
+    # 1500s, not 600s: generate_status.py runs the suite twice
+    # (plain + under coverage), and the suite measured 903-922s
+    # on 2026-11-15 at 996 tests (Round E added slow integration
+    # tests: the E.1 trimmed harness/direction runs and the E.3
+    # full-kit runs). The timeout is a hang guard, not a budget.
     return subprocess.run(cmd, cwd=root, capture_output=True, text=True,
-                          check=False, timeout=600)
+                          check=False, timeout=1500)
 
 
 def collect_counts(root):

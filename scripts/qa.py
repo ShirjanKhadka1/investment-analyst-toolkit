@@ -62,9 +62,14 @@ def _tool(name):
     return [sys.executable, "-m", name]
 
 
-def _run(cmd, cwd=ROOT):
+def _run(cmd, cwd=ROOT, timeout=900):
+    # The timeout is a hang guard, not a budget. The readme-claim
+    # gate needs 1800s: it regenerates status.json by running the
+    # suite twice (plain + under coverage), and the suite measured
+    # ~900s on 2026-11-15 at 996 tests (Round E added slow
+    # integration tests). Every other gate keeps the 900s default.
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                          check=False, timeout=900)
+                          check=False, timeout=timeout)
 
 
 def gate_lint(_args):
@@ -143,7 +148,8 @@ def _script_gate(name):
         cmd = [sys.executable, str(SCRIPTS / name)]
         if name == "qa_links.py" and args.offline:
             cmd.append("--offline")
-        proc = _run(cmd)
+        timeout = 1800 if name == "qa_readme.py" else 900
+        proc = _run(cmd, timeout=timeout)
         print(proc.stdout.strip())
         if proc.stderr.strip():
             print(proc.stderr.strip()[-1000:])
