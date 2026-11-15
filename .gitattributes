@@ -2,3 +2,26 @@
 # the on-disk bytes match git blob hashes
 # (see tests/test_direction_rules.py::test_rule_code_hash_matches_git_hash_object).
 *.py text eol=lf
+
+# General LF pinning for text formats. Generated artifacts are compared
+# byte-for-byte against committed files (e.g. tests/test_live_replay.py::
+# test_replay_rerender_is_byte_identical), and on Windows Git's default
+# checkout converts LF to CRLF, breaking the comparison. Pinning by
+# extension replaces the path-by-path rules added for individual files
+# (PR #43: docs/workspace-replay.html, examples/agent-run-events.jsonl,
+# examples/agent-run-events-2.jsonl).
+*.md text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.jsonl text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+*.yml text eol=lf
+*.toml text eol=lf
+
+# Images are binary: never apply line-ending conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
