@@ -25,6 +25,8 @@ choice and says so.
   stdlib-only local server that streams a run's events as
   Server-Sent Events, a static recorded-run replay page for GitHub
   Pages, a deterministic run-diff view, and a cost/latency meter.
+  The workspace UI is a fixture-driven prototype: the server streams
+  fixture/recorded event files only, never a live agent run.
   It builds on U.1 (`toolkit/events.py`, `SCHEMA_VERSION "1.0.0"`)
   and U.2 (`toolkit/workspace_ui.py`, pure `render_events_html`).
   It does not change the U.2 renderer, the U.1 schema, or the
@@ -101,12 +103,16 @@ Two consequences are pre-registered here:
 - Modes (CLI `--mode`, server argument `mode`):
   - `recorded` — reads the whole events file once and streams it in
     order, then the `end` frame. This is the mode that streams a
-    recorded `events.jsonl` live, one event per line.
+    recorded `events.jsonl` in order as a live stream, one event per
+    line. The file is a fixture/recorded event file, never a live
+    agent run.
   - `tail` (default) — streams the events already in the file, then
     polls the file every 0.2 s for appended lines and streams each new
     line as it appears, until a `run_finished` event has been
     streamed, then the `end` frame. This is the mode that follows a
-    live run as it appends to its `events.jsonl`.
+    fixture/recorded events file as lines are appended to it. It
+    streams fixture files only: it never connects to a live agent
+    run.
 - Missing or empty events file: NEVER a crash. `recorded` mode on a
   missing/empty file streams zero `data:` frames and then the `end`
   frame (`"events": 0`, `"run_id": null`); `tail` mode on a missing
@@ -366,8 +372,8 @@ Two consequences are pre-registered here:
    commits follow it (protocol-before-results, visible in commit order).
 2. The SSE server streams a recorded `events.jsonl` in order with
    `text/event-stream` framing and a terminal `end` frame, and tails
-   a live file until `run_finished`; a missing/empty file never
-   crashes it.
+   a fixture/recorded events file until `run_finished`; a
+   missing/empty file never crashes it.
 3. The replay page is a static file that works with no server and
    carries the exact `recorded demo` label with the run date
    (`2026-11-14`) and the provider (`FAKE`, labelled honestly).

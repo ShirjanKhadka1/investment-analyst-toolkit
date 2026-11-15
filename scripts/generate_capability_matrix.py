@@ -527,7 +527,9 @@ REPOS = [
            "native <details>/<summary>, no tabindex. Export: "
            "scripts/render_workspace.py; the committed example "
            "examples/agent-run-workspace.html is rendered from the U.1 "
-           "fixture with a fixed reference time."),
+           "fixture with a fixed reference time. Fixture-driven "
+           "prototype: it renders fixture/synthetic runs only, never "
+           "a live agent run."),
           "tests/test_workspace_ui.py"),
          (("Live mode + recorded-run replay (SSE server, replay page, "
            "run diff, cost/latency meter)"),
@@ -546,7 +548,9 @@ REPOS = [
            "(examples/agent-run-events-2.jsonl); a cost/latency meter "
            "from tool_call/tool_result timestamps — $0.00 for the fake "
            "provider, a per-token rate only when the caller supplies "
-           "one. Export: scripts/serve_workspace.py and "
+           "one. Fixture-driven prototype: the server streams "
+           "fixture/recorded event files only, never a live agent "
+           "run. Export: scripts/serve_workspace.py and "
            "scripts/render_replay.py; screenshots at 375px and 1280px "
            "in examples/."),
           "tests/test_live_replay.py"),
