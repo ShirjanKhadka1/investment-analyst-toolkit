@@ -10,7 +10,12 @@ Stdlib only. Gates run the same commands CI runs (see
                3.11+ stdlib modules, e.g. tomllib)
   tzdata-pin   scripts/check_tzdata_pin.py (tzdata pin in test.yml
                must equal requirements-tzdata.txt)
-  tests        pytest tests/ -q, then coverage (fail_under from pyproject)
+  tests        pytest tests/ -q -m "not slow", then coverage
+               (fail_under from pyproject) — the slow marker is
+               excluded here exactly as in CI (see
+               .github/workflows/test.yml); the slow tests run
+               nightly instead (ops/ready-for-browser/
+               nightly-slow-tests.yml, staged, not deployed).
   lookahead    scripts/qa_lookahead.py (suites + leaking-variant mutation)
   licence      scripts/qa_licence.py
   secrets      scripts/qa_secrets.py (tree + git history)
@@ -62,14 +67,14 @@ def _tool(name):
     return [sys.executable, "-m", name]
 
 
-def _run(cmd, cwd=ROOT, timeout=900):
-    # The timeout is a hang guard, not a budget. The readme-claim
-    # gate needs 1800s: it regenerates status.json by running the
-    # suite twice (plain + under coverage), and the suite measured
-    # ~900s on 2026-11-15 at 996 tests (Round E added slow
-    # integration tests). Every other gate keeps the 900s default.
+def _run(cmd, cwd=ROOT):
+    # The timeout is a hang guard, not a budget: 900s for every gate.
+    # (Round E raised the readme-claim gate to 1800s because the
+    # suite took ~900s; that raise is reverted — the slow tests are
+    # excluded from PR CI instead, so the suite fits the 900s guard
+    # and qa_readme.py fits its own 600s guard.)
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True,
-                          check=False, timeout=timeout)
+                          check=False, timeout=900)
 
 
 def gate_lint(_args):
@@ -114,13 +119,14 @@ def _coverage_fail_under():
 
 
 def gate_tests(_args):
-    proc = _run(_tool("pytest") + ["tests/", "-q"])
+    proc = _run(_tool("pytest") + ["tests/", "-q", "-m", "not slow"])
     print(proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else "")
     if proc.returncode != 0:
         print(proc.stdout[-2000:])
         print(proc.stderr[-2000:])
         return proc.returncode
-    cov = _run(_tool("coverage") + ["run", "-m", "pytest", "tests/", "-q"])
+    cov = _run(_tool("coverage") + ["run", "-m", "pytest", "tests/", "-q",
+                                    "-m", "not slow"])
     if cov.returncode != 0:
         print("coverage run failed:")
         print(cov.stdout[-2000:])
@@ -148,8 +154,7 @@ def _script_gate(name):
         cmd = [sys.executable, str(SCRIPTS / name)]
         if name == "qa_links.py" and args.offline:
             cmd.append("--offline")
-        timeout = 1800 if name == "qa_readme.py" else 900
-        proc = _run(cmd, timeout=timeout)
+        proc = _run(cmd)
         print(proc.stdout.strip())
         if proc.stderr.strip():
             print(proc.stderr.strip()[-1000:])

@@ -30,16 +30,19 @@ PER_FILE = re.compile(r"tests/(test_[A-Za-z0-9_]+\.py)[` ]+(?:\(|, )(\d+) tests"
 
 
 def run(cmd, root):
-    # 1500s, not 600s: generate_status.py runs the suite twice
-    # (plain + under coverage), and the suite measured 903-922s
-    # on 2026-11-15 at 996 tests (Round E added slow integration
-    # tests: the E.1 trimmed harness/direction runs and the E.3
-    # full-kit runs). The timeout is a hang guard, not a budget.
+    # 600s hang guard. generate_status.py runs the suite twice
+    # (plain + under coverage) with the slow tests excluded
+    # (`-m "not slow"`, as in PR CI), so it fits this guard; the
+    # Round E raise to 1500s is reverted, not raised.
     return subprocess.run(cmd, cwd=root, capture_output=True, text=True,
-                          check=False, timeout=1500)
+                          check=False, timeout=600)
 
 
 def collect_counts(root):
+    # Deliberately UNFILTERED (no `-m "not slow"`): collection is
+    # fast (no test executes) and the README per-file counts name
+    # every test in the file, slow ones included. Only the executed
+    # runs (generate_status.py, qa.py) exclude slow tests.
     proc = run([sys.executable, "-m", "pytest", "tests/", "--collect-only",
                 "-q"], root)
     if proc.returncode != 0:

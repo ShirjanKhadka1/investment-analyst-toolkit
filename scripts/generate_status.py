@@ -7,6 +7,14 @@ parsed from an actual pytest run, version read from pyproject.toml
 when the repo has one, coverage measured with coverage.py when it is
 installed (otherwise coverage_percent is null and labelled TO VERIFY --
 never guessed).
+
+The counted run is the PR-CI fast suite (`-m "not slow"`): tests
+with the `slow` marker (full walk-forward evaluations, minutes
+each) are excluded, and their count is recorded separately as
+slow_tests_total, so tests_total + slow_tests_total is the whole
+collected suite. The nightly workflow runs the slow tests
+(ops/ready-for-browser/nightly-slow-tests.yml, staged, not
+deployed).
 """
 import argparse
 import json
@@ -82,8 +90,17 @@ def run(cmd, cwd, env=None):
 
 
 def pytest_counts(root, test_dir, extra_env=None):
-    """Return (passed, total) from a real pytest run, or raise."""
-    r = run([sys.executable, "-m", "pytest", test_dir, "-q"], cwd=root, env=extra_env)
+    """Return (passed, total) from a real pytest run, or raise.
+
+    PR CI runs the fast suite only: slow tests (marker `slow`,
+    full walk-forward evaluations) are excluded with
+    `-m "not slow"` here exactly as in .github/workflows/test.yml
+    and scripts/qa.py, so status.json counts the suite PR CI
+    actually runs. The slow count is recorded separately by
+    slow_test_count() below.
+    """
+    r = run([sys.executable, "-m", "pytest", test_dir, "-q",
+             "-m", "not slow"], cwd=root, env=extra_env)
     out = r.stdout + r.stderr
     m = re.search(r"(\d+) passed", out)
     if not m:
@@ -92,6 +109,22 @@ def pytest_counts(root, test_dir, extra_env=None):
     f = re.search(r"(\d+) failed", out)
     total = passed + (int(f.group(1)) if f else 0)
     return passed, total
+
+
+def slow_test_count(root, test_dir):
+    """Return how many collected tests carry the `slow` marker.
+
+    Collection only — no test executes, so this is fast. The
+    count keeps status.json honest about the whole suite:
+    tests_total (fast, run in PR CI) + slow_tests_total (nightly)
+    = every collected test.
+    """
+    r = run([sys.executable, "-m", "pytest", test_dir, "-m", "slow",
+             "--collect-only", "-q"], cwd=root)
+    out = r.stdout + r.stderr
+    if r.returncode != 0:
+        raise RuntimeError(f"pytest --collect-only -m slow failed:\\n{out[-2000:]}")
+    return len(re.findall(r"::test_", out))
 
 
 def main():
@@ -123,8 +156,16 @@ def main():
                                   extra_env={"PYTHONPATH": str(root)} if True else None)
     status["tests_passed"] = passed
     status["tests_total"] = total
+    status["slow_tests_total"] = slow_test_count(root, args.test_dir)
+    status["slow_tests_note"] = (
+        "tests with the `slow` marker (full walk-forward evaluations) "
+        "are excluded from PR CI and run nightly "
+        "(ops/ready-for-browser/nightly-slow-tests.yml, staged, "
+        "not deployed); tests_total + slow_tests_total = all "
+        "collected tests")
     if True:
-        run([sys.executable, "-m", "coverage", "run", "-m", "pytest", args.test_dir, "-q"],
+        run([sys.executable, "-m", "coverage", "run", "-m", "pytest", args.test_dir, "-q",
+             "-m", "not slow"],
             cwd=root, env={"PYTHONPATH": str(root)})
         rep = run([sys.executable, "-m", "coverage", "report"], cwd=root)
         m = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", rep.stdout)

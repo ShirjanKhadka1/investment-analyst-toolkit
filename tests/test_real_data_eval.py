@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent
                        / "scripts"))
 
 import evaluate_real_data as evd
+import pytest
 
 FIXTURE = (Path(__file__).resolve().parent / "fixtures"
            / "real_data_eval_slice.json")
@@ -104,6 +105,7 @@ def test_event_study_on_slice():
     assert result["aggregate"]["small_n_caveat"] is True
 
 
+@pytest.mark.slow
 def test_harness_on_trimmed_slice():
     cache = _trimmed(_load_slice())
     result = evd._evaluate_harness(cache, symbols=["AAPL", "MSFT"])
@@ -117,6 +119,7 @@ def test_harness_on_trimmed_slice():
     assert result["per_symbol"]["AAPL"]["n_folds"] > 0
 
 
+@pytest.mark.slow
 def test_direction_on_trimmed_slice():
     cache = _trimmed(_load_slice())
     result = evd._evaluate_direction(cache, symbols=["MSFT"])

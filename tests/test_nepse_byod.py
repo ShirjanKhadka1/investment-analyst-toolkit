@@ -156,6 +156,7 @@ def test_too_short_series_refuses_run(tmp_path):
         run_byod(path, FLOORSHEET, SOURCE)
 
 
+@pytest.mark.slow
 def test_full_run_on_fixtures():
     report = run_byod(PRICES, FLOORSHEET, SOURCE, events_path=EVENTS)
     assert report["source"] == SOURCE
@@ -195,6 +196,7 @@ def test_full_run_on_fixtures():
     assert study["aggregate"]["small_n_caveat"] is True
 
 
+@pytest.mark.slow
 def test_cli_writes_reports(tmp_path):
     # The CLI run uses no events file, covering the no-events path.
     out_dir = tmp_path / "out"
