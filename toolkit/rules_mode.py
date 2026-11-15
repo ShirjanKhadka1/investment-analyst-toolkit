@@ -282,34 +282,110 @@ def corporate_action_flags(actions):
     return {"actions": out, "n_actions": len(out)}
 
 
-def run_rules_team(symbol, exchange, inputs):
+def _recorded_step(recorder, step, tool, fn):
+    """Run one rules-team section, recording it when asked.
+
+    With no recorder this just calls ``fn()`` — the recorded path and
+    the unrecorded path compute the same value. With a recorder it
+    emits ``step_started`` + ``tool_call`` before the section and a
+    ``tool_result`` (status ``"ok"``) after it. A section failure
+    propagates to the caller's ``try``/``except``, which records the
+    ``error`` event — there is no ``tool_result`` for a failed tool.
+    """
+    if recorder is None:
+        return fn()
+    recorder.record("step_started", step=step)
+    recorder.record("tool_call", tool=tool, step=step)
+    result = fn()
+    recorder.record("tool_result", tool=tool, step=step, status="ok")
+    return result
+
+
+def _record_error(recorder, symbol, exc):
+    """Best-effort ``error`` event; a broken recorder must never mask
+    the run's own exception, so a failure to record is swallowed."""
+    if recorder is None:
+        return
+    try:
+        payload = {"error": str(exc)}
+        if symbol:
+            payload["symbol"] = symbol
+        recorder.record("error", payload)
+    except Exception:  # noqa: BLE001, S110 — see docstring
+        pass
+
+
+def _record_headline_evidence(recorder, symbol, headlines):
+    """One ``evidence_ref`` per headline that carries a source."""
+    if recorder is None:
+        return
+    for head in headlines or []:
+        source = head.get("source") if isinstance(head, dict) else None
+        if source:
+            recorder.record("evidence_ref", source=str(source),
+                            symbol=symbol, step="sentiment")
+
+
+def run_rules_team(symbol, exchange, inputs, recorder=None):
     """Run every rules-mode agent over supplied inputs, one dict out.
 
     ``inputs`` may carry ``closes``, ``sector``, ``metrics``,
     ``headlines``, ``broker_rows``, ``macro`` and ``actions``; any
     missing key yields that section as UNKNOWN. The returned dict
     mirrors the NEPSE agent team's structured output schema.
+
+    ``recorder`` is an optional ``toolkit.events.EventRecorder``. When
+    one is passed, the run is traced to its event log (``run_started``,
+    ``plan``, one ``step_started`` / ``tool_call`` / ``tool_result``
+    per section, ``evidence_ref`` per sourced headline,
+    ``run_finished`` — or ``error`` if the run fails, with the
+    exception re-raised). With no recorder the return value, the
+    exceptions and every other behaviour are byte-identical to before.
     """
-    if not symbol or not exchange:
-        raise ValueError("run_rules_team needs a symbol and an exchange")
-    sections = {"symbol": symbol, "exchange": exchange,
-                "rules_mode_version": RULES_MODE_VERSION,
-                "llm": "none — deterministic rules mode, zero API keys"}
-    closes = inputs.get("closes")
-    sections["technical"] = (technical_read(closes) if closes else
-                             {"status": "UNKNOWN",
-                              "reason": "no closes supplied"})
-    sections["fundamentals"] = sector_fundamentals_check(
-        inputs.get("sector", ""), inputs.get("metrics") or {})
-    sections["sentiment"] = sentiment_score(inputs.get("headlines") or [])
-    sections["broker_flow"] = broker_flow_read(
-        inputs.get("broker_rows") or [])
-    sections["macro"] = macro_checklist(inputs.get("macro") or {})
-    sections["corporate_actions"] = corporate_action_flags(
-        inputs.get("actions") or [])
-    sections["note"] = ("rules-mode output: a structured read of supplied "
-                        "inputs, not a recommendation, not a prediction")
-    return sections
+    try:
+        if not symbol or not exchange:
+            raise ValueError("run_rules_team needs a symbol and an exchange")
+        steps = ["technical", "fundamentals", "sentiment", "broker_flow",
+                 "macro", "corporate_actions"]
+        if recorder is not None:
+            recorder.record("run_started", team="nepse_rules",
+                            symbol=symbol, exchange=exchange)
+            recorder.record("plan", steps=list(steps))
+        sections = {"symbol": symbol, "exchange": exchange,
+                    "rules_mode_version": RULES_MODE_VERSION,
+                    "llm": "none — deterministic rules mode, zero API keys"}
+        closes = inputs.get("closes")
+        sections["technical"] = _recorded_step(
+            recorder, "technical", "technical_read",
+            lambda: (technical_read(closes) if closes else
+                     {"status": "UNKNOWN",
+                      "reason": "no closes supplied"}))
+        sections["fundamentals"] = _recorded_step(
+            recorder, "fundamentals", "sector_fundamentals_check",
+            lambda: sector_fundamentals_check(
+                inputs.get("sector", ""), inputs.get("metrics") or {}))
+        sections["sentiment"] = _recorded_step(
+            recorder, "sentiment", "sentiment_score",
+            lambda: sentiment_score(inputs.get("headlines") or []))
+        _record_headline_evidence(recorder, symbol,
+                                  inputs.get("headlines") or [])
+        sections["broker_flow"] = _recorded_step(
+            recorder, "broker_flow", "broker_flow_read",
+            lambda: broker_flow_read(inputs.get("broker_rows") or []))
+        sections["macro"] = _recorded_step(
+            recorder, "macro", "macro_checklist",
+            lambda: macro_checklist(inputs.get("macro") or {}))
+        sections["corporate_actions"] = _recorded_step(
+            recorder, "corporate_actions", "corporate_action_flags",
+            lambda: corporate_action_flags(inputs.get("actions") or []))
+        sections["note"] = ("rules-mode output: a structured read of supplied "
+                            "inputs, not a recommendation, not a prediction")
+        if recorder is not None:
+            recorder.record("run_finished", status="ok", symbol=symbol)
+        return sections
+    except Exception as exc:
+        _record_error(recorder, symbol, exc)
+        raise
 
 
 # --- Market-agnostic global team (1.4.0) ----------------------------------
@@ -561,7 +637,7 @@ def list_global_personas():
     return list(GLOBAL_TEAM)
 
 
-def run_global_rules_team(symbol, market, inputs):
+def run_global_rules_team(symbol, market, inputs, recorder=None):
     """Run the global rules-mode team over supplied inputs, one dict out.
 
     ``market`` is a market-profile key (e.g. "us", "crypto", "fx").
@@ -570,26 +646,60 @@ def run_global_rules_team(symbol, market, inputs):
     ``earnings_events``; any missing key yields that section as
     UNKNOWN. Technicals and sentiment reuse the market-agnostic
     functions shared with the NEPSE team.
+
+    ``recorder`` is an optional ``toolkit.events.EventRecorder`` —
+    same contract as ``run_rules_team``: with one, the run is traced
+    (``run_started``, ``plan``, one ``step_started`` / ``tool_call`` /
+    ``tool_result`` per section, ``evidence_ref`` per sourced
+    headline, ``run_finished`` — or ``error`` with the exception
+    re-raised); without one, the return value and behaviour are
+    byte-identical to before.
     """
-    if not symbol or not market:
-        raise ValueError("run_global_rules_team needs a symbol and a market")
-    sections = {"symbol": symbol, "market": market,
-                "rules_mode_version": RULES_MODE_VERSION,
-                "llm": "none — deterministic rules mode, zero API keys"}
-    closes = inputs.get("closes")
-    sections["technical"] = (technical_read(closes) if closes else
-                             {"status": "UNKNOWN",
-                              "reason": "no closes supplied"})
-    sections["us_fundamentals"] = us_fundamentals_check(
-        inputs.get("fundamentals_metrics") or {})
-    sections["etf_index"] = etf_index_check(
-        inputs.get("etf_metrics") or {})
-    sections["fx_macro"] = fx_macro_check(inputs.get("fx_inputs") or {})
-    sections["crypto"] = crypto_check(inputs.get("crypto_metrics") or {})
-    sections["earnings"] = earnings_check(
-        inputs.get("earnings_events") or [])
-    sections["sentiment"] = sentiment_score(inputs.get("headlines") or [])
-    sections["note"] = ("global rules-mode output: a structured read of "
-                        "supplied inputs, not a recommendation, not a "
-                        "prediction")
-    return sections
+    try:
+        if not symbol or not market:
+            raise ValueError("run_global_rules_team needs a symbol and a market")
+        steps = ["technical", "us_fundamentals", "etf_index", "fx_macro",
+                 "crypto", "earnings", "sentiment"]
+        if recorder is not None:
+            recorder.record("run_started", team="global_rules",
+                            symbol=symbol, market=market)
+            recorder.record("plan", steps=list(steps))
+        sections = {"symbol": symbol, "market": market,
+                    "rules_mode_version": RULES_MODE_VERSION,
+                    "llm": "none — deterministic rules mode, zero API keys"}
+        closes = inputs.get("closes")
+        sections["technical"] = _recorded_step(
+            recorder, "technical", "technical_read",
+            lambda: (technical_read(closes) if closes else
+                     {"status": "UNKNOWN",
+                      "reason": "no closes supplied"}))
+        sections["us_fundamentals"] = _recorded_step(
+            recorder, "us_fundamentals", "us_fundamentals_check",
+            lambda: us_fundamentals_check(
+                inputs.get("fundamentals_metrics") or {}))
+        sections["etf_index"] = _recorded_step(
+            recorder, "etf_index", "etf_index_check",
+            lambda: etf_index_check(inputs.get("etf_metrics") or {}))
+        sections["fx_macro"] = _recorded_step(
+            recorder, "fx_macro", "fx_macro_check",
+            lambda: fx_macro_check(inputs.get("fx_inputs") or {}))
+        sections["crypto"] = _recorded_step(
+            recorder, "crypto", "crypto_check",
+            lambda: crypto_check(inputs.get("crypto_metrics") or {}))
+        sections["earnings"] = _recorded_step(
+            recorder, "earnings", "earnings_check",
+            lambda: earnings_check(inputs.get("earnings_events") or []))
+        sections["sentiment"] = _recorded_step(
+            recorder, "sentiment", "sentiment_score",
+            lambda: sentiment_score(inputs.get("headlines") or []))
+        _record_headline_evidence(recorder, symbol,
+                                  inputs.get("headlines") or [])
+        sections["note"] = ("global rules-mode output: a structured read of "
+                            "supplied inputs, not a recommendation, not a "
+                            "prediction")
+        if recorder is not None:
+            recorder.record("run_finished", status="ok", symbol=symbol)
+        return sections
+    except Exception as exc:
+        _record_error(recorder, symbol, exc)
+        raise

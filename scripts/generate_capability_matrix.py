@@ -497,6 +497,21 @@ REPOS = [
           "toolkit/track_record.py (settlement vs naive and "
           "buy-and-hold baselines)."),
           "tests/test_decision_log.py"),
+         (("Agent run event log (events.jsonl, schema-validated, "
+           "versioned, hash-chained)"),
+          "implemented",
+          ("toolkit/events.py: every agent-team run (rules-mode NEPSE / "
+           "global teams and the autonomous runner) can record a "
+           "schema-validated, versioned, hash-chained JSONL event log — "
+           "run_started, plan, step_started, tool_call, tool_result, "
+           "evidence_ref, gate_result, memo_section, run_finished and "
+           "error — following the toolkit/decision_log.py chain "
+           "(prev_hash per row, first row \"genesis\"). The recorder is "
+           "opt-in: with no recorder the hooked functions return "
+           "byte-identical output. A fake-provider fixture run "
+           "(scripts/run_fake_agent_events.py) writes a real "
+           "examples/agent-run-events.jsonl with no network and no LLM."),
+          "tests/test_events.py"),
          ("Point-in-time / look-ahead discipline",
           "implemented",
           ("toolkit/pit_store.py; direction-rule code is pinned by git "

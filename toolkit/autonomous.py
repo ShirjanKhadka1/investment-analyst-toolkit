@@ -45,9 +45,30 @@ def _write(path, text):
         f.write(text)
 
 
-def run_once(config):
+def run_once(config, recorder=None):
+    """Run one autonomous pass over ``config['symbols']``.
+
+    ``recorder`` is an optional ``toolkit.events.EventRecorder``. When
+    one is passed, the run is traced to its event log (``run_started``,
+    ``plan``, one ``step_started`` / ``tool_call`` / ``tool_result`` /
+    ``evidence_ref`` / ``gate_result`` per symbol, ``memo_section``
+    after each report is written, ``error`` per failed symbol, and
+    ``run_finished``). With no recorder the summary, the reports, the
+    audit log and every other behaviour are byte-identical to before.
+    A recorder failure inside a per-symbol step is caught by the
+    existing per-symbol handler (the symbol is marked STALE_OR_FAILED,
+    like any other per-symbol failure); a recorder failure outside
+    the per-symbol steps propagates.
+    """
     symbols = config.get("symbols") or []
     if not symbols:
+        if recorder is not None:
+            try:
+                recorder.record(
+                    "error",
+                    error="config['symbols'] must be a non-empty list")
+            except Exception:  # noqa: BLE001, S110 — never mask the config error
+                pass
         raise ValueError("config['symbols'] must be a non-empty list")
     out_dir = config.get("output_dir", "autonomous_reports")
     max_age = config.get("max_age_days", 7)
@@ -56,6 +77,13 @@ def run_once(config):
     fetchers = config.get("fetchers")
     if fetchers is None:
         fetchers = [("yahoo", data_mod.fetch_yahoo_prices)]
+    if recorder is not None:
+        recorder.record("run_started", team="autonomous",
+                        symbols=list(symbols))
+        recorder.record("plan",
+                        steps=["fetch", "validate", "select_model",
+                               "forecast", "report"],
+                        symbols=list(symbols))
     summary = {"run_at": stamp, "symbols": {}}
     audit_path = os.path.join(out_dir, "audit.jsonl")
     prev_hash = "GENESIS"
@@ -66,13 +94,37 @@ def run_once(config):
                 prev_hash = json.loads(lines[-1])["hash"]
     for symbol in symbols:
         try:
+            if recorder is not None:
+                recorder.record("step_started", step=symbol, symbol=symbol)
+                recorder.record("tool_call", tool="fetch_fresh_prices",
+                                step=symbol, symbol=symbol)
             fresh = data_mod.fetch_fresh_prices(symbol, fetchers, max_age_days=max_age, today=today)
             closes = [c for _, c in fresh["pairs"]]
+            if recorder is not None:
+                provenance = fresh["provenance"]
+                recorder.record("tool_result", tool="fetch_fresh_prices",
+                                step=symbol, symbol=symbol, status="ok",
+                                n_points=len(fresh["pairs"]))
+                recorder.record("evidence_ref",
+                                source=str(provenance["source"]),
+                                symbol=symbol, step=symbol,
+                                last_date=str(provenance["last_date"]),
+                                n_points=len(fresh["pairs"]))
+                age = provenance.get("age_days")
+                recorder.record(
+                    "gate_result", gate="freshness", symbol=symbol,
+                    verdict=("PASS" if age is not None and age <= max_age
+                             else "BLOCK"),
+                    reason=(f"last bar {age} days old, max {max_age}"
+                            if age is not None else "age unknown"))
             # Accuracy loop: score yesterday's predictions against today's actual, then record today's prediction.
             ledger_path = os.path.join(out_dir, "predictions.jsonl")
             scored = tracker_mod.score_pending(ledger_path, symbol, closes[-1], fresh["pairs"][-1][0])
             tracker_mod.record_prediction(ledger_path, symbol, 0.0, "placeholder", "x", "x", closes[-1]) if False else None
             validate_series(f"closes for {symbol}", closes, min_length=30)
+            if recorder is not None:
+                recorder.record("gate_result", gate="validate_series",
+                                symbol=symbol, verdict="PASS")
             selection = auto_select_model(closes, train_size=max(10, len(closes) // 2))
             ens = ensemble_forecast(closes, series_for_weights=closes, train_size=max(10, len(closes) // 2))
             perf = performance_report(returns_from_prices(closes), closes)
@@ -88,11 +140,19 @@ def run_once(config):
                     "performance": perf, "disclaimer": "Research only. Not investment advice. No trade is made by this system."}
             report = f"# Autonomous Research Update — {symbol}\n\nRun: {stamp} | Status: FRESH\n\nSource: {fresh['provenance']['source']} | Last date: {fresh['provenance']['last_date']} ({fresh['provenance']['age_days']} days old) | Points: {fresh['provenance']['n_points']}\n\nBest predictive model (walk-forward MAE): {selection['best_model']} (MAE {selection['best_mae']:.4f}, beats naive: {selection['beats_naive']})\n\nEnsemble forecast (next step): {ens['forecast']:.4f} ({ens['weighting']})\n\nVolatility regime: {regime['regime']} | Anomalies flagged: {len(anomalies)}\n\nPerformance: {perf}\n\n*Research only. Not investment advice. No trade is made by this system.*\n"
         except Exception as e:  # noqa: BLE001 — per-symbol failure must not kill the run
+            if recorder is not None:
+                try:
+                    recorder.record("error", error=str(e), symbol=symbol)
+                except Exception:  # noqa: BLE001, S110 — never mask the run's error
+                    pass
             body = {"symbol": symbol, "status": "STALE_OR_FAILED", "error": str(e),
                     "note": "Previous report kept unchanged. No data was invented."}
             report = f"# Autonomous Research Update — {symbol}\n\nRun: {stamp} | Status: STALE_OR_FAILED\n\nError: {e}\n\nPrevious report kept unchanged. No data was invented.\n\n*Research only. Not investment advice.*\n"
         summary["symbols"][symbol] = body
         _write(os.path.join(out_dir, symbol, f"{stamp}.md"), report)
+        if recorder is not None:
+            recorder.record("memo_section", section="autonomous_report",
+                            symbol=symbol, status=body["status"])
         # Last-known-good rule: latest.md is updated ONLY on a fresh
         # run. On failure the timestamped report above IS the STALE
         # marker, and the previous latest.md is kept unchanged — a
@@ -107,6 +167,8 @@ def run_once(config):
             f.write(json.dumps({"prev_hash": prev_hash, "hash": h, **entry}) + "\n")
         prev_hash = h
     _write(os.path.join(out_dir, f"summary-{stamp}.json"), json.dumps(summary, indent=2))
+    if recorder is not None:
+        recorder.record("run_finished", status="ok", symbols=list(symbols))
     return summary
 
 
