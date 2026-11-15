@@ -21,6 +21,9 @@ Real-data evaluated column: "yes" means the capability was evaluated
 on real (non-synthetic) market data, with the run date and the model
 card that evidences it (see REAL_DATA below). Everything else is
 "no": synthetic-only evaluations and rows proven by unit tests alone.
+"no (fixtures only)" is the explicit form for rows demonstrated on
+fixture/synthetic data only (see the "fixtures" sentinel in
+REAL_DATA): a fixture-driven prototype, not a real-data evaluation.
 
 Counts in the doc are computed from this table, never typed.
 
@@ -600,18 +603,23 @@ REPOS = [
      ]),
 ]
 
-# Real-data evaluation evidence: capability -> (run date, model card).
-# Only the five rows below were evaluated on real (non-synthetic)
-# market data, each with a dated model card. Everything else is "no":
-# the cross-sectional ranking, event studies and floorsheet rows were
-# evaluated on bundled SYNTHETIC fixtures only; the forecast ledger
-# was verified by unit tests (the 34 migrated development-period
-# forecasts are real rows, but no scored evaluation ran through the
-# ledger); the track-record rows have real calls logged but no scored
-# evaluation yet (first settlements 2026-11-19/20); all other rows
-# are proven by unit tests alone. Keys must match a capability string
-# in REPOS exactly; _validate_real_data() raises on an orphan key so
-# a rename cannot silently flip a row to "no".
+# Real-data evaluation evidence: capability -> (run date, model card),
+# or the "fixtures" sentinel for rows demonstrated on fixture /
+# synthetic data only (they render "no (fixtures only)", not "yes").
+# Only the five (date, card) rows below were evaluated on real
+# (non-synthetic) market data, each with a dated model card.
+# Everything else is "no": the cross-sectional ranking, event studies
+# and floorsheet rows were evaluated on bundled SYNTHETIC fixtures
+# only; the forecast ledger was verified by unit tests (the 34
+# migrated development-period forecasts are real rows, but no scored
+# evaluation ran through the ledger); the track-record rows have real
+# calls logged but no scored evaluation yet (first settlements
+# 2026-11-19/20); all other rows are proven by unit tests alone.
+# Keys must match a capability string in REPOS exactly;
+# _validate_real_data() raises on an orphan key so a rename cannot
+# silently flip a row to "no". A plain string entry would break
+# _real_data_cell (it unpacks each entry as a (date, card) tuple),
+# which is why fixture-only rows use the "fixtures" sentinel.
 REAL_DATA = {
     ("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
      "scored)"):
@@ -629,6 +637,12 @@ REAL_DATA = {
         ("2026-11-14", "docs/forecast-harness-model-card.md"),
     "Experiment workflow / recorder (config + model + metrics per run)":
         ("2026-11-14", "docs/forecast-harness-model-card.md"),
+    ("Agent run event log (events.jsonl, schema-validated, "
+     "versioned, hash-chained)"): "fixtures",
+    ("Static agent workspace UI (single self-contained HTML "
+     "rendered from events.jsonl)"): "fixtures",
+    ("Live mode + recorded-run replay (SSE server, replay page, "
+     "run diff, cost/latency meter)"): "fixtures",
 }
 
 
@@ -637,6 +651,8 @@ def _real_data_cell(capability):
     entry = REAL_DATA.get(capability)
     if entry is None:
         return "no"
+    if entry == "fixtures":
+        return "no (fixtures only)"
     date, card = entry
     return f"yes — {date}, [{card}](../{card})"
 
@@ -832,7 +848,11 @@ def render():
                  "capability was evaluated on real (non-synthetic) "
                  "market data, with the run date and the model card "
                  "that evidences it. \"no\" means the only evidence "
-                 "is unit tests or a synthetic-data evaluation.")
+                 "is unit tests or a synthetic-data evaluation. "
+                 "\"no (fixtures only)\" means the capability was "
+                 "demonstrated on fixture/synthetic data only — a "
+                 "fixture-driven prototype, not a real-data "
+                 "evaluation.")
     lines.append("- AGPL and unlicensed repos are ideas only: nothing was "
                  "copied from them. Apache-2.0/MIT code is never pasted "
                  "without attribution plus a LICENSES.md entry.")

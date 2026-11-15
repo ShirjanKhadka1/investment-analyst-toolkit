@@ -8,6 +8,8 @@ these tests pin the generator's contract, not the prose:
 - every linked test file exists;
 - the build plan lists exactly the eight named items, in rank order;
 - the doc contains no marketing words;
+- the three agent-workspace rows render "no (fixtures only)" (the
+  "fixtures" sentinel in REAL_DATA), not a plain "no" and not "yes";
 - the stale-doc check works: the qa gate fails when the doc differs
   from a fresh render, and passes when it matches.
 """
@@ -122,6 +124,44 @@ def test_no_marketing_words():
     doc = gen.render().lower()
     for word in gen.BANNED_WORDS:
         assert word not in doc, word
+
+
+# The three agent-workspace rows (U.1/U.2/U.3) are fixture-driven
+# prototypes: demonstrated on fixture/synthetic event logs only, never
+# on a live agent run or real market data. They carry the "fixtures"
+# sentinel in REAL_DATA, which must render as "no (fixtures only)"
+# — a plain string entry would break _real_data_cell, which unpacks
+# every other entry as a (date, card) tuple.
+WORKSPACE_FIXTURE_CAPABILITIES = (
+    ("Agent run event log (events.jsonl, schema-validated, versioned, "
+     "hash-chained)"),
+    ("Static agent workspace UI (single self-contained HTML rendered "
+     "from events.jsonl)"),
+    ("Live mode + recorded-run replay (SSE server, replay page, run "
+     "diff, cost/latency meter)"),
+)
+
+
+def test_workspace_rows_render_no_fixtures_only():
+    for capability in WORKSPACE_FIXTURE_CAPABILITIES:
+        assert gen.REAL_DATA.get(capability) == "fixtures", capability
+        assert gen._real_data_cell(capability) == "no (fixtures only)", \
+            capability
+    doc = gen.render()
+    for capability in WORKSPACE_FIXTURE_CAPABILITIES:
+        match = re.search(
+            rf"\| {re.escape(capability)} \| implemented \| .* \| "
+            rf"no \(fixtures only\) \|",
+            doc)
+        assert match, capability
+    assert "no (fixtures only)" in doc
+    # The sentinel must not leak into the "yes" rows or the plain "no"
+    # rows.
+    assert gen._real_data_cell(
+        "Volatility forecasting (EWMA/GARCH-lite, walk-forward "
+        "scored)").startswith("yes — 2026-11-14, ")
+    assert gen._real_data_cell("Scanner rule table + named setups") == \
+        "no"
 
 
 def test_generated_doc_on_disk_is_fresh():
