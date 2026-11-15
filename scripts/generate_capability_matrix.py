@@ -527,7 +527,9 @@ REPOS = [
            "native <details>/<summary>, no tabindex. Export: "
            "scripts/render_workspace.py; the committed example "
            "examples/agent-run-workspace.html is rendered from the U.1 "
-           "fixture with a fixed reference time."),
+           "fixture with a fixed reference time. Fixture-driven "
+           "prototype: it renders fixture/synthetic runs only, never "
+           "a live agent run."),
           "tests/test_workspace_ui.py"),
          ("Point-in-time / look-ahead discipline",
           "implemented",

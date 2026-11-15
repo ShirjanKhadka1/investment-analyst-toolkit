@@ -23,7 +23,9 @@ choice and says so.
 
 - This PR adds a static renderer that turns an `events.jsonl` (the U.1
   log) into a SINGLE self-contained HTML file. It is the read-only
-  workspace view for Round U. It adds no live behaviour: U.3 (live
+  workspace view for Round U — a fixture-driven prototype: it renders
+  fixture/synthetic runs only, never a live agent run. It adds no live
+  behaviour: U.3 (live
   mode + replay) is a later PR, and nothing here opens a socket,
   polls, or fetches.
 - The renderer reads the U.1 schema only (`toolkit/events.py`,
