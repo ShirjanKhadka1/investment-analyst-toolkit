@@ -36,6 +36,7 @@ number is never separated from where it came from.
 from __future__ import annotations
 
 import datetime as _dt
+import gzip as _gzip
 import json as _json
 import time as _time
 import urllib.error as _urlerror
@@ -46,6 +47,35 @@ EDGAR_USER_AGENT = (
     "investment-analyst-toolkit/0.9.0 (research; "
     "+https://github.com/ShirjanKhadka1/investment-analyst-toolkit)"
 )
+
+
+def declared_user_agent(contact_email):
+    """A declared SEC User-Agent with a contact email.
+
+    SEC fair-access rules require a declared User-Agent naming
+    the requester with a contact email. The module default
+    (``EDGAR_USER_AGENT``) carries no email, and the SEC returns
+    403 to it from some egresses (seen 2026-11-15: 403 on both
+    sec.gov hosts from this VM, 200 with a contact email in the
+    UA). Callers that fetch EDGAR must pass a UA built here with
+    their own contact email — the email is caller-supplied and
+    never stored in this repo (the secrets gate forbids email
+    addresses in the tree). Raises on an empty or malformed
+    address instead of sending a UA the SEC will reject.
+    """
+    if not isinstance(contact_email, str) or "@" not in contact_email:
+        raise ValueError(
+            "contact_email must be a contact email address, got "
+            f"{contact_email!r}")
+    local, _, domain = contact_email.strip().partition("@")
+    if not local or "." not in domain or not domain.split(".")[-1]:
+        raise ValueError(
+            "contact_email must be a contact email address, got "
+            f"{contact_email!r}")
+    return (
+        "investment-analyst-toolkit/0.9.0 (research; contact "
+        f"{contact_email.strip()})"
+    )
 # SEC ceiling is 10 requests/second; stay at half of it.
 _MIN_INTERVAL_SECONDS = 0.2
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
@@ -65,10 +95,14 @@ _ticker_cache: dict[str, int] | None = None
 
 __all__ = [
     "EDGAR_USER_AGENT",
+    "annual_value_as_of",
+    "declared_user_agent",
     "fetch_company_concept",
     "fetch_company_facts",
     "fetch_submissions",
+    "freshest_annual_value_as_of",
     "get_fundamentals",
+    "get_fundamentals_as_of",
     "latest_annual_value",
     "ticker_to_cik",
 ]
@@ -109,7 +143,14 @@ def _get_json(url, user_agent=None):
     req = _urlrequest.Request(url, headers=headers)
     try:
         with _urlrequest.urlopen(req, timeout=30) as resp:
-            return _json.loads(resp.read().decode("utf-8"))
+            raw = resp.read()
+            # The request advertises gzip; when the server honours
+            # it the body arrives compressed (gzip magic 1f 8b) and
+            # must be decompressed before decoding — the old code
+            # decoded the compressed bytes as UTF-8 and died.
+            if raw[:2] == b"\x1f\x8b":
+                raw = _gzip.decompress(raw)
+            return _json.loads(raw.decode("utf-8"))
     except _urlerror.HTTPError as exc:
         raise RuntimeError(
             f"EDGAR request failed ({exc.code}) for {url}") from exc
@@ -196,6 +237,123 @@ def latest_annual_value(facts, taxonomy, tag):
         "filed": best.get("filed"),
         "accn": best.get("accn"),
         "fy": best.get("fy"),
+    }
+
+
+def annual_value_as_of(facts, taxonomy, tag, as_of, prefer_10k=True):
+    """Point-in-time annual value of one XBRL concept.
+
+    ``facts`` is the dict from fetch_company_facts; ``as_of`` is
+    an ISO date (a ranking date). Only entries FILED on or before
+    ``as_of`` are visible — a filing made after the ranking date
+    is never used for it, so no look-ahead. With ``prefer_10k``
+    (the default) the latest 10-K entry filed by ``as_of`` wins,
+    falling back to the most recent entry of any form only when
+    no 10-K was filed by then (the same fallback as
+    ``latest_annual_value``). With ``prefer_10k=False`` the most
+    recent entry of any form filed by ``as_of`` wins — for
+    point-in-time counts such as shares outstanding, where a
+    10-Q is as current as a 10-K. Returns the same
+    {"value", "end", "form", "filed", "accn", "fy"} shape as
+    ``latest_annual_value``. Raises ValueError if the concept is
+    absent or nothing was filed by ``as_of``.
+    """
+    try:
+        units = facts["facts"][taxonomy][tag]["units"]
+    except (KeyError, TypeError) as exc:
+        raise ValueError(
+            f"concept {taxonomy}:{tag} not in company facts") from exc
+    entries = [e for vals in units.values() for e in vals]
+    if not entries:
+        raise ValueError(f"concept {taxonomy}:{tag} has no values")
+    visible = [e for e in entries
+               if (e.get("filed") or "") <= str(as_of)]
+    if not visible:
+        raise ValueError(
+            f"concept {taxonomy}:{tag} has no value filed by {as_of}")
+    if prefer_10k:
+        annual = [e for e in visible if e.get("form") == "10-K"]
+        pool = annual or visible
+    else:
+        pool = visible
+    best = max(pool, key=lambda e: (e.get("end", ""), e.get("filed", "")))
+    return {
+        "value": best["val"],
+        "end": best.get("end"),
+        "form": best.get("form"),
+        "filed": best.get("filed"),
+        "accn": best.get("accn"),
+        "fy": best.get("fy"),
+    }
+
+
+def freshest_annual_value_as_of(facts, candidates, as_of,
+                                prefer_10k=True):
+    """Freshest annual value across several XBRL tags, as of a date.
+
+    XBRL tags are not uniform across filers: Apple and Microsoft
+    report revenue under
+    ``RevenueFromContractWithCustomerExcludingAssessedTax`` while
+    Alphabet reports ``Revenues`` and Amazon reports no
+    ``Revenues`` at all (seen 2026-11-15); Visa's
+    ``StockholdersEquity`` stops in 2011 while
+    ``StockholdersEquityIncludingPortionAttributableToNoncontrolling
+    Interest`` is current. A single tag would silently return a
+    15-year-stale value for some filers (Microsoft's ``Revenues``
+    ends 2010-12-31). ``candidates`` is a list of
+    (taxonomy, tag) pairs for one economic concept; this returns
+    the candidate whose latest value filed by ``as_of`` has the
+    most recent (end, filed) — the freshest concept, not the
+    first listed. Returns (value_dict, taxonomy, tag), the value
+    dict in the ``latest_annual_value`` shape. Raises ValueError
+    naming every candidate when none has a value filed by
+    ``as_of``.
+    """
+    best = None
+    for taxonomy, tag in candidates:
+        try:
+            value = annual_value_as_of(facts, taxonomy, tag, as_of,
+                                       prefer_10k=prefer_10k)
+        except ValueError:
+            continue
+        key = (value.get("end", ""), value.get("filed", ""))
+        if best is None or key > best[0]:
+            best = (key, value, taxonomy, tag)
+    if best is None:
+        names = ", ".join(f"{t}:{g}" for t, g in candidates)
+        raise ValueError(
+            f"none of {names} has a value filed by {as_of}")
+    _key, value, taxonomy, tag = best
+    return value, taxonomy, tag
+
+
+def get_fundamentals_as_of(ticker, concepts, as_of, user_agent=None):
+    """Latest audited annual values as of ``as_of``, by ticker.
+
+    Point-in-time ``get_fundamentals``: ``concepts`` is a list of
+    (taxonomy, tag) pairs, and every value is the latest 10-K
+    entry filed on or before ``as_of`` (see
+    ``annual_value_as_of``). Returns {"ticker", "cik", "source",
+    "retrieved_at", "as_of", "values": {tag:
+    annual_value_as_of(...)}}. A missing concept raises
+    ValueError naming it — no value is ever invented or
+    defaulted. Callers that need a per-concept fallback (a
+    symbol that carries no GrossProfit, e.g. a bank) catch that
+    error per concept instead of calling this helper.
+    """
+    cik = ticker_to_cik(ticker, user_agent=user_agent)
+    facts = fetch_company_facts(cik, user_agent=user_agent)
+    values = {}
+    for taxonomy, tag in concepts:
+        values[tag] = annual_value_as_of(facts, taxonomy, tag, as_of)
+    return {
+        "ticker": str(ticker).strip().upper(),
+        "cik": cik,
+        "source": "SEC EDGAR companyfacts",
+        "retrieved_at": _dt.datetime.now(_dt.timezone.utc).isoformat(
+            timespec="seconds"),
+        "as_of": str(as_of),
+        "values": values,
     }
 
 
