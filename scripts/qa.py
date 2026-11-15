@@ -12,6 +12,9 @@ Stdlib only. Gates run the same commands CI runs (see
                must equal requirements-tzdata.txt)
   tests        pytest tests/ -q, then coverage (fail_under from pyproject)
   lookahead    scripts/qa_lookahead.py (suites + leaking-variant mutation)
+  wall-clock   scripts/qa_wall_clock.py (tests must not call
+               datetime.now / datetime.today / time.time unless the
+               clock is injected)
   licence      scripts/qa_licence.py
   secrets      scripts/qa_secrets.py (tree + git history)
   links        scripts/qa_links.py (internal must resolve; external best-effort)
@@ -167,6 +170,7 @@ GATES = [
     ("tzdata-pin", _script_gate("check_tzdata_pin.py")),
     ("tests", gate_tests),
     ("lookahead", _script_gate("qa_lookahead.py")),
+    ("wall-clock", _script_gate("qa_wall_clock.py")),
     ("licence", _script_gate("qa_licence.py")),
     ("secrets", _script_gate("qa_secrets.py")),
     ("links", _script_gate("qa_links.py")),
