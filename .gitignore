@@ -1,0 +1,6 @@
+# Raw vendor data is NEVER committed (data policy: derived metrics
+# only). The E.1 raw cache is reproduced locally with
+# scripts/fetch_real_data_eval.py; the committed record is
+# data/real-data-eval-2026-11-15/derived-metrics.json +
+# data/real-data-eval-2026-11-15/manifest.json.
+data/real-data-eval-2026-11-15.json

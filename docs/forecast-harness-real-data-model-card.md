@@ -29,7 +29,7 @@ Reproduce with:
 EDGAR_CONTACT_EMAIL=<contact> python3 scripts/evaluate_real_data.py --refresh --only harness
 ```
 
-The cache is `data/real-data-eval-2026-11-15.json`.
+The raw cache is NOT committed (data policy: derived metrics only). The committed record is `data/real-data-eval-2026-11-15/derived-metrics.json` plus `data/real-data-eval-2026-11-15/manifest.json` (source data with its SHA-256); re-fetch the raw data locally with `scripts/fetch_real_data_eval.py`, then re-run `scripts/evaluate_real_data.py`.
 
 ## Run
 
