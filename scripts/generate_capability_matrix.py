@@ -345,7 +345,10 @@ REPOS = [
             "(NEPSE sourced schedule / explicit cost_fraction) with a "
             "seeded-bootstrap verdict in toolkit/cross_sectional.py; "
             "pre-registered protocol + model card (all four rules "
-            "\"no edge\" on the synthetic evaluation)."),
+            "\"no edge\" on the synthetic evaluation; re-run on real "
+            "data 2026-11-15 — 30 caps, 12 monthly rebalances, all "
+            "four rules \"no edge\" again, see "
+            "docs/cross-sectional-real-data-model-card.md)."),
           "tests/test_cross_sectional.py"),
          (("Experiment workflow / recorder (config + model + metrics "
           "per run)"),
@@ -467,7 +470,10 @@ REPOS = [
             "user-supplied CSVs (CSV-only by design) plus global "
             "earnings on caller-supplied dates; bundled SYNTHETIC demo "
             "CSV; model card reports no significant abnormal return "
-            "on the synthetic evaluation."),
+            "on the synthetic evaluation; re-run on real data "
+            "2026-11-15 (10 10-Q filing-date events — CAAR +1.45%, "
+            "not significant, see "
+            "docs/event-study-real-data-model-card.md)."),
           "tests/test_cross_sectional.py"),
      ]),
     ("skfolio",
@@ -613,17 +619,17 @@ REPOS = [
 ]
 
 # Real-data evaluation evidence: capability -> (run date, model card).
-# Only the five rows below were evaluated on real (non-synthetic)
+# Only the seven rows below were evaluated on real (non-synthetic)
 # market data, each with a dated model card. Everything else is "no":
-# the cross-sectional ranking, event studies and floorsheet rows were
-# evaluated on bundled SYNTHETIC fixtures only; the forecast ledger
-# was verified by unit tests (the 34 migrated development-period
-# forecasts are real rows, but no scored evaluation ran through the
-# ledger); the track-record rows have real calls logged but no scored
-# evaluation yet (first settlements 2026-11-19/20); all other rows
-# are proven by unit tests alone. Keys must match a capability string
-# in REPOS exactly; _validate_real_data() raises on an orphan key so
-# a rename cannot silently flip a row to "no".
+# the floorsheet row was evaluated on bundled SYNTHETIC fixtures
+# only; the forecast ledger was verified by unit tests (the 34
+# migrated development-period forecasts are real rows, but no scored
+# evaluation ran through the ledger); the track-record rows have
+# real calls logged but no scored evaluation yet (first settlements
+# 2026-11-19/20); all other rows are proven by unit tests alone.
+# Keys must match a capability string in REPOS exactly;
+# _validate_real_data() raises on an orphan key so a rename cannot
+# silently flip a row to "no".
 REAL_DATA = {
     ("Volatility forecasting (EWMA/GARCH-lite, walk-forward "
      "scored)"):
@@ -631,16 +637,28 @@ REAL_DATA = {
     ("Probabilistic direction models (calibrated probabilities, "
      "walk-forward scored vs coin-flip/base-rate/direction-rule "
      "baselines, ensembles)"):
-        ("2026-11-14", "docs/direction-models-model-card.md"),
+        ("2026-11-15",
+         "docs/direction-models-real-data-model-card.md"),
     "Regime classifier + signal diagnostics":
-        ("2026-11-14", "docs/direction-models-model-card.md"),
+        ("2026-11-15",
+         "docs/direction-models-real-data-model-card.md"),
     ("Forecast evaluation harness (walk-forward + "
      "purged/embargoed splits, Brier/log score/QLIKE, "
      "calibration curves, bootstrap-CI comparison, count of "
      "models tried)"):
-        ("2026-11-14", "docs/forecast-harness-model-card.md"),
+        ("2026-11-15",
+         "docs/forecast-harness-real-data-model-card.md"),
     "Experiment workflow / recorder (config + model + metrics per run)":
-        ("2026-11-14", "docs/forecast-harness-model-card.md"),
+        ("2026-11-15",
+         "docs/forecast-harness-real-data-model-card.md"),
+    ("Cross-sectional ranking (momentum/value/quality proxies, "
+     "decile tests net of costs)"):
+        ("2026-11-15",
+         "docs/cross-sectional-real-data-model-card.md"),
+    ("Event studies (NEPSE corporate actions on user CSVs + "
+     "global earnings)"):
+        ("2026-11-15",
+         "docs/event-study-real-data-model-card.md"),
 }
 
 
