@@ -1,14 +1,14 @@
 {
   "repo": "investment-analyst-toolkit",
   "generated_by": "scripts/generate_status.py (Round 3: pytest run + file reads)",
-  "generated_at": "2026-11-16",
+  "generated_at": "2026-11-15",
   "method": "tests counted from a live pytest run in this checkout; version read from pyproject.toml when present",
   "version": "0.9.0",
   "coverage_fail_under": 80,
-  "tests_passed": 1106,
-  "tests_total": 1106,
-  "slow_tests_total": 2,
+  "tests_passed": 1119,
+  "tests_total": 1119,
+  "slow_tests_total": 4,
   "slow_tests_note": "tests with the `slow` marker (full walk-forward evaluations) are excluded from PR CI and run nightly (ops/ready-for-browser/nightly-slow-tests.yml, staged, not deployed); tests_total + slow_tests_total = all collected tests",
-  "coverage_percent": 92,
+  "coverage_percent": 91,
   "coverage_note": "measured by coverage.py in this run"
 }
