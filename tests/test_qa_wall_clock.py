@@ -216,7 +216,11 @@ def _load_qa():
 def test_qa_registers_the_wall_clock_gate():
     qa = _load_qa()
     names = [name for name, _gate in qa.GATES]
-    assert len(names) == 14
+    assert len(names) == 15
     assert "wall-clock" in names
     assert names.index("wall-clock") > names.index("lookahead")
     assert names.index("wall-clock") < names.index("licence")
+    assert "evidence-ratchet" in names
+    assert names.index("evidence-ratchet") > names.index(
+        "capability-matrix")
+    assert names.index("evidence-ratchet") < names.index("fresh-clone")
