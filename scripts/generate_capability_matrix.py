@@ -443,7 +443,15 @@ REPOS = [
            "realised-vol baseline per "
            "docs/volatility-forecast-eval-protocol.md; both beat the "
            "baseline out of sample on SPY/AAPL/VT "
-           "(docs/volatility-forecast-model-card.md)."),
+           "(docs/volatility-forecast-model-card.md). Forward "
+           "ledger (Round E, E.2): the same three models forecast "
+           "daily for the exact 7-ticker watchlist into an "
+           "append-only hash-chained ledger on its own data branch "
+           "(toolkit/volatility_ledger.py, "
+           "docs/volatility-ledger-protocol.md, "
+           "docs/volatility-ledger.md) — no claim before 100 "
+           "scored observations per symbol; ledger tests in "
+           "tests/test_volatility_ledger.py."),
           "tests/test_volatility.py"),
          (("Event studies (NEPSE corporate actions on user CSVs + "
            "global earnings)"),
@@ -847,7 +855,10 @@ def render():
                  "already lives — indicators, portfolio maths, risk "
                  "measures, point-in-time discipline, decision logging — "
                  "and thin where the programme deliberately stops: "
-                 "execution, personal finance, model zoos, and app UIs.")
+                 "execution and personal finance. App UIs are no longer "
+                 "a stop: a fixture-driven prototype exists (Round U — a "
+                 "prototype, not a live surface). Model zoos stay out "
+                 "unless an extra passes the evaluation harness.")
     lines.append("")
     for _name, repo, licence, rows in REPOS:
         lines.append(f"## {repo} ({licence})")
