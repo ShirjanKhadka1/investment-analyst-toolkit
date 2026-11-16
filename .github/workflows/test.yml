@@ -30,6 +30,13 @@
 # locally, and their first GitHub run is the proof. Quality and
 # smoke jobs stay on ubuntu-latest, where they were verified.
 # All CI dependencies are pinned to versions measured 28 Oct 2026.
+# Slow tests (pytest marker `slow`, registered in pyproject.toml)
+# are EXCLUDED from every job here with `-m "not slow"`: they run
+# full walk-forward evaluations (minutes each) and live in the
+# nightly workflow (ops/ready-for-browser/nightly-slow-tests.yml,
+# staged, not deployed). scripts/qa.py and
+# scripts/generate_status.py apply the same exclusion, so the
+# quality job's 600s readme-claim gate still holds.
 name: Tests
 on: [push, pull_request]
 jobs:
@@ -45,7 +52,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install "pytest==9.2.0" "tzdata==2026.6"
-      - run: python -m pytest tests/ -q
+      - run: python -m pytest tests/ -q -m "not slow"
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -74,4 +81,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "pytest==9.2.0" -r requirements-numpy.txt
-      - run: python -m pytest tests/ -q
+      - run: python -m pytest tests/ -q -m "not slow"
