@@ -1,0 +1,338 @@
+{
+  "derived_metrics": {
+    "contents": "Per-fold-derived aggregates only (pooled + per-symbol scores, verdicts, bootstrap CIs, monthly spreads, per-event CARs). No raw prices, no raw series, no SEC filing values.",
+    "file": "data/real-data-eval-2026-11-15/derived-metrics.json",
+    "sha256": "114d8a45ddc5caa77352c3fbf1c292084e9c84abc48713dbb727617648b6192c"
+  },
+  "evaluation": "Round E, E.1 real-data evaluation",
+  "events_10q_2025": {
+    "filings_per_symbol": {
+      "AAPL": 3,
+      "ADBE": 3,
+      "AMD": 3,
+      "AMZN": 3,
+      "AVGO": 3,
+      "BAC": 0,
+      "CAT": 3,
+      "COST": 3,
+      "CRM": 3,
+      "CVX": 3,
+      "DIS": 3,
+      "GOOGL": 3,
+      "GS": 0,
+      "HD": 3,
+      "JNJ": 3,
+      "JPM": 0,
+      "KO": 3,
+      "LLY": 3,
+      "MA": 3,
+      "META": 3,
+      "MSFT": 3,
+      "NFLX": 3,
+      "NVDA": 3,
+      "ORCL": 3,
+      "PG": 3,
+      "TSLA": 3,
+      "UNH": 3,
+      "V": 3,
+      "WMT": 3,
+      "XOM": 3
+    },
+    "filings_total": 81,
+    "symbols": 30
+  },
+  "fetch_script": "scripts/fetch_real_data_eval.py",
+  "notes": [
+    "SEC filing facts ARE in the raw cache (EDGAR companyfacts point-in-time values + 10-Q filing dates); they are NOT in the committed record. The committed derived metrics carry only aggregates (spreads, CARs, scores) and per-symbol missing-concept coverage.",
+    "XOM maps to CIK 34088 by explicit override (see scripts/evaluate_real_data.py CIK_OVERRIDES)."
+  ],
+  "point_in_time_fundamentals": {
+    "cik_per_symbol": {
+      "AAPL": 320193,
+      "ADBE": 796343,
+      "AMD": 2488,
+      "AMZN": 1018724,
+      "AVGO": 1730168,
+      "BAC": 70858,
+      "CAT": 18230,
+      "COST": 909832,
+      "CRM": 1108524,
+      "CVX": 93410,
+      "DIS": 1744489,
+      "GOOGL": 1652044,
+      "GS": 886982,
+      "HD": 354950,
+      "JNJ": 200406,
+      "JPM": 19617,
+      "KO": 21344,
+      "LLY": 59478,
+      "MA": 1141391,
+      "META": 1326801,
+      "MSFT": 789019,
+      "NFLX": 1065280,
+      "NVDA": 1045810,
+      "ORCL": 1341439,
+      "PG": 80424,
+      "TSLA": 1318605,
+      "UNH": 731766,
+      "V": 1403161,
+      "WMT": 104169,
+      "XOM": 34088
+    },
+    "ranking_dates": [
+      "2024-12-31",
+      "2025-01-31",
+      "2025-02-28",
+      "2025-03-31",
+      "2025-04-30",
+      "2025-05-30",
+      "2025-06-30",
+      "2025-07-31",
+      "2025-08-29",
+      "2025-09-30",
+      "2025-10-31",
+      "2025-11-28"
+    ],
+    "symbols": 30
+  },
+  "price_series": {
+    "date_range": [
+      "2021-11-15",
+      "2026-11-13"
+    ],
+    "per_symbol": {
+      "AAPL": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "ADBE": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "AMD": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "AMZN": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "AVGO": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "BAC": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "CAT": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "COST": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "CRM": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "CVX": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "DIA": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "DIS": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "GOOGL": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "GS": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "HD": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "JNJ": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "JPM": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "KO": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "LLY": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "MA": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "META": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "MSFT": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "NFLX": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "NVDA": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "ORCL": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "PG": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "QQQ": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "SPY": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "TSLA": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "UNH": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "V": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "VT": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "WMT": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      },
+      "XOM": {
+        "first_date": "2021-11-15",
+        "last_date": "2026-11-13",
+        "rows": 1255
+      }
+    },
+    "range": "5y",
+    "rows_total": 42670,
+    "symbols": 34
+  },
+  "protocol": "docs/real-data-eval-protocol.md",
+  "raw_cache": {
+    "bytes": 3394235,
+    "file": "data/real-data-eval-2026-11-15.json",
+    "lines": 190564,
+    "sha256": "713c6a37c71053ce3210b0701b169e77b47d60aa39228bccf1b75d549eb78511",
+    "status": "NOT committed (local-only, gitignored). Reproduce with scripts/fetch_real_data_eval.py."
+  },
+  "raw_data_home": "Local-only gitignored file data/real-data-eval-2026-11-15.json (reproduced by the fetch script); a copy may also be kept as a release asset or on the data branch \u2014 never in a main-branch commit.",
+  "reproduce": [
+    "EDGAR_CONTACT_EMAIL=<contact> python3 scripts/fetch_real_data_eval.py",
+    "python3 scripts/evaluate_real_data.py"
+  ],
+  "run_date": "2026-11-15",
+  "sources": {
+    "events": "SEC EDGAR submissions (10-Q filing dates)",
+    "fundamentals": "SEC EDGAR companyfacts via toolkit.edgar (point-in-time, filed <= ranking date)",
+    "prices": "Yahoo Finance chart API via toolkit.data.fetch_yahoo_prices"
+  },
+  "universe": {
+    "caps": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "GOOGL",
+      "AMZN",
+      "AVGO",
+      "META",
+      "TSLA",
+      "LLY",
+      "JPM",
+      "V",
+      "XOM",
+      "JNJ",
+      "MA",
+      "COST",
+      "HD",
+      "PG",
+      "BAC",
+      "UNH",
+      "CVX",
+      "ORCL",
+      "CRM",
+      "NFLX",
+      "ADBE",
+      "AMD",
+      "CAT",
+      "GS",
+      "WMT",
+      "KO",
+      "DIS"
+    ],
+    "etfs": [
+      "SPY",
+      "VT",
+      "QQQ",
+      "DIA"
+    ]
+  }
+}

@@ -271,9 +271,24 @@ def test_walk_forward_no_lookahead():
             assert f1["baselines"] == f2["baselines"]
 
 
-def test_walk_forward_rejects_unknown_symbol_and_short_series():
+def test_walk_forward_rejects_empty_symbol_and_short_series():
+    # Round E, E.1: the old SPY/AAPL/VT-only symbol guard is lifted —
+    # the models are symbol-agnostic, so any non-empty symbol runs
+    # (BTC-USD here, a watchlist symbol with a registered rule, and
+    # any other symbol likewise). What is still rejected: a missing
+    # symbol label and a series too short for the training size.
+    result = dm.walk_forward_direction(_random_walk_closes(130),
+                                       "BTC-USD", train_size=60)
+    assert result["n_test"] > 0
+    # A symbol with no pre-registered direction rule also runs:
+    # its direction-rule baseline falls back to the base rate.
+    unregistered = dm.walk_forward_direction(
+        _random_walk_closes(130), "FAKE", train_size=60)
+    assert unregistered["n_test"] > 0
+    assert all(fold["direction_rule_fallback"]
+               for fold in unregistered["folds"])
     with pytest.raises(ValueError):
-        dm.walk_forward_direction(_random_walk_closes(130), "BTC-USD",
+        dm.walk_forward_direction(_random_walk_closes(130), "",
                                   train_size=60)
     with pytest.raises(ValueError):
         dm.walk_forward_direction([100.0] * 40, "SPY", train_size=60)

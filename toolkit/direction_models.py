@@ -522,8 +522,14 @@ def walk_forward_direction(closes, symbol, train_size=TRAIN_SIZE):
     closes = validate_series("closes", closes, min_length=train_size + 2)
     if any(p <= 0 for p in closes):
         raise ValueError("closes must all be positive for walk_forward_direction")
-    if symbol not in ("SPY", "AAPL", "VT"):
-        raise ValueError(f"walk_forward_direction covers SPY/AAPL/VT, got {symbol!r}")
+    # Round E, E.1: the SPY/AAPL/VT-only guard is lifted. The models
+    # are symbol-agnostic — every feature is a per-symbol return or
+    # average, and nothing in the maths is symbol-specific — so any
+    # symbol's closes run here. The symbol is a label only; it must
+    # still be a non-empty string.
+    if not isinstance(symbol, str) or not symbol.strip():
+        raise ValueError(
+            f"symbol must be a non-empty string, got {symbol!r}")
     if not 0 < train_size < len(closes) - 1:
         raise ValueError("train_size must leave a non-empty test set")
     X, y, indices = feature_rows(closes)
@@ -584,9 +590,25 @@ def walk_forward_direction(closes, symbol, train_size=TRAIN_SIZE):
             issued["ensemble_weighted"] = issued["ensemble_equal"]
         # Baselines from visible data only.
         base_rate = _mean(y_train)
-        _rule_id, rule_dir = direction_for(symbol, closes[:origin + 1])
-        rule_prob = (RULE_UP_PROB if rule_dir == "up" else
-                     RULE_DOWN_PROB if rule_dir == "down" else base_rate)
+        # The direction-rule baseline exists only for symbols with
+        # a pre-registered rule (the 7-ticker watchlist, in
+        # toolkit/direction_rules.py — the track record's rules,
+        # never extended here). For any other symbol the rule
+        # baseline is undefined, so it falls back to the base rate
+        # and the fold records the fallback; the other two
+        # baselines (coin flip, base rate) are unaffected, and no
+        # rule is invented for the new symbol.
+        try:
+            _rule_id, rule_dir = direction_for(
+                symbol, closes[:origin + 1])
+        except ValueError:
+            rule_prob = base_rate
+            rule_fallback = True
+        else:
+            rule_prob = (RULE_UP_PROB if rule_dir == "up" else
+                         RULE_DOWN_PROB if rule_dir == "down" else
+                         base_rate)
+            rule_fallback = False
         outcome = y[k]
         cusum = cusum_alarms(_simple_returns(closes[:origin + 1]))
         folds.append({
@@ -600,6 +622,7 @@ def walk_forward_direction(closes, symbol, train_size=TRAIN_SIZE):
             "calibrated": calibrated_flags,
             "baselines": {"coin_flip": 0.5, "base_rate": base_rate,
                           "direction_rule": rule_prob},
+            "direction_rule_fallback": rule_fallback,
         })
         # Record this fold for future origins only (never the current).
         for model in BASE_MODELS + ("logistic_regime",):

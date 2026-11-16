@@ -25,3 +25,16 @@ omit = ["toolkit/__init__.py"]
 [tool.coverage.report]
 fail_under = 80
 show_missing = true
+
+# PR CI runs the fast suite only (`pytest -m "not slow"`, see
+# .github/workflows/test.yml). Tests marked `slow` run full
+# walk-forward evaluations (minutes each) and live in the nightly
+# workflow (ops/ready-for-browser/nightly-slow-tests.yml, staged,
+# not deployed). The marker is registered here so an unmarked
+# collection never warns about an unknown marker; no addopts is
+# set on purpose — each call site states its filter explicitly,
+# so the nightly `-m slow` run is never ANDed with a default.
+[tool.pytest.ini_options]
+markers = [
+    "slow: full walk-forward evaluation (minutes); excluded from PR CI, run nightly",
+]
