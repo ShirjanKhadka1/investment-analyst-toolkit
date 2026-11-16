@@ -855,7 +855,10 @@ def render():
                  "already lives — indicators, portfolio maths, risk "
                  "measures, point-in-time discipline, decision logging — "
                  "and thin where the programme deliberately stops: "
-                 "execution, personal finance, model zoos, and app UIs.")
+                 "execution and personal finance. App UIs are no longer "
+                 "a stop: a fixture-driven prototype exists (Round U — a "
+                 "prototype, not a live surface). Model zoos stay out "
+                 "unless an extra passes the evaluation harness.")
     lines.append("")
     for _name, repo, licence, rows in REPOS:
         lines.append(f"## {repo} ({licence})")
