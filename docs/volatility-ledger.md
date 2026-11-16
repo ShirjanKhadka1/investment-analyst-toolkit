@@ -61,6 +61,32 @@ files do not exist yet), run the daily ledger step with
 provisional mode: a manual dispatch before the close records
 missed days, it never logs a forecast from a partial bar.
 
+### Dispatching during a session
+
+The scheduled run is 22:30 UTC — after the NYSE close (21:00
+UTC), so every session has closed and all seven tickers log a
+forecast. A manual dispatch earlier in the day does NOT refuse
+the run, and it never logs a forecast from a partial bar. What
+happens per ticker depends on whether its session has closed at
+dispatch time (session closes: NSE 10:00 UTC, LSE 16:30 UTC,
+NYSE 21:00 UTC):
+
+- Before 10:00 UTC: NIFTYBEES.NS, ISF.L, SPY, AAPL and VT each
+  record a missed day (their bars are incomplete); EURUSD=X and
+  BTC-USD still log a forecast, from the previous complete bar
+  (their in-progress bar is dropped).
+- 10:00–16:30 UTC: NIFTYBEES.NS logs (NSE closed); ISF.L, SPY,
+  AAPL and VT record missed days; EURUSD=X and BTC-USD log from
+  the previous complete bar.
+- 16:30–21:00 UTC: NIFTYBEES.NS and ISF.L log; SPY, AAPL and VT
+  record missed days; EURUSD=X and BTC-USD log from the previous
+  complete bar.
+- After 21:00 UTC: all seven log.
+
+A missed day is never filled in and never forecast from. The
+only dispatch that refuses the whole run is an UNKNOWN session
+state (no time-zone database on the runner) — never guessed.
+
 ## Notes on the ledger's conventions
 
 - `annualised_vol` uses the same 252-day convention for every
