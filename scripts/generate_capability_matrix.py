@@ -36,6 +36,8 @@ exit 1 with --check when regenerating would change the doc.
 
 import argparse
 import difflib
+import re
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -673,6 +675,75 @@ REAL_DATA = {
     ("Live mode + recorded-run replay (SSE server, replay page, "
      "run diff, cost/latency meter)"): "fixtures",
 }
+
+# Evidence ratchet: the real-data "yes" count (the number of
+# (date, card) tuple entries in REAL_DATA — the "fixtures" sentinel
+# string entries do NOT count) may not fall below REAL_DATA_MIN_YES
+# without an explicit, dated waiver in REAL_DATA_WAIVER. A waiver is
+# a (date, reason, new_min) tuple, e.g. ("2026-11-16", "XOM delisted,
+# re-eval pending", 6): date must be a real YYYY-MM-DD date, reason a
+# non-empty string, new_min an int. Dropping a REAL_DATA entry
+# silently (as the E.3 merge did to the E.1 entries — PR #50) must
+# fail the qa run instead.
+REAL_DATA_MIN_YES = 7
+REAL_DATA_WAIVER = None
+
+
+def check_evidence_ratchet(real_data=None, min_yes=None, waiver=None):
+    """Fail unless the real-data 'yes' count meets the minimum.
+
+    Counts the (date, card) tuple entries in ``real_data``; the
+    "fixtures" sentinel string entries do not count as yes. With no
+    waiver the count must be >= ``min_yes``; with a waiver the waiver
+    must be a well-formed (date, reason, new_min) tuple and the count
+    must be >= ``new_min``. Returns the count on success; raises
+    ValueError otherwise. Defaults read the module constants.
+    """
+    if real_data is None:
+        real_data = REAL_DATA
+    if min_yes is None:
+        min_yes = REAL_DATA_MIN_YES
+    if waiver is None:
+        waiver = REAL_DATA_WAIVER
+    count = sum(1 for v in real_data.values() if isinstance(v, tuple))
+    if waiver is None:
+        if count < min_yes:
+            raise ValueError(
+                f"real-data 'yes' count fell to {count}, below the "
+                f"minimum {min_yes}; do not drop a REAL_DATA entry "
+                "without an explicit, dated waiver (REAL_DATA_WAIVER)")
+        return count
+    if not isinstance(waiver, (tuple, list)) or len(waiver) != 3:
+        raise ValueError(
+            f"malformed REAL_DATA_WAIVER {waiver!r}: expected a "
+            "(date, reason, new_min) tuple")
+    date, reason, new_min = waiver
+    if (not isinstance(date, str)
+            or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date)):
+        raise ValueError(
+            f"malformed REAL_DATA_WAIVER date {date!r}: expected "
+            "YYYY-MM-DD")
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError(
+            f"malformed REAL_DATA_WAIVER date {date!r}: not a real "
+            "calendar date")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError(
+            "malformed REAL_DATA_WAIVER: reason must be a non-empty "
+            "string")
+    if not isinstance(new_min, int) or isinstance(new_min, bool):
+        raise ValueError(  # noqa: TRY004 — the ratchet contract raises
+            # ValueError for every malformed waiver (bad date, empty
+            # reason, non-int new_min) so callers catch one type.
+            f"malformed REAL_DATA_WAIVER new_min {new_min!r}: expected "
+            "an int")
+    if count < new_min:
+        raise ValueError(
+            f"real-data 'yes' count is {count}, below the waived "
+            f"minimum {new_min} (waiver {date}: {reason})")
+    return count
 
 
 def _real_data_cell(capability):

@@ -10,6 +10,8 @@ these tests pin the generator's contract, not the prose:
 - the doc contains no marketing words;
 - the three agent-workspace rows render "no (fixtures only)" (the
   "fixtures" sentinel in REAL_DATA), not a plain "no" and not "yes";
+- the evidence ratchet fails when a real-data "yes" entry is dropped
+  without an explicit, dated waiver, and passes with one;
 - the stale-doc check works: the qa gate fails when the doc differs
   from a fresh render, and passes when it matches.
 """
@@ -162,6 +164,38 @@ def test_workspace_rows_render_no_fixtures_only():
         "scored)").startswith("yes — 2026-11-14, ")
     assert gen._real_data_cell("Scanner rule table + named setups") == \
         "no"
+
+
+def test_evidence_ratchet_fails_when_entry_dropped():
+    # (a) The live count meets the minimum.
+    live = gen.check_evidence_ratchet()
+    assert live >= gen.REAL_DATA_MIN_YES
+    # (b) Dropping one (date, card) entry fails without a waiver.
+    # Drop the first tuple-valued entry (a real-data "yes" row), not a
+    # "fixtures" sentinel: dropping a sentinel must not trip the ratchet.
+    dropped = dict(gen.REAL_DATA)
+    key = next(k for k, v in dropped.items() if isinstance(v, tuple))
+    dropped.pop(key)
+    with pytest.raises(ValueError) as excinfo:
+        gen.check_evidence_ratchet(real_data=dropped)
+    message = str(excinfo.value)
+    assert "6" in message and "7" in message and "waiver" in message
+    # (c) The same dropped copy passes with an explicit waiver.
+    assert gen.check_evidence_ratchet(
+        real_data=dropped,
+        waiver=("2026-11-16", "test waiver", 6)) == 6
+    # (d) A malformed waiver raises ValueError: bad date, empty reason,
+    # non-int new_min.
+    with pytest.raises(ValueError):
+        gen.check_evidence_ratchet(
+            real_data=dropped,
+            waiver=("16-11-2026", "test waiver", 6))
+    with pytest.raises(ValueError):
+        gen.check_evidence_ratchet(
+            real_data=dropped, waiver=("2026-11-16", "", 6))
+    with pytest.raises(ValueError):
+        gen.check_evidence_ratchet(
+            real_data=dropped, waiver=("2026-11-16", "test waiver", "6"))
 
 
 def test_generated_doc_on_disk_is_fresh():

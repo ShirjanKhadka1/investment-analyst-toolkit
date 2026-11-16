@@ -29,6 +29,11 @@ Stdlib only. Gates run the same commands CI runs (see
   capability-matrix
                scripts/generate_capability_matrix.py --check (the matrix
                doc must match what the generator renders)
+  evidence-ratchet
+               the real-data "yes" count in REAL_DATA must not fall
+               below REAL_DATA_MIN_YES without an explicit, dated
+               waiver (REAL_DATA_WAIVER) — see check_evidence_ratchet
+               in scripts/generate_capability_matrix.py
   fresh-clone  scripts/qa_fresh_clone.py (clone + demo under 60 s)
 
 Dev tools come from requirements-dev.txt (pinned versions identical
@@ -174,6 +179,20 @@ def gate_capability_matrix(_args):
     return proc.returncode
 
 
+def gate_evidence_ratchet(_args):
+    """The real-data 'yes' count may not fall without a waiver."""
+    sys.path.insert(0, str(SCRIPTS))
+    import generate_capability_matrix as gen
+    try:
+        count = gen.check_evidence_ratchet()
+    except ValueError as exc:
+        print(f"evidence ratchet FAILED: {exc}")
+        return 1
+    print(f"real-data 'yes' count {count} >= minimum "
+          f"{gen.REAL_DATA_MIN_YES}")
+    return 0
+
+
 GATES = [
     ("lint", gate_lint),
     ("typecheck", gate_typecheck),
@@ -188,6 +207,7 @@ GATES = [
     ("readme-claim", _script_gate("qa_readme.py")),
     ("counts", _script_gate("qa_counts.py")),
     ("capability-matrix", gate_capability_matrix),
+    ("evidence-ratchet", gate_evidence_ratchet),
     ("fresh-clone", _script_gate("qa_fresh_clone.py")),
 ]
 
