@@ -1,7 +1,7 @@
 {
   "repo": "investment-analyst-toolkit",
   "generated_by": "scripts/generate_status.py (Round 3: pytest run + file reads)",
-  "generated_at": "2026-11-15",
+  "generated_at": "2026-11-16",
   "method": "tests counted from a live pytest run in this checkout; version read from pyproject.toml when present",
   "version": "0.9.0",
   "coverage_fail_under": 80,
