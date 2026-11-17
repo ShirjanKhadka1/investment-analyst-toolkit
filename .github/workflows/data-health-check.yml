@@ -56,7 +56,7 @@ jobs:
         run: python3 scripts/data_health.py --probe --output /tmp/data_health.json
       - name: Keep the report as an artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: data-health
           path: /tmp/data_health.json
