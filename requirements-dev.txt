@@ -4,7 +4,7 @@
 # runtime (stdlib only); nothing here is a runtime dependency.
 pytest==9.2.0
 ruff==0.17.3
-mypy==2.4.0
+mypy==2.4.1
 coverage==7.17.0
 # PyYAML for the workflow lint test (tests/test_workflow_lint.py):
 # it parses .github/workflows and ops/ready-for-browser as YAML.
