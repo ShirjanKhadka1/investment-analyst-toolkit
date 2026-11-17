@@ -238,5 +238,17 @@
     "run_at": "20261116T074941Z",
     "report": "reports/daily/archive/MSFT/20261116T074941Z.md",
     "summary": "reports/daily/archive/MSFT/20261116T074941Z.json"
+  },
+  {
+    "symbol": "AAPL",
+    "run_at": "20261117T085804Z",
+    "report": "reports/daily/archive/AAPL/20261117T085804Z.md",
+    "summary": "reports/daily/archive/AAPL/20261117T085804Z.json"
+  },
+  {
+    "symbol": "MSFT",
+    "run_at": "20261117T085804Z",
+    "report": "reports/daily/archive/MSFT/20261117T085804Z.md",
+    "summary": "reports/daily/archive/MSFT/20261117T085804Z.json"
   }
 ]
