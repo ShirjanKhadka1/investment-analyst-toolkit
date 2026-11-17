@@ -51,7 +51,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install "pytest==9.2.0" "tzdata==2026.6"
+      - run: pip install "pytest==9.2.0" "tzdata==2026.6" "pyyaml==6.0.1"
       - run: python -m pytest tests/ -q -m "not slow"
   quality:
     runs-on: ubuntu-latest
@@ -80,5 +80,5 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install "pytest==9.2.0" -r requirements-numpy.txt
+      - run: pip install "pytest==9.2.0" "pyyaml==6.0.1" -r requirements-numpy.txt
       - run: python -m pytest tests/ -q -m "not slow"

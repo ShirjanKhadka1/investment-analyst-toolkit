@@ -1,0 +1,69 @@
+# Daily volatility ledger — STAGED, NOT DEPLOYED (Round E, E.2).
+# The owner deploys it himself: copy this file to
+# .github/workflows/daily-volatility-ledger.yml on main and enable it
+# in Actions. Do NOT enable it before the E.2 implementation PR
+# merges — the protocol (docs/volatility-ledger-protocol.md) must
+# merge first, and no ledger row may exist before the protocol does.
+# Watchlist (owner-approved 13 Nov 2026): SPY, AAPL, VT,
+# NIFTYBEES.NS, ISF.L, EURUSD=X, BTC-USD.
+# Purpose: once a day, fetch the seven watchlist tickers, take the
+# last COMPLETE bar per symbol, log one-day-ahead variance forecasts
+# (naive / EWMA / GARCH-lite) and score due forecasts, and commit
+# results to the DATA branch (data/volatility-ledger) — NEVER to main.
+# Safety (same discipline as PR 7.0 for the track record): the ledger
+# is append-only with a hash chain (volatility-ledger.jsonl). The
+# workflow seeds the local ledger from the data branch before running,
+# so prior forecasts load; publish() refuses to push unless the remote
+# rows are byte-identical and the diff has only additions;
+# verify_volatility_ledger.py walks the branch history after
+# publishing. There is no provisional mode: a run before the close
+# records missed days, it never logs a forecast from a partial bar.
+name: Daily volatility ledger
+
+on:
+  schedule:
+    # 22:30 UTC daily — after the NYSE close (21:00 UTC) and after
+    # the daily track record (22:00 UTC).
+    - cron: "30 22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Seed prior ledger from the data branch
+        run: |
+          # The script can only append to what it can see. The data
+          # branch holds the log; main does not. Extract the current
+          # log (and missed-days) from the data branch into the
+          # working tree so the run loads prior forecasts. Genesis
+          # when the branch or the files do not exist yet.
+          if git ls-remote --exit-code --heads origin data/volatility-ledger >/dev/null 2>&1; then
+            git fetch origin data/volatility-ledger
+            mkdir -p data/volatility-ledger
+            for f in volatility-ledger.jsonl missed_days.jsonl; do
+              if git cat-file -e "origin/data/volatility-ledger:$f" 2>/dev/null; then
+                git show "origin/data/volatility-ledger:$f" > "data/volatility-ledger/$f"
+              fi
+            done
+          else
+            echo "data/volatility-ledger does not exist yet — genesis run"
+          fi
+      - name: Run the daily volatility-ledger step
+        run: |
+          python3 scripts/volatility_ledger_daily.py --ledger data/volatility-ledger/volatility-ledger.jsonl --missed data/volatility-ledger/missed_days.jsonl --publish-branch data/volatility-ledger --publish
+      - name: Verify the branch history is append-only
+        run: |
+          # The verifier fetches the branch itself, so it reads the
+          # post-publish tip even though this checkout is main.
+          python3 scripts/verify_volatility_ledger.py --repo . --branch data/volatility-ledger --file volatility-ledger.jsonl
