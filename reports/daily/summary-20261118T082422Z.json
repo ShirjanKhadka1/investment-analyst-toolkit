@@ -1,0 +1,129 @@
+{
+  "run_at": "20261118T082422Z",
+  "symbols": {
+    "AAPL": {
+      "symbol": "AAPL",
+      "status": "fresh",
+      "provenance": {
+        "source": "yahoo",
+        "last_date": "2026-11-17",
+        "age_days": 1,
+        "n_points": 251,
+        "stale": false
+      },
+      "scored_this_run": 1,
+      "accuracy": {
+        "n_scored": 21,
+        "direction_accuracy": 0.47619047619047616,
+        "mean_abs_error": 3.491607305016368,
+        "failure_rate": 0.5238095238095238,
+        "by_model": {
+          "naive": {
+            "n": 21,
+            "failures": 11
+          }
+        }
+      },
+      "best_model": "naive",
+      "best_mae": 3.9884120396205356,
+      "beats_naive": false,
+      "ensemble_forecast": 351.7432663022533,
+      "volatility_regime": "high",
+      "anomalies": [
+        {
+          "index": 58,
+          "return": -0.049981811301894274,
+          "z": -3.2585723314646593
+        },
+        {
+          "index": 149,
+          "return": -0.06117781321571136,
+          "z": -3.971079089078691
+        },
+        {
+          "index": 154,
+          "return": 0.0484068203126522,
+          "z": 3.0028203904540187
+        },
+        {
+          "index": 174,
+          "return": -0.07353864245054431,
+          "z": -4.757714749498018
+        },
+        {
+          "index": 241,
+          "return": 0.05305819883393248,
+          "z": 3.298831292751468
+        }
+      ],
+      "performance": {
+        "label": "",
+        "volatility_regime": null,
+        "annualised_return": 0.30791587925825653,
+        "annualised_volatility": 0.24944468042400958,
+        "sharpe": 1.2344054751332312,
+        "sortino": 1.8195212033632944,
+        "max_drawdown": 0.13822983759432042,
+        "cvar_5pct": -0.03474187259979059
+      },
+      "disclaimer": "Research only. Not investment advice. No trade is made by this system."
+    },
+    "MSFT": {
+      "symbol": "MSFT",
+      "status": "fresh",
+      "provenance": {
+        "source": "yahoo",
+        "last_date": "2026-11-17",
+        "age_days": 1,
+        "n_points": 251,
+        "stale": false
+      },
+      "scored_this_run": 1,
+      "accuracy": {
+        "n_scored": 21,
+        "direction_accuracy": 0.42857142857142855,
+        "mean_abs_error": 6.519845586019561,
+        "failure_rate": 0.5714285714285714,
+        "by_model": {
+          "naive": {
+            "n": 21,
+            "failures": 12
+          }
+        }
+      },
+      "best_model": "naive",
+      "best_mae": 7.427144610692585,
+      "beats_naive": false,
+      "ensemble_forecast": 512.0399515147869,
+      "volatility_regime": "high",
+      "anomalies": [
+        {
+          "index": 48,
+          "return": -0.09993149179840488,
+          "z": -4.678365191543451
+        },
+        {
+          "index": 173,
+          "return": 0.15506733300956488,
+          "z": 7.2209229053539525
+        },
+        {
+          "index": 241,
+          "return": 0.0668150985836291,
+          "z": 3.1027127001894477
+        }
+      ],
+      "performance": {
+        "label": "",
+        "volatility_regime": null,
+        "annualised_return": 0.08183109553380069,
+        "annualised_volatility": 0.3401868092755194,
+        "sharpe": 0.24054752654305647,
+        "sortino": 0.3764617061552888,
+        "max_drawdown": 0.2854655208355286,
+        "cvar_5pct": -0.04100046072124742
+      },
+      "disclaimer": "Research only. Not investment advice. No trade is made by this system."
+    }
+  }
+}
