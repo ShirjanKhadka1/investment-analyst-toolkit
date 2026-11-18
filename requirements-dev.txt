@@ -10,4 +10,4 @@ coverage==7.17.0
 # it parses .github/workflows and ops/ready-for-browser as YAML.
 # Dev-only: the toolkit stays standard-library only at runtime.
 # Pinned to the version measured 16 Nov 2026 in this environment.
-pyyaml==6.0.1
+pyyaml==6.0.3
