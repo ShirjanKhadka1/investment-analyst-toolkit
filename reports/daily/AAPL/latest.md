@@ -1,15 +1,15 @@
 # Autonomous Research Update — AAPL
 
-Run: 20261118T082422Z | Status: FRESH
+Run: 20261119T083531Z | Status: FRESH
 
-Source: yahoo | Last date: 2026-11-17 (1 days old) | Points: 251
+Source: yahoo | Last date: 2026-11-18 (1 days old) | Points: 251
 
-Best predictive model (walk-forward MAE): naive (MAE 3.9884, beats naive: False)
+Best predictive model (walk-forward MAE): naive (MAE 3.9667, beats naive: False)
 
-Ensemble forecast (next step): 351.7433 (inverse_walk_forward_mae)
+Ensemble forecast (next step): 351.8464 (inverse_walk_forward_mae)
 
 Volatility regime: high | Anomalies flagged: 5
 
-Performance: {'label': '', 'volatility_regime': None, 'annualised_return': 0.30791587925825653, 'annualised_volatility': 0.24944468042400958, 'sharpe': 1.2344054751332312, 'sortino': 1.8195212033632944, 'max_drawdown': 0.13822983759432042, 'cvar_5pct': -0.03474187259979059}
+Performance: {'label': '', 'volatility_regime': None, 'annualised_return': 0.3052413232130885, 'annualised_volatility': 0.24942697561283453, 'sharpe': 1.223770293742767, 'sortino': 1.8037168497668201, 'max_drawdown': 0.13822983759432042, 'cvar_5pct': -0.03474187259979059}
 
 *Research only. Not investment advice. No trade is made by this system.*
