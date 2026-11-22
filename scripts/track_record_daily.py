@@ -45,6 +45,21 @@ call for the same date/symbol/rule already in the log is skipped),
 settles no call twice (``settle_call`` refuses settled calls), and
 publishes no empty commit.
 
+Incident 2 (November 2026 — the runner, not the ledger): the
+settlement clock and the settle guard disagreed — settlement counts
+5 *trading* days from the entry bar while ``settle_call`` refuses
+before call date + 5 *calendar* days, so a crypto/FX call whose
+entry bar predates its call date raised a horizon-end ValueError
+and failed the whole run (runs #9, #13). A settlement attempt that
+recorded a missed day then let the runner log a fresh call for a
+ticker whose earlier call was still unsettled (run #10), and a
+call was logged from bars two days stale. The runner now treats a
+not-yet-due horizon as a normal no-op, never logs while a counting
+call is open, refuses a call whose entry bar is older than the
+latest completed trading bar for that exchange (recording a missed
+day instead), and prints the run start time and each symbol's last
+bar date in the summary. See ``tests/test_track_record_incident2.py``.
+
 Stdlib only. Run from the repo root:
 ``python3 scripts/track_record_daily.py [--as-of YYYY-MM-DD]
 [--calls PATH] [--out PATH] [--bars-dir DIR] [--publish]``.
@@ -271,17 +286,25 @@ def _call_due(calls, symbol, as_of, profile_key, observed_dates):
 
     One call per ticker per 5 trading days, non-overlapping: due when
     there is no prior counting call, or the latest counting call's
-    entry-bar date + 5 trading days is on or before ``as_of``.
-    The horizon runs from the entry bar, not the decision date —
-    the two differ when a call is dated a non-trading day or when
-    a crypto/FX call uses the previous day's bar. Provisional and
-    excluded calls never make a call due or not due — they are
-    invisible to this check.
+    entry-bar date + 5 trading days is on or before ``as_of`` — and
+    never while a counting call for the ticker is still open
+    (incident 2 (b): an unsettled call blocks a replacement even
+    when its due date has passed). The horizon runs from the entry
+    bar, not the decision date — the two differ when a call is dated
+    a non-trading day or when a crypto/FX call uses the previous
+    day's bar. Provisional and excluded calls never make a call due
+    or not due — they are invisible to this check.
     """
     mine = [c for c in calls if c["symbol"] == symbol
             and _counts_toward(c)]
     if not mine:
         return True
+    # Incident 2 (b): never log a new call while a counting call
+    # for the ticker is still unsettled — not even after a
+    # settlement attempt recorded a missed day. The next call is
+    # due only once the previous one has settled.
+    if any(c.get("status") == "open" for c in mine):
+        return False
     latest = max(_parse_day(c.get("bar_date") or c["date"]) for c in mine)
     next_due = latest
     remaining = HORIZON_TRADING_DAYS
@@ -340,19 +363,61 @@ def _bar_complete(symbol, profile_key, bar_date, now):
     return now >= close
 
 
+def _latest_completed_bar_date(symbol, profile_key, bars, as_of, now):
+    """Latest completed trading-bar date on or before ``as_of``.
+
+    Walks back from ``as_of`` (at most 15 days) for the latest date
+    that is a trading day for the exchange — observed bars count
+    (special-session rule), otherwise the weekday/holiday calendar
+    — and whose session had closed by ``now`` (crypto/FX: dated
+    before the current UTC day). Returns None when no such date is
+    found in the window: the caller treats that as stale, never as
+    fresh — a call must not be logged when the latest completed bar
+    cannot be established.
+    """
+    observed = frozenset(b["date"] for b in bars)
+    day = as_of
+    for _ in range(15):
+        if is_trading_day(profile_key, day, observed) and \
+                _bar_complete(symbol, profile_key, day, now) is True:
+            return day
+        day -= timedelta(days=1)
+    return None
+
+
 def _settle_due_calls(calls_path, calls, symbol, profile_key, bars,
-                      observed_dates, as_of, fetch_index, missed_path):
+                      observed_dates, as_of, fetch_index, missed_path,
+                      excluded_call_ids=None):
     """Settle this ticker's open calls whose horizon has passed.
 
     Returns the number settled. A call whose settlement-date bar is
     missing stays open and is recorded as a missed day — never
-    settled against the next bar's close.
+    settled against the next bar's close. A call whose horizon has
+    not ended yet is a normal no-op, not an error (incident 2 (a)):
+    ``settle_call`` refuses before call date + 5 calendar days,
+    while the settlement date counts 5 trading days from the entry
+    bar, and for crypto/FX those disagree when the entry bar
+    predates the call date — the run must complete SUCCESS and
+    settle the call on a later run instead of failing. A call whose
+    call_id is in ``docs/track-record-exclusions.json`` is skipped
+    outright — never settled, never a missed day — because
+    ``settle_call`` refuses excluded calls and attempting one
+    would fail the whole run (incident 2 integration fix: the
+    19 Nov calls become due on 24 Nov, and all three are
+    excluded). ``excluded_call_ids`` defaults to the file's
+    contents; pass an explicit set to override it (tests).
     """
+    if excluded_call_ids is None:
+        excluded_call_ids = track_record_mod.load_excluded_call_ids()
+    excluded = set(excluded_call_ids)
     settled = 0
     for call in [c for c in calls if c["symbol"] == symbol
                  and c.get("status") == "open"]:
         if call.get("provisional") or call.get("status") == "excluded":
             continue  # provisional/excluded calls are never settled
+        if call["call_id"] in excluded:
+            continue  # excluded by docs/track-record-exclusions.json:
+            # never attempted, never a missed day, stays open.
         # The horizon runs from the ENTRY BAR, not the decision date
         # — the two differ when a call is dated a non-trading day or
         # when a crypto/FX call uses the previous day's bar. Legacy
@@ -402,17 +467,30 @@ def _settle_due_calls(calls_path, calls, symbol, profile_key, bars,
         bnh_hit = (float(realised_close) / entry_close - 1.0) > 0
         # Baselines ride on the settlement row: one append, not a
         # settle-then-update rewrite (see toolkit/decision_log.py).
-        settle_call(
-            calls_path, call["call_id"], realised_close, entry_close,
-            index_return, index_source, as_of.isoformat(),
-            naive_expected=naive_expected, naive_hit=naive_hit,
-            bnh_hit=bnh_hit)
+        try:
+            settle_call(
+                calls_path, call["call_id"], realised_close, entry_close,
+                index_return, index_source, as_of.isoformat(),
+                naive_expected=naive_expected, naive_hit=naive_hit,
+                bnh_hit=bnh_hit)
+        except ValueError as exc:
+            # Incident 2 (a): the horizon has not ended yet — the
+            # trading-day settlement date arrived before the
+            # calendar-day horizon end. Not due, not an error: the
+            # call stays open and settles on a later run. Any other
+            # ValueError (bad prices, unknown call, already
+            # settled) is a real fault and still propagates.
+            if str(exc).startswith(
+                    "cannot settle before the horizon ends"):
+                continue
+            raise
         settled += 1
     return settled
 
 
 def _decide_call(calls_path, calls, symbol, profile_key, bars, as_of,
-                 source="unknown", now=None, provisional=False):
+                 source="unknown", now=None, provisional=False,
+                 missed_path=None):
     """Log one new call for ``symbol`` when due. Returns True if logged.
 
     The direction comes from the registered rule evaluated on the
@@ -425,6 +503,15 @@ def _decide_call(calls_path, calls, symbol, profile_key, bars, as_of,
     (whether that bar was complete at ``now``); a call logged from
     an incomplete bar is possible only with ``provisional=True``,
     and is labelled provisional.
+
+    Staleness gate (incident 2 (c)): a call may be logged only when
+    its entry bar is the latest completed trading bar for the
+    exchange at log time. An entry bar older than that — the fetch
+    is missing one or more recent bars — logs nothing and records a
+    missed day instead (when ``missed_path`` is given). An entry bar
+    NEWER than the latest completed bar is the in-progress bar of a
+    provisional call, which the gate does not block: only a stale
+    (older) entry bar is refused.
 
     Entry bar = the last COMPLETE bar. An in-progress last bar is
     dropped for crypto/FX (no close to wait for — the daily bar
@@ -484,6 +571,20 @@ def _decide_call(calls_path, calls, symbol, profile_key, bars, as_of,
             "provisional=True to log it as a provisional call "
             "(never scored).")
     entry_date, entry_close = entry_bars[-1]
+    # Staleness gate (incident 2 (c)): the entry bar must be the
+    # latest completed trading bar for this exchange at log time.
+    # Only an OLDER entry bar is stale — a newer one is the
+    # in-progress bar of a provisional call (see docstring).
+    expected = _latest_completed_bar_date(
+        symbol, profile_key, bars, as_of, now)
+    if expected is None or _parse_day(entry_date) < expected:
+        if missed_path is not None:
+            _record_missed_once(
+                missed_path, as_of, symbol,
+                f"stale bars: latest bar {entry_date}, latest "
+                f"completed trading bar "
+                f"{expected.isoformat() if expected else 'unknown'}")
+        return False
     rule_id, direction = direction_for(
         symbol, [c for _, c in entry_bars])
     if direction is None:
@@ -528,7 +629,8 @@ def _decide_call(calls_path, calls, symbol, profile_key, bars, as_of,
 
 
 def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
-            fetch=fetch_prices, now=None, provisional=False):
+            fetch=fetch_prices, now=None, provisional=False,
+            excluded_call_ids=None):
     """Run one daily step. Returns a summary dict.
 
     ``fetch`` is injectable ``(symbol, kind) -> result dict`` with a
@@ -537,8 +639,17 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
     it is what the bar-completeness check reads, not ``as_of``.
     ``provisional`` permits logging calls from incomplete bars as
     provisional calls (never scored); without it, such a run is
-    refused before anything is logged. All file writes stay under
-    the given paths — this function never touches git or main.
+    refused before anything is logged. ``excluded_call_ids``
+    defaults to ``docs/track-record-exclusions.json`` (loaded once
+    here, passed to the settler); pass an explicit set to override
+    it (tests). All file writes stay under the given paths — this
+    function never touches git or main.
+
+    The summary reports the run start time (UTC) and, per symbol,
+    the last bar date the fetch returned (incident 2 (d)).
+    ``missed_days`` counts fetch failures; settlement misses and
+    stale-bars misses are recorded in the missed-days file but not
+    in that counter (the pre-existing settlement-miss convention).
 
     Two phases, so a refusal is atomic: phase 1 fetches everything
     and writes nothing; phase 2 settles and logs. A refused run
@@ -631,19 +742,25 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
             "or pass --provisional to log provisional calls "
             "(labelled, never scored).")
 
-    # Phase 2 — settle, then log.
+    # Phase 2 — settle, then log. Excluded call_ids are loaded
+    # once here (incident 2 integration fix) and passed to the
+    # settler, so an excluded call is never attempted at all.
+    if excluded_call_ids is None:
+        excluded_call_ids = track_record_mod.load_excluded_call_ids()
     for symbol, (bars, pit_bars, source, profile_key) in fetched.items():
         cache_path = bars_dir / f"{symbol}.json"
         _save_json(cache_path, {"symbol": symbol, "bars": bars})
         observed = frozenset(b["date"] for b in pit_bars)
         settled += _settle_due_calls(
             calls_path, load_calls(calls_path), symbol, profile_key,
-            pit_bars, observed, as_of, fetch_index, missed_path)
+            pit_bars, observed, as_of, fetch_index, missed_path,
+            excluded_call_ids=excluded_call_ids)
         calls = load_calls(calls_path)
         is_provisional = provisional_for.get(symbol, False)
         if _decide_call(calls_path, calls, symbol, profile_key,
                         pit_bars, as_of, source=source, now=now,
-                        provisional=is_provisional):
+                        provisional=is_provisional,
+                        missed_path=missed_path):
             logged += 1
             if is_provisional:
                 provisional_logged += 1
@@ -667,10 +784,20 @@ def run_day(calls_path, out_path, bars_dir, missed_path, as_of,
         fh.write(track_record_mod.render_track_record_md(all_calls))
     rows = load_rows(calls_path)
     head_hash = row_hash(rows[-1]) if rows else None
+    # Incident 2 (d): per symbol, the last bar date the fetch
+    # returned (None when the fetch failed), plus the run start
+    # time in UTC — so a stale-bars missed day can be diagnosed
+    # from the summary alone.
+    last_bar_date = {
+        symbol: (fetched[symbol][0][-1]["date"]
+                 if symbol in fetched and fetched[symbol][0] else None)
+        for symbol in WATCHLIST_PROFILES}
     return {"as_of": as_of.isoformat(), "calls_logged": logged,
             "calls_settled": settled, "missed_days": missed,
             "provisional_logged": provisional_logged,
             "head_hash": head_hash,
+            "run_started_utc": now.isoformat(),
+            "last_bar_date": last_bar_date,
             "n_settled": sum(1 for c in all_calls
                              if c.get("status") == "settled")}
 

@@ -555,6 +555,11 @@ def test_track_record_runner_price_inputs_golden(monkeypatch, tmp_path):
     assert summary == {"as_of": "2026-11-06", "calls_logged": 0,
                        "calls_settled": 0, "missed_days": 0,
                        "provisional_logged": 0, "head_hash": None,
+                       "run_started_utc": "2026-11-07T22:00:00+00:00",
+                       "last_bar_date": {
+                           symbol: ("2026-11-07" if symbol == "BTC-USD"
+                                    else "2026-11-06")
+                           for symbol in _daily.WATCHLIST_PROFILES},
                        "n_settled": 0}
     assert calls.read_text(encoding="utf-8") == ""
     for symbol in _daily.WATCHLIST_PROFILES:
