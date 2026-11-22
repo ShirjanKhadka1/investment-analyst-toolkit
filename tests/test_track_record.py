@@ -247,7 +247,11 @@ def test_missed_day_recorded_and_never_backfilled(tmp_path):
     assert records[0]["symbol"] == "ISF.L"
     assert records[0]["date"] == "2026-11-06"
     # Next day the fetch works: the call is dated the 9th, not the 6th.
-    _summary2, _, _, _ = _run(tmp_path, "2026-11-09", series)
+    # The 9 Nov run needs bars through the 9th: the staleness gate
+    # (incident 2) refuses a call from the 6 Nov bar when the 9 Nov
+    # bar is the latest completed trading bar.
+    fresh = _all_ticker_series("2026-11-09")
+    _summary2, _, _, _ = _run(tmp_path, "2026-11-09", fresh)
     isf = [c for c in load_calls(calls) if c["symbol"] == "ISF.L"]
     assert len(isf) == 1 and isf[0]["date"] == "2026-11-09"
 
