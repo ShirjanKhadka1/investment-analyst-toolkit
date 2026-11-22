@@ -84,3 +84,31 @@ commissioning and is not scored. Its rows are listed in
   is what exposes a changed earlier row.
 - `scripts/verify_track_record.py` walks the branch history and
   fails if any commit removed or changed an earlier row.
+
+## The 19 Nov calls — excluded and labelled (owner's decision, 2026-11-22)
+
+Three calls logged by the run of 2026-11-19 (data-branch commit
+`0c61959`, 2026-11-19T02:57:01Z) are **excluded from scoring**.
+They overlap earlier unsettled calls for the same ticker (the
+14 Nov first-series calls, entry bar 2026-11-17 in both cases)
+and part of their horizon was observable when they were logged.
+The decision was made by the owner on 2026-11-22, before any
+outcome of these three calls was known. Machine-readable record:
+`docs/track-record-exclusions.json`.
+
+| Symbol | Direction | Entry close | Entry bar | Call ID |
+|---|---|---|---|---|
+| NIFTYBEES.NS | up | 289.60 | 2026-11-17 | 3f257a877c7df6d0 |
+| ISF.L | up | 1043.40 | 2026-11-17 | 5332effdbd924ff7 |
+| BTC-USD | down | 64893.9453125 | 2026-11-17 | 429bd0aa0af7e9e2 |
+
+All three are `sma50_trend` v1.0.0 (NIFTYBEES.NS, ISF.L) or
+`mom20_sign` v1.0.0 (BTC-USD). They stay in the log
+(`data/track-record/calls-v2.jsonl`) and are never deleted —
+exclusion only means they are never settled and never scored.
+`toolkit/track_record.py` (`score_settled`) skips them and
+`toolkit/decision_log.py` (`settle_call`) refuses them, both
+loading `docs/track-record-exclusions.json`; the daily runner
+must skip them before attempting settlement. See
+`docs/track-record-incidents.md` (Incident 3) for the runs that
+produced them.

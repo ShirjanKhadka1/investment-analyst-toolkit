@@ -23,17 +23,25 @@ Scoring rules (see ``docs/watchlist-proposal.md``):
   independent trials. The pooled interval is reported with that
   caveat printed next to it, never as if the calls were
   independent.
+- **Excluded calls are never scored.** Call_ids listed in
+  ``docs/track-record-exclusions.json`` stay in the log and are
+  never deleted, but ``score_settled`` skips them — even if a
+  settlement row exists for one — and ``toolkit/decision_log.py``
+  refuses to settle them. See ``load_excluded_call_ids``.
 
 Original code for this toolkit. Research only.
 """
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 __all__ = [
     "HEADLINE_MIN_N",
     "headline_allowed",
+    "load_excluded_call_ids",
     "render_track_record_md",
     "score_settled",
     "wilson_interval",
@@ -41,6 +49,44 @@ __all__ = [
 
 HEADLINE_MIN_N = 100
 _Z = 1.96
+
+# The exclusions file lives at the repo root, next to this package:
+# ``toolkit/`` is one level below the root, so the docs dir is the
+# parent of this file's parent.
+DEFAULT_EXCLUSIONS_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "docs" / "track-record-exclusions.json"
+)
+
+
+def load_excluded_call_ids(exclusions_path=None):
+    """Call_ids excluded from scoring and settlement.
+
+    Reads ``docs/track-record-exclusions.json`` (or
+    ``exclusions_path`` when given) and returns the excluded
+    ``call_id`` values as a frozenset. A missing file means no
+    exclusions — checkouts predating the file still score. A
+    present but malformed file raises: silently ignoring it
+    would silently score excluded calls.
+    """
+    path = (Path(exclusions_path) if exclusions_path is not None
+            else DEFAULT_EXCLUSIONS_PATH)
+    if not path.exists():
+        return frozenset()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    entries = data.get("excluded", [])
+    if not isinstance(entries, list):
+        # Toolkit convention is ValueError for all input validation.
+        raise ValueError(  # noqa: TRY004
+            f"{path}: 'excluded' must be a list")
+    ids = set()
+    for entry in entries:
+        call_id = entry.get("call_id") if isinstance(entry, dict) else None
+        if not isinstance(call_id, str) or not call_id:
+            raise ValueError(f"{path}: every excluded entry needs a "
+                             f"string call_id, got {entry!r}")
+        ids.add(call_id)
+    return frozenset(ids)
 
 
 def wilson_interval(hits, n, z=_Z):
@@ -77,7 +123,7 @@ def _entry(calls, field):
             "wilson_low": low, "wilson_high": high}
 
 
-def score_settled(calls):
+def score_settled(calls, excluded_call_ids=None):
     """Per-ticker and pooled scoring for settled calls.
 
     ``calls`` are settled call records (as written by
@@ -88,8 +134,19 @@ def score_settled(calls):
     dicts. Baseline n may be smaller than model n when a settled
     call has no baseline fields (legacy) — the two ns are reported
     separately, never silently equalised.
+
+    Excluded calls (``docs/track-record-exclusions.json``) are
+    skipped: they contribute nothing to any rate, even if a
+    settlement row exists for one. ``excluded_call_ids`` defaults
+    to loading that file; pass a set explicitly to score against
+    a different exclusion set.
     """
-    settled = [c for c in calls if c.get("status") == "settled"]
+    if excluded_call_ids is None:
+        excluded_call_ids = load_excluded_call_ids()
+    excluded = set(excluded_call_ids)
+    settled = [c for c in calls
+               if c.get("status") == "settled"
+               and c.get("call_id") not in excluded]
     pooled = {"model": _entry(settled, "hit"),
               "naive": _entry(settled, "naive_hit"),
               "buy_and_hold": _entry(settled, "bnh_hit")}
@@ -122,15 +179,19 @@ def _fmt_rate(entry):
             f"95% Wilson [{low:.1f}%, {high:.1f}%]")
 
 
-def render_track_record_md(calls, headline_min_n=HEADLINE_MIN_N):
+def render_track_record_md(calls, headline_min_n=HEADLINE_MIN_N,
+                           excluded_call_ids=None):
     """Render the public track-record page from settled calls.
 
     The pooled headline hit rate appears only at
     ``headline_min_n`` settled calls; below that the page shows n
     and the Wilson intervals, with the headline explicitly withheld.
     The correlation caveat is printed with the pooled numbers.
+    Excluded calls are skipped by ``score_settled`` (see above);
+    pass ``excluded_call_ids`` through to score against a different
+    exclusion set.
     """
-    scores = score_settled(calls)
+    scores = score_settled(calls, excluded_call_ids=excluded_call_ids)
     pooled = scores["pooled"]["model"]
     lines = [
         "# Track record — public calls, scored after the fact",
