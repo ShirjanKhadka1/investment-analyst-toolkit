@@ -19,6 +19,10 @@ Rules that make this honest:
   settlement refuses.
 - A call is settled only after its horizon has passed (``as_of``
   date >= call date + horizon). Settling early is refused.
+- Excluded calls are never settled: a ``call_id`` listed in
+  ``docs/track-record-exclusions.json`` is refused by
+  ``settle_call``. The call stays in the log, labelled — exclusion
+  is a scoring decision, never a deletion.
 - Point-in-time: a call is scored from the first close *after* its
   date, so same-day news cannot leak into the score.
 - Append-only with a hash chain (PR 7.0, after the November 2026
@@ -41,6 +45,8 @@ import json
 import math
 from datetime import date, timedelta
 from pathlib import Path
+
+from toolkit.track_record import load_excluded_call_ids
 
 __all__ = [
     "GENESIS_PREV_HASH",
@@ -341,7 +347,9 @@ def settle_call(path, call_id, realised_close, entry_close,
     when the caller already knows them; otherwise ``update_call``
     appends them later. Refuses: unknown call_id, already-settled
     call, settlement before the horizon has passed, missing index
-    source, non-positive prices.
+    source, non-positive prices — and any call_id listed in
+    ``docs/track-record-exclusions.json`` (excluded calls stay in
+    the log, labelled, and are never settled).
 
     Append-only (PR 7.0): settlement APPENDS a ``"settlement"``
     row chained to the previous row. The call row itself is never
@@ -358,6 +366,11 @@ def settle_call(path, call_id, realised_close, entry_close,
         raise ValueError(f"no call with call_id {call_id!r} in this log")
     if target.get("status") == "settled":
         raise ValueError(f"call {call_id} is already settled")
+    if call_id in load_excluded_call_ids():
+        raise ValueError(
+            f"call {call_id} is excluded from scoring — see "
+            "docs/track-record-exclusions.json — and cannot be "
+            "settled; it stays in the log, labelled")
     if not index_source or not isinstance(index_source, str):
         raise ValueError("index_source is required — never settle "
                          "against an unnamed index series")
