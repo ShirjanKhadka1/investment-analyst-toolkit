@@ -1,8 +1,8 @@
 # Autonomous Research Update — AAPL
 
-Run: 20261126T092000Z | Status: FRESH
+Run: 20261127T093443Z | Status: FRESH
 
-Source: yahoo | Last date: 2026-11-25 (1 days old) | Points: 251
+Source: yahoo | Last date: 2026-11-25 (2 days old) | Points: 251
 
 Best predictive model (walk-forward MAE): naive (MAE 4.0593, beats naive: False)
 
