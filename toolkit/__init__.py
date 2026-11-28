@@ -7,6 +7,7 @@ directly (``from toolkit import mcp_server``) when needed.
 """
 
 from . import (
+    agent_team,
     archive,
     autonomous,
     backtest,
@@ -42,4 +43,4 @@ from . import (
     volatility,
 )
 
-__all__ = ["archive", "autonomous", "backtest", "checks", "connectors", "cross_sectional", "data", "decision_log", "edgar", "event_study", "forecast", "indicators", "llm_providers", "market_profiles", "montecarlo", "nepal_frictions", "nepse_floorsheet", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "strategy_backtester", "timemachine", "tracker", "valuation", "volatility"]
+__all__ = ["agent_team", "archive", "autonomous", "backtest", "checks", "connectors", "cross_sectional", "data", "decision_log", "edgar", "event_study", "forecast", "indicators", "llm_providers", "market_profiles", "montecarlo", "nepal_frictions", "nepse_floorsheet", "options", "paper_ledger", "performance", "pit_store", "portfolio", "position_plan", "predictive", "quant", "ratios", "report", "rules_mode", "strategy_backtester", "timemachine", "tracker", "valuation", "volatility"]

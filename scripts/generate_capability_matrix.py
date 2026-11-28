@@ -524,17 +524,15 @@ REPOS = [
      "TauricResearch/TradingAgents", "Apache-2.0",
      [
          (("Multi-agent debate (bull/bear researchers -> research "
-          "manager; three-way risk debate)"),
-          "partial",
-          ("The debate structure lives in finance-research-agents "
-           "runbooks; this repo has no debate runner on main. The "
-           "runner exists only on unmerged PR #29 (branch "
-           "llm-agent-team, open, conflicting with main as of "
-           "2026-11-27; debate + checkpoint/resume + llm-team series "
-           "in toolkit/agent_team.py, 19 tests in "
-           "tests/test_agent_team.py on that branch). Round 9.1 "
-           "hardens it; see docs/round-9-protocol.md."),
-          ""),
+          "manager)"),
+          "implemented",
+          ("toolkit/agent_team.py runs the bull/bear debate in "
+           "schema-validated JSON, then a trader proposes a direction "
+           "and a portfolio manager writes the memo; the 19-check "
+           "deterministic risk gate stands in for the three-way "
+           "risk debate, which this repo does not run as an LLM "
+           "debate."),
+          "tests/test_agent_team.py"),
          (("Analyst team roles (fundamentals / market / news / "
           "sentiment)"),
           "partial",
@@ -700,6 +698,8 @@ REAL_DATA = {
          "docs/event-study-real-data-model-card.md"),
     ("Agent run event log (events.jsonl, schema-validated, "
      "versioned, hash-chained)"): "fixtures",
+    ("Multi-agent debate (bull/bear researchers -> research "
+     "manager)"): "fixtures",
     ("Static agent workspace UI (single self-contained HTML "
      "rendered from events.jsonl)"): "fixtures",
     ("Live mode + recorded-run replay (SSE server, replay page, "
@@ -1058,10 +1058,13 @@ def render():
                  "moves two rows from 'not planned' to 'partial': "
                  "structured JSON handoffs (multi-agent-market-research) "
                  "and the multi-provider LLM factory (tradingagents). "
-                 "The executable agent team that uses it is PR #29 "
-                 "(Round 6 PR B, branch llm-agent-team): open, unmerged, "
-                 "and conflicting with main as of 2026-11-27; Round 9.1 "
-                 "hardens it (docs/round-9-protocol.md). Its known "
+                 "The executable agent team (toolkit/agent_team.py, "
+                 "PR #29 / Round 6 PR B, branch llm-agent-team) is "
+                 "implemented on main via Round 9.1 "
+                 "(docs/round-9-protocol.md): it moves the bull/bear "
+                 "debate row from 'partial' to 'implemented'; the "
+                 "three-way risk debate stays 'partial' — the "
+                 "deterministic risk gate stands in for it. Its known "
                  "volume gap is closed on main by Round 7.1 (Yahoo "
                  "per-bar volume in toolkit/connectors.py).")
     lines.append("")
