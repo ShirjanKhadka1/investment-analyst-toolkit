@@ -1,0 +1,221 @@
+{
+  "cik": "0001234567",
+  "entityName": "Demo Corporation",
+  "facts": {
+    "us-gaap": {
+      "Assets": {
+        "description": "Synthetic demo fixture.",
+        "label": "Assets",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 900000000
+            }
+          ]
+        }
+      },
+      "CashAndCashEquivalentsAtCarryingValue": {
+        "description": "Synthetic demo fixture.",
+        "label": "CashAndCashEquivalentsAtCarryingValue",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 80000000
+            }
+          ]
+        }
+      },
+      "CommonStockSharesOutstanding": {
+        "description": "Synthetic demo fixture.",
+        "label": "CommonStockSharesOutstanding",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 50000000
+            }
+          ]
+        }
+      },
+      "GrossProfit": {
+        "description": "Synthetic demo fixture.",
+        "label": "GrossProfit",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 210000000
+            }
+          ]
+        }
+      },
+      "Liabilities": {
+        "description": "Synthetic demo fixture.",
+        "label": "Liabilities",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 400000000
+            }
+          ]
+        }
+      },
+      "NetCashProvidedByOperatingActivities": {
+        "description": "Synthetic demo fixture.",
+        "label": "NetCashProvidedByOperatingActivities",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 150000000
+            }
+          ]
+        }
+      },
+      "NetIncomeLoss": {
+        "description": "Synthetic demo fixture.",
+        "label": "NetIncomeLoss",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 97000000
+            }
+          ]
+        }
+      },
+      "OperatingIncomeLoss": {
+        "description": "Synthetic demo fixture.",
+        "label": "OperatingIncomeLoss",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 120000000
+            }
+          ]
+        }
+      },
+      "PaymentsToAcquirePropertyPlantAndEquipment": {
+        "description": "Synthetic demo fixture.",
+        "label": "PaymentsToAcquirePropertyPlantAndEquipment",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 40000000
+            }
+          ]
+        }
+      },
+      "RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "description": "Synthetic demo fixture.",
+        "label": "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 385000000
+            },
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2026-03-31",
+              "filed": "2026-05-10",
+              "form": "10-Q",
+              "fp": "Q1",
+              "fy": 2026,
+              "val": 100000000
+            }
+          ]
+        }
+      },
+      "Revenues": {
+        "description": "Synthetic demo fixture.",
+        "label": "Revenues",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2024-12-31",
+              "filed": "2025-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2024,
+              "val": 350000000
+            }
+          ]
+        }
+      },
+      "StockholdersEquity": {
+        "description": "Synthetic demo fixture.",
+        "label": "StockholdersEquity",
+        "units": {
+          "USD": [
+            {
+              "accn": "0001234567-26-000001",
+              "end": "2025-12-31",
+              "filed": "2026-02-14",
+              "form": "10-K",
+              "fp": "FY",
+              "fy": 2025,
+              "val": 500000000
+            }
+          ]
+        }
+      }
+    }
+  }
+}
