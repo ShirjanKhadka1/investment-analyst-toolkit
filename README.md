@@ -410,8 +410,8 @@ supplied inputs in one structured dict. No keys, no endpoints, no
 fetching; offline tests with synthetic fixtures only
 (`tests/test_rules_mode.py`, 14 tests).
 
-The companion pack holds 36 agents — 18 NEPSE-side (9-agent NEPSE
-team + 8 sector agents + Nepal Market Researcher) and 18
+The companion pack holds 41 agents — 18 NEPSE-side (9-agent NEPSE
+team + 8 sector agents + Nepal Market Researcher) and 23
 market-agnostic — with 12 runbooks and 8 templates. The split is
 counted from the pack's roster by `scripts/count_agents.py` (see
 `docs/agents-roster-counts.json`); the "9 + 8 = 17" framing omits

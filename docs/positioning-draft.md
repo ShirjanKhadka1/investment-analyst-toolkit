@@ -89,12 +89,9 @@ with the two statements, in order:
 
 ### For the finance-research-agents repo description (replaces the current one)
 
-> Free finance research agent pack and skill library — 36 agents,
-> 12 runbooks. NEPSE: 18 agents (9-agent team + 8 sector agents +
-> Nepal Market Researcher). World: 18 market-agnostic agents + a
-> global rules team in the companion toolkit. Research only.
+> Free finance research agent pack and skill library — 41 agents, 12 runbooks. NEPSE: 18 agents (9-agent team + 8 sector agents + Nepal Market Researcher). World: 23 market-agnostic agents + a global rules team in the companion toolkit. Research only.
 
-(The 36 split 18 NEPSE / 18 market-agnostic — counted from the
+(The 41 split 18 NEPSE / 23 market-agnostic — counted from the
 roster by `scripts/count_agents.py` in the toolkit; see
 `docs/agents-roster-counts.json`. The NEPSE side is the 9-agent
 NEPSE team + 8 sector agents + Nepal Market Researcher — the
@@ -193,7 +190,7 @@ repo README/description was checked against the code on the branch.
 | 5 | This draft, round 1 | "9-agent rules team" | The toolkit's rules mode has 6 sections (`run_rules_team`: technical, fundamentals, sentiment, broker_flow, macro, corporate_actions) mirroring the 9-agent NEPSE team — "9-agent rules team" overstates the toolkit by 3. | "6-section rules mode mirroring the 9-agent NEPSE team, plus 5 global personas". |
 | 6 | Agents README, NEPSE Fees & Tax agent (§ NEPSE sector agents) | "circuit ±15%, settlement T+2 — every figure from the user-supplied Nepal frictions of 28 Oct 2026" | Outdated single values: circuit is ±15% only from 20 Apr 2026 (±10% before); settlement T+2 with the transition date unverified (the pre-2021 lag was previously published as T+3 — withdrawn 2026-11-08, no official source). | "circuit ±15% from 20 Apr 2026 (±10% before), settlement T+2 (transition date unverified; pre-2017 lag unknown, not T+3) — effective-dated rules, see the toolkit's `market_profiles.py`". |
 | 7 | Agents README (whole file) | No mention of the 5 global rules-mode personas | The world side of the pack is under-described: only the World Market Researcher agent names it. | Add a section naming the 5 personas (`toolkit/rules_mode.py` v1.4.0) and the `macro-to-company` runbook. |
-| 8 | Agents repo description (live, via API) | "36 agents, 12 runbooks" | True, but says nothing about the scope split — a reader cannot tell it is not NEPSE-only. | The separated agents description in (a): 18 NEPSE / 18 market-agnostic. |
+| 8 | Agents repo description (live, via API) | "36 agents, 12 runbooks" | True, but says nothing about the scope split — a reader cannot tell it is not NEPSE-only. | The separated agents description in (a): 18 NEPSE / 23 market-agnostic. |
 
 ### Verified clean (no change needed)
 
