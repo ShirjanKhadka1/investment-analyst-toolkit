@@ -4,7 +4,7 @@ name: Failure alert
 
 on:
   workflow_run:
-    workflows: ["Scheduled update", "Daily derived refresh", "Data health check", "Daily track record"]
+    workflows: ["Scheduled update", "Daily derived refresh", "Data health check", "Daily track record", "Daily volatility ledger", "Nightly slow tests"]
     types: [completed]
 
 permissions:
