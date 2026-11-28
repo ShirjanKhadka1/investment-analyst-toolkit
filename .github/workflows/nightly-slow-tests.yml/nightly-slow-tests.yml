@@ -1,0 +1,61 @@
+# Nightly slow tests — STAGED, NOT DEPLOYED.
+#
+# Purpose: run ONLY the tests with the pytest `slow` marker
+# (registered in pyproject.toml) — the full walk-forward
+# evaluations that take minutes each and are excluded from PR CI:
+#   tests/test_real_data_eval.py::test_harness_on_trimmed_slice
+#   tests/test_real_data_eval.py::test_direction_on_trimmed_slice
+#   tests/test_nepse_byod.py::test_full_run_on_fixtures
+#   tests/test_nepse_byod.py::test_cli_writes_reports
+# PR CI runs everything else (`-m "not slow"`, see
+# .github/workflows/test.yml, scripts/qa.py and
+# scripts/generate_status.py).
+#
+# This workflow MUST NOT block PRs: it has no push or
+# pull_request trigger — schedule + manual dispatch only — and
+# it never touches main, the data branches, or any track-record
+# file. It only runs tests.
+#
+# DO NOT DEPLOY YET. This workflow is staged only. The parent
+# deploys it via the GitHub web UI (browser route — the API token
+# has no workflow scope): copy this file to
+# .github/workflows/nightly-slow-tests.yml on main (a workflow
+# file must exist on the default branch to be dispatched or
+# scheduled), then dispatch it once by hand and read the log
+# before relying on the schedule.
+#
+# Second-run evidence: the workflow's exact commands were run
+# twice consecutively on the rework-slow-marker branch before
+# staging (the workflow itself runs once per trigger; the double
+# run is the local proof it is repeatable, in the same spirit as
+# the track-record multi-run test). Timings are in the rework
+# report that accompanies the branch — do not claim this
+# workflow is green on GitHub until the first dispatched run
+# after deployment is observed green.
+#
+# Timeout note: test_cli_writes_reports carries its own 600s
+# subprocess timeout (the NEPSE byod CLI run on the full
+# synthetic fixture). Under heavy local contention on 2026-11-15
+# that CLI run exceeded 600s once and the test failed; on a
+# quiet runner it passes. If this workflow ever goes red on
+# that test alone, check runner load before touching the code.
+# The 60-minute job timeout is a hang guard, not a budget.
+name: Nightly slow tests
+
+on:
+  schedule:
+    # 02:00 UTC daily — clear of the 22:00 UTC track-record run.
+    - cron: "0 2 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  slow-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pytest==9.2.0" "tzdata==2026.6"
+      - run: python -m pytest tests/ -q -m slow
