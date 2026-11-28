@@ -93,6 +93,173 @@
         ]
       },
       "win": true
+    },
+    {
+      "as_of": "2026-11-27",
+      "beats_rules_baseline": true,
+      "checker_verdict": "PASS",
+      "comparable_sections_covered": [
+        "Thesis",
+        "Business",
+        "Industry",
+        "Financials",
+        "Forensic",
+        "Valuation",
+        "Key risks",
+        "What would change my mind",
+        "Open questions",
+        "Sources"
+      ],
+      "comps_peers": [
+        "DELL",
+        "OMCL",
+        "OSS",
+        "SMCI"
+      ],
+      "dcf_assumptions": {
+        "discount_rate": 0.09,
+        "forecast": "flat at the filed free cash flow for 5 years",
+        "forecast_years": 5,
+        "terminal_growth": 0.025,
+        "terminal_year_fcf_rule": "filed free cash flow x (1 + terminal_growth)"
+      },
+      "dossier_sourced_count": 23,
+      "fixes": [],
+      "fixture": "real-aapl",
+      "last_close": 358.5400085449219,
+      "last_close_date": "2026-11-27",
+      "numbers_checked": 61,
+      "numbers_grounded": 61,
+      "peer_exclusions": [
+        {
+          "cik": "0002133022",
+          "name": "Oura Inc.",
+          "reason": "no Yahoo price: All data sources failed or stale for OURA (stock). Attempts: [{'source': 'yahoo', 'status': 'failed', 'error': 'yahoo: fetch failed for OURA: API call failed (404) for https://query1.finance.yahoo.com/v8/finance/chart/OURA?range=1y&interval=1d'}]. No fresh data was returned.",
+          "ticker": "OURA"
+        },
+        {
+          "cik": "0000944075",
+          "name": "SOCKET MOBILE, INC.",
+          "reason": "non-positive EPS -1.8025 (no meaningful P/E)",
+          "ticker": "SCKT"
+        },
+        {
+          "cik": "0002097163",
+          "name": "Xanadu Quantum Technologies Ltd",
+          "reason": "non-positive EPS -0.0691 (no meaningful P/E)",
+          "ticker": "XNDU"
+        },
+        {
+          "cik": "0001720446",
+          "name": "Zepp Health Corp",
+          "reason": "shares outstanding is 0 in the latest filing",
+          "ticker": "ZEPP"
+        }
+      ],
+      "peer_multiples": [
+        {
+          "cik": "0001571996",
+          "eps": 9.1043,
+          "exchange": "NYSE",
+          "name": "Dell Technologies Inc.",
+          "net_income": 5936000000,
+          "net_income_end": "2026-01-30",
+          "net_income_filed": "2026-03-16",
+          "net_income_form": "10-K",
+          "pe_ratio": 34.81,
+          "price": 316.96,
+          "price_date": "2026-11-27",
+          "price_source": "yahoo",
+          "shares_filed": "2026-03-16",
+          "shares_form": "10-K",
+          "shares_outstanding": 652000000,
+          "ticker": "DELL"
+        },
+        {
+          "cik": "0000926326",
+          "eps": 0.0456,
+          "exchange": "Nasdaq",
+          "name": "OMNICELL, INC.",
+          "net_income": 2052000,
+          "net_income_end": "2025-12-31",
+          "net_income_filed": "2026-02-26",
+          "net_income_form": "10-K",
+          "pe_ratio": 780.51,
+          "price": 35.57,
+          "price_date": "2026-11-27",
+          "price_source": "yahoo",
+          "shares_filed": "2026-02-26",
+          "shares_form": "10-K",
+          "shares_outstanding": 45027000,
+          "ticker": "OMCL"
+        },
+        {
+          "cik": "0001394056",
+          "eps": 0.207,
+          "exchange": "Nasdaq",
+          "name": "ONE STOP SYSTEMS, INC.",
+          "net_income": 5087694,
+          "net_income_end": "2025-12-31",
+          "net_income_filed": "2026-03-18",
+          "net_income_form": "10-K",
+          "pe_ratio": 21.65,
+          "price": 4.48,
+          "price_date": "2026-11-27",
+          "price_source": "yahoo",
+          "shares_filed": "2026-03-18",
+          "shares_form": "10-K",
+          "shares_outstanding": 24583775,
+          "ticker": "OSS"
+        },
+        {
+          "cik": "0001375365",
+          "eps": 3.3955,
+          "exchange": "Nasdaq",
+          "name": "Super Micro Computer, Inc.",
+          "net_income": 2230453000,
+          "net_income_end": "2026-06-30",
+          "net_income_filed": "2026-08-31",
+          "net_income_form": "10-K",
+          "pe_ratio": 7.0,
+          "price": 23.76,
+          "price_date": "2026-11-27",
+          "price_source": "yahoo",
+          "shares_filed": "2026-08-31",
+          "shares_form": "10-K",
+          "shares_outstanding": 656882000,
+          "ticker": "SMCI"
+        }
+      ],
+      "price_bars": 251,
+      "reality_checker": "Pass",
+      "rules_sourced_count": 4,
+      "sections_covered_count": 10,
+      "sic": "3571",
+      "sic_description": "Electronic Computers",
+      "sic_pages": 2,
+      "sic_peers_with_ticker": 8,
+      "sic_rows_parsed": 114,
+      "sic_without_ticker": 105,
+      "status": "complete",
+      "ticker": "AAPL",
+      "unparseable_numbers": 0,
+      "unsourced_numbers": 0,
+      "valuation": {
+        "comps": [
+          {
+            "implied_price": 256.89,
+            "method": "P/E",
+            "metric": "eps",
+            "metric_value": 9.1,
+            "multiple": 28.23,
+            "multiple_source": "median of 4 peer pe_ratio values"
+          }
+        ],
+        "dcf_enterprise_value": 1923637181695.24,
+        "dcf_per_share": 114.74,
+        "not_built": []
+      },
+      "win": true
     }
   ],
   "runbook_baseline_bnt": {

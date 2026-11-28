@@ -100,7 +100,14 @@ DOSSIER_EDGAR_CONCEPTS = {
     ],
     "cash": [("us-gaap", "CashAndCashEquivalentsAtCarryingValue")],
     "operating_cash_flow": [
-        ("us-gaap", "NetCashProvidedByOperatingActivities")],
+        ("us-gaap", "NetCashProvidedByOperatingActivities"),
+        # Apple files operating cash flow under the "UsedIn" label
+        # (NetCashProvidedByUsedInOperatingActivities, FY2026
+        # 145,097,000,000) and carries no
+        # NetCashProvidedByOperatingActivities tag at all — found
+        # on the first real filer (Round 10, PR 10.2). Same
+        # measure, different label; the freshest tag wins.
+        ("us-gaap", "NetCashProvidedByUsedInOperatingActivities")],
     "capex": [("us-gaap", "PaymentsToAcquirePropertyPlantAndEquipment")],
     "shares_outstanding": [("us-gaap", "CommonStockSharesOutstanding")],
 }
@@ -389,17 +396,17 @@ def _prices_section(prices, as_of):
                     "closes": closes}
 
 
-def _peers_section(peers):
+def _peers_section(peers, reason=None):
     """Peer section: caller-supplied peers or an UNKNOWN section.
 
     The peer set is caller-supplied or taken from the same EDGAR SIC
-    (not implemented: no SIC source is wired in yet) — never invented.
-    With no peer source the section is UNKNOWN with the reason stated
-    (protocol test 3).
+    via ``edgar.get_sic_peers`` — never invented. With no peer
+    source the section is UNKNOWN with the reason stated (``reason``
+    when the caller supplies one, else the default).
     """
     if not peers:
         return {"status": "UNKNOWN",
-                "reason": "no peer source supplied",
+                "reason": reason or "no peer source supplied",
                 "peers": [], "medians": {}}
     by_metric = {}
     labelled = []
@@ -652,6 +659,12 @@ def build_dossier(inputs):
             load_demo_fundamentals),
         prices (optional fetch model or {source, last_close, last_date}),
         peers (optional list of {symbol, metric, value, source}),
+        peers_reason (optional reason the peers section is UNKNOWN
+            when no peers are supplied),
+        sic / sic_description / sic_peers (optional: the filer's SIC
+            and the ``edgar.get_sic_peers`` discovery result — recorded
+            in the dossier and the event log, never rendered as a
+            memo number),
         dcf (optional {free_cash_flows, discount_rate, terminal_growth,
             terminal_year_fcf}),
         risks (optional list of {risk, trigger}),
@@ -752,7 +765,14 @@ def build_dossier(inputs):
               detail=f"last_close UNKNOWN: {price_record['reason']}")
 
     # --- Peers ---
-    peers_section = _peers_section(inputs.get("peers"))
+    peers_section = _peers_section(inputs.get("peers"),
+                                   inputs.get("peers_reason"))
+    sic_peers = inputs.get("sic_peers")
+    if sic_peers:
+        event("tool_result", tool="sic_peers", status="ok",
+              detail=(f"SIC {sic_peers['sic']}: "
+                      f"{sic_peers['rows_parsed']} rows, "
+                      f"{len(sic_peers['peers'])} ticker-mapped peers"))
     if peers_section["status"] == "filed":
         for peer in peers_section["peers"]:
             event("evidence_ref", source=peer["source"])
@@ -847,6 +867,9 @@ def build_dossier(inputs):
         "company_name": inputs.get("company_name") or ticker,
         "exchange": inputs.get("exchange") or "UNKNOWN",
         "industry": inputs.get("industry") or "UNKNOWN",
+        "sic": inputs.get("sic") or "UNKNOWN",
+        "sic_description": inputs.get("sic_description") or "UNKNOWN",
+        "sic_peers": inputs.get("sic_peers"),
         "run_id": run_id,
         "values": values,
         "forensic": forensic,
@@ -1438,18 +1461,52 @@ def fetch_dossier_inputs(ticker, as_of, *, include_stooq=False,
                          user_agent=None):
     """Fetch live inputs for one ticker as of one date.
 
-    Thin wrapper over ``edgar.get_fundamentals_as_of`` and
+    Thin wrapper over ``edgar`` and
     ``connectors.fetch_prices_with_volumes``. Returns an inputs dict
-    for :func:`build_dossier` (with ``edgar_facts`` and ``prices``).
+    for :func:`build_dossier` with the RAW companyfacts dict as
+    ``edgar_facts`` (``build_dossier`` reads each concept with a
+    per-concept fallback, so a filer missing one candidate tag
+    never crashes the fetch), the filer's submissions (name, SIC,
+    SIC description, exchange), Yahoo prices, and the SIC peer
+    discovery result (``sic_peers``: CIK / name / ticker per peer
+    — no multiples; per-peer multiples are computed by
+    ``scripts/fetch_real_aapl_dossier.py``, which is what turns
+    the discovery into dossier peers). Peer discovery is
+    best-effort: when it fails the wrapper still returns the base
+    inputs with ``sic_peers`` None and the failure in
+    ``peers_reason``, so the dossier's peers section is UNKNOWN
+    with the reason stated instead of the whole fetch failing.
     Network only — never call from tests.
     """
     from .connectors import fetch_prices_with_volumes
-    concepts = [pair for pairs in DOSSIER_EDGAR_CONCEPTS.values()
-                for pair in pairs]
-    fundamentals = edgar.get_fundamentals_as_of(
-        ticker, concepts, as_of, user_agent=user_agent)
+    cik = edgar.ticker_to_cik(ticker, user_agent=user_agent)
+    facts = edgar.fetch_company_facts(cik, user_agent=user_agent)
+    submissions = edgar.fetch_submissions(cik, user_agent=user_agent)
     prices = fetch_prices_with_volumes(
         ticker, kind="stock", include_stooq=include_stooq)
-    return {"ticker": ticker, "as_of": as_of,
-            "edgar_facts": fundamentals.get("facts"),
-            "prices": prices}
+    sic = str(submissions.get("sic") or "")
+    sic_description = submissions.get("sicDescription") or "UNKNOWN"
+    exchanges = submissions.get("exchanges") or []
+    sic_peers = None
+    peers_reason = (
+        "peer multiples are computed by "
+        "scripts/fetch_real_aapl_dossier.py, not by this wrapper")
+    if sic:
+        try:
+            sic_peers = edgar.get_sic_peers(
+                sic, exclude_cik=cik, user_agent=user_agent)
+        except Exception as exc:  # noqa: BLE001 - peer lookup is best-effort
+            peers_reason = f"SIC peer lookup failed: {exc}"
+    return {
+        "ticker": str(ticker).strip().upper(), "as_of": as_of,
+        "company_name": submissions.get("name") or ticker,
+        "exchange": exchanges[0] if exchanges else "UNKNOWN",
+        "industry": sic_description,
+        "sic": sic, "sic_description": sic_description,
+        "edgar_facts": facts,
+        "submissions": submissions,
+        "prices": prices,
+        "sic_peers": sic_peers,
+        "peers": [],
+        "peers_reason": peers_reason,
+    }
