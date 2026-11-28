@@ -1,0 +1,189 @@
+{
+  "agreement": {
+    "chance_baseline": 0.3333333333333333,
+    "matching_pairs": 2,
+    "n_pairs": 6,
+    "n_personas": 4,
+    "pairs": [
+      {
+        "a": "crypto",
+        "b": "etf_index",
+        "match": false,
+        "stance_a": "cautious",
+        "stance_b": "constructive"
+      },
+      {
+        "a": "crypto",
+        "b": "fx_macro",
+        "match": true,
+        "stance_a": "cautious",
+        "stance_b": "cautious"
+      },
+      {
+        "a": "crypto",
+        "b": "us_large_cap_fundamentals",
+        "match": false,
+        "stance_a": "cautious",
+        "stance_b": "constructive"
+      },
+      {
+        "a": "etf_index",
+        "b": "fx_macro",
+        "match": false,
+        "stance_a": "constructive",
+        "stance_b": "cautious"
+      },
+      {
+        "a": "etf_index",
+        "b": "us_large_cap_fundamentals",
+        "match": true,
+        "stance_a": "constructive",
+        "stance_b": "constructive"
+      },
+      {
+        "a": "fx_macro",
+        "b": "us_large_cap_fundamentals",
+        "match": false,
+        "stance_a": "cautious",
+        "stance_b": "constructive"
+      }
+    ],
+    "rate": 0.3333333333333333,
+    "reason": "2 of 6 persona pairs agree"
+  },
+  "as_of": "2026-11-27",
+  "date": "2026-11-28",
+  "filer": "Apple Inc.",
+  "last_close": 358.5400085449219,
+  "market": "us",
+  "provenance": {
+    "as_of": "2026-11-27",
+    "btc_window": {
+      "base_date": "2025-11-28",
+      "last_date": "2026-11-27",
+      "n_bars": 365
+    },
+    "eurusd_window": {
+      "base_date": "2025-11-27",
+      "last_date": "2026-11-27",
+      "n_bars": 260
+    },
+    "spy_window": {
+      "base_date": "2025-11-28",
+      "last_date": "2026-11-27",
+      "n_bars": 251
+    }
+  },
+  "run_id": "personas-team-aapl-2026-11-27",
+  "scores": {
+    "crypto": {
+      "persona": "crypto",
+      "reason": "6 concrete value(s) traced to an input",
+      "score": "sourced",
+      "sourced_values": [
+        "all_time_high_usd",
+        "drawdown_from_ath_pct",
+        "mean_200d_usd",
+        "price_usd",
+        "price_vs_mean_200d_pct",
+        "realised_vol_30d_daily_pct"
+      ]
+    },
+    "earnings": {
+      "persona": "earnings",
+      "reason": "no concrete value traced to an input",
+      "score": "UNKNOWN",
+      "sourced_values": []
+    },
+    "etf_index": {
+      "persona": "etf_index",
+      "reason": "1 concrete value(s) traced to an input",
+      "score": "sourced",
+      "sourced_values": [
+        "index_return_1y_pct"
+      ]
+    },
+    "fx_macro": {
+      "persona": "fx_macro",
+      "reason": "1 concrete value(s) traced to an input",
+      "score": "sourced",
+      "sourced_values": [
+        "pair_change_1y_pct"
+      ]
+    },
+    "us_large_cap_fundamentals": {
+      "persona": "us_large_cap_fundamentals",
+      "reason": "4 concrete value(s) traced to an input",
+      "score": "sourced",
+      "sourced_values": [
+        "debt_to_equity",
+        "free_cash_flow_margin_pct",
+        "net_margin_pct",
+        "revenue_growth_pct"
+      ]
+    }
+  },
+  "sentiment": {
+    "label": "NO HEADLINES"
+  },
+  "sic": "3571",
+  "sic_description": "Electronic Computers",
+  "stances": {
+    "crypto": {
+      "detail": {
+        "price_vs_mean_200d_pct": -16.63334180579539
+      },
+      "persona": "crypto",
+      "reason": "BTC price vs 200-day mean -16.63334180579539% \u2014 above the mean is a risk-on read, below it risk-off, at it neutral",
+      "stance": "cautious"
+    },
+    "earnings": {
+      "detail": {
+        "event_date": "2026-11-03"
+      },
+      "persona": "earnings",
+      "reason": "most recent event carries no computable surprise (no consensus expectation in any public source this programme uses)",
+      "stance": "UNKNOWN"
+    },
+    "etf_index": {
+      "detail": {
+        "index_return_1y_pct": 6.574575529742699
+      },
+      "persona": "etf_index",
+      "reason": "SPY 1y return 6.574575529742699% \u2014 rising is constructive, falling cautious, flat neutral",
+      "stance": "constructive"
+    },
+    "fx_macro": {
+      "detail": {
+        "pair_change_1y_pct": -5.430112056618086
+      },
+      "persona": "fx_macro",
+      "reason": "EUR/USD 1y change -5.430112056618086% \u2014 a rising EUR/USD is a weakening dollar, constructive for AAPL's overseas earnings; a falling EUR/USD is a strengthening dollar, cautious",
+      "stance": "cautious"
+    },
+    "us_large_cap_fundamentals": {
+      "detail": {
+        "healthy": [
+          "free_cash_flow_margin_pct",
+          "net_margin_pct",
+          "revenue_growth_pct"
+        ],
+        "weak": [
+          "debt_to_equity"
+        ]
+      },
+      "persona": "us_large_cap_fundamentals",
+      "reason": "3 healthy vs 1 flagged of the sourced checks",
+      "stance": "constructive"
+    }
+  },
+  "symbol": "AAPL",
+  "technical": {
+    "momentum_20d_pct": 2.760025445455083,
+    "n_bars": 251,
+    "price_vs_mean_20d_pct": 2.688508219425789,
+    "rsi_14": 37.546749264166294,
+    "volatility_daily_pct": 1.5729405745492606
+  },
+  "verdict": "win"
+}
