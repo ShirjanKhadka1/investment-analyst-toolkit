@@ -60,3 +60,5 @@
 {"prev_hash": "2adb304737b43b2f0420eaa10c486d7f56f0dde5f0a09112d7090a129fb79a88", "hash": "bf608c43bb85f5c0a492444bf397041db833762f67d8a419c8cf551f5c9448a8", "symbol": "MSFT", "status": "fresh", "run_at": "20261126T092000Z"}
 {"prev_hash": "bf608c43bb85f5c0a492444bf397041db833762f67d8a419c8cf551f5c9448a8", "hash": "8c0dfa4108d78bb44bddec992a2b2099a8b06f24a73f004f85bd66c72b9aeca2", "symbol": "AAPL", "status": "fresh", "run_at": "20261127T093443Z"}
 {"prev_hash": "8c0dfa4108d78bb44bddec992a2b2099a8b06f24a73f004f85bd66c72b9aeca2", "hash": "26c2c8a653e2719028571c8bb187409259fc32d00bc05789c39f97afdb7aa9b5", "symbol": "MSFT", "status": "fresh", "run_at": "20261127T093443Z"}
+{"prev_hash": "26c2c8a653e2719028571c8bb187409259fc32d00bc05789c39f97afdb7aa9b5", "hash": "f8d041d41ed67fb242245b021c80d831d76eaa583199afbe41fd75ea94f0cf0f", "symbol": "AAPL", "status": "fresh", "run_at": "20261128T084725Z"}
+{"prev_hash": "f8d041d41ed67fb242245b021c80d831d76eaa583199afbe41fd75ea94f0cf0f", "hash": "7ea80be119490be8d69a4635866f2198776d1c836e89cb6855bbdf41261a4364", "symbol": "MSFT", "status": "fresh", "run_at": "20261128T084725Z"}
