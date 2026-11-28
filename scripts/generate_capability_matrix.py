@@ -192,7 +192,11 @@ REPOS = [
          ("Connector catalogue (201 connectors)",
           "partial",
           ("toolkit/connectors.py fallback chain + toolkit/free_data.py "
-          "exist; the catalogue JSON is deferred (see README)."),
+          "exist; Round 7.1 added Yahoo per-bar volume (BarsConnector, "
+          "fetch_prices_with_volumes) and an opt-in Stooq source "
+          "(include_stooq=True; probe staged, not deployed; live chain "
+          "stays Yahoo-only until it passes). The catalogue JSON itself "
+          "is still deferred (see README)."),
           "tests/test_connectors.py"),
          ("Live brokerage / algo-trading execution",
           "not planned",
@@ -258,8 +262,11 @@ REPOS = [
           "tests/test_llm_providers.py"),
          ("Streamlit UI + PDF export",
           "not planned",
-          ("No app UI in this repo; the surfaces are the terminal and "
-          "HTML reports."),
+          ("No Streamlit UI and no PDF export in this repo. Round U "
+           "added a different surface instead: a static self-contained "
+           "HTML workspace UI rendered from events.jsonl "
+           "(toolkit/workspace_ui.py, fixture-driven prototype, never a "
+           "live agent run)."),
           ""),
      ]),
     ("openbb",
@@ -287,8 +294,10 @@ REPOS = [
           "tests/test_pit_store.py"),
          ("FRED / ECB / IMF / SEC provider implementations",
           "partial",
-          ("SEC EDGAR is implemented (toolkit/edgar.py); FRED, ECB and "
-          "IMF are not."),
+          ("SEC EDGAR is implemented (toolkit/edgar.py); ECB reference "
+           "rates and World Bank macro are implemented "
+           "(toolkit/connectors.py, toolkit/free_data.py); FRED and IMF "
+           "are not."),
           "tests/test_edgar.py"),
      ]),
     ("qf-lib",
@@ -463,7 +472,12 @@ REPOS = [
            "docs/volatility-ledger-protocol.md, "
            "docs/volatility-ledger.md) — no claim before 100 "
            "scored observations per symbol; ledger tests in "
-           "tests/test_volatility_ledger.py."),
+           "tests/test_volatility_ledger.py. Ledger state checked "
+           "2026-11-27: built and tested but never run — 0 forecast "
+           "rows, 0 scores; the daily workflow is staged at "
+           "ops/ready-for-browser/daily-volatility-ledger.yml in the "
+           "ops repo, not deployed (no such file in .github/workflows "
+           "on main)."),
           "tests/test_volatility.py"),
          (("Event studies (NEPSE corporate actions on user CSVs + "
            "global earnings)"),
@@ -513,25 +527,40 @@ REPOS = [
           "manager; three-way risk debate)"),
           "partial",
           ("The debate structure lives in finance-research-agents "
-          "runbooks; this repo has no debate runner."),
+           "runbooks; this repo has no debate runner on main. The "
+           "runner exists only on unmerged PR #29 (branch "
+           "llm-agent-team, open, conflicting with main as of "
+           "2026-11-27; debate + checkpoint/resume + llm-team series "
+           "in toolkit/agent_team.py, 19 tests in "
+           "tests/test_agent_team.py on that branch). Round 9.1 "
+           "hardens it; see docs/round-9-protocol.md."),
           ""),
          (("Analyst team roles (fundamentals / market / news / "
           "sentiment)"),
           "partial",
           ("toolkit/rules_mode.py covers deterministic analyst outputs; "
-          "the news-sentiment agent lives in finance-research-agents."),
+          "the news-sentiment agent lives in finance-research-agents. "
+          "The executable team that would call them is unmerged PR #29 "
+          "(see the debate row); Round 9.1 hardens it."),
           "tests/test_rules_mode.py"),
          (("Risk-management debate (aggressive / neutral / "
           "conservative)"),
           "partial",
           ("The deterministic analogue is the risk gate in "
-          "toolkit/position_plan.py."),
+          "toolkit/position_plan.py. PR #29 runs the 19-check extended "
+          "gate but no LLM risk debate; Round 9.1 keeps the gate as the "
+          "veto and adds a risk-gate agreement check in the agent eval "
+          "suite."),
           "tests/test_position_plan.py"),
          ("Memory log + reflection + settlement vs benchmark",
           "implemented",
           ("toolkit/decision_log.py (append-only log + reflections) and "
           "toolkit/track_record.py (settlement vs naive and "
-          "buy-and-hold baselines)."),
+          "buy-and-hold baselines). Settlement code is tested "
+          "(tests/test_track_record.py); live state checked "
+          "2026-11-27: calls-v2.jsonl on the data/track-record branch "
+          "holds 23 rows (15 open, 8 without a settled status) and the "
+          "scoreboard reads 0 settled — no hit rate is published."),
           "tests/test_decision_log.py"),
          (("Agent run event log (events.jsonl, schema-validated, "
            "versioned, hash-chained)"),
@@ -632,8 +661,9 @@ REPOS = [
 # SYNTHETIC fixtures only; the forecast ledger was verified by unit
 # tests (the 34 migrated development-period forecasts are real rows,
 # but no scored evaluation ran through the ledger); the track-record
-# rows have real calls logged but no scored evaluation yet (first
-# settlements 2026-11-19/20); all other rows are proven by unit tests
+# rows have real calls logged but no scored evaluation yet (checked
+# 2026-11-27: 23 rows in calls-v2.jsonl on data/track-record, 0
+# settled, scoreboard n=0); all other rows are proven by unit tests
 # alone. Keys must match a capability string in REPOS exactly;
 # _validate_real_data() raises on an orphan key so a rename cannot
 # silently flip a row to "no". A plain string entry would break
@@ -770,29 +800,35 @@ def _validate_real_data():
 
 # Ranked build plan: impact for a world-market user (1-5) divided by
 # effort (1-5). Rank is the tie-break (dependency order) when ratios
-# are equal. These eight items are NOT started — this table is the plan,
-# not the work.
+# are equal. Three of the eight items are done since the plan was
+# written (universe screener, volatility forecasting, second price
+# source opt-in); they stay listed until the plan itself is revised.
+# These eight items are the plan, not the work.
 BUILD_PLAN = [
     ("Universe screener",
      5, 2,
-     ("Highest impact per effort: the named-setup rules already exist "
-     "(toolkit/terminal.py) and the scanner table exists in the "
-     "satellite repo; a universe scan is a small step from both.")),
+     ("DONE in Round 7.3: multi-symbol universe scan in "
+      "toolkit/screener.py reusing the five named setups in "
+      "toolkit/terminal.py (tests/test_screener.py). Kept on the plan "
+      "until the plan is revised.")),
     ("Second price source",
      4, 2,
-     ("Data reliability for world markets: the fallback chain in "
-     "toolkit/connectors.py already supports a second source; adding "
-     "one more keyless source is bounded work.")),
+     ("PARTLY DONE in Round 7.1: Stooq is an opt-in second source "
+      "(include_stooq=True) with a staged probe at "
+      "ops/ready-for-browser/stooq-ci-probe.yml; the live chain stays "
+      "Yahoo-only until the probe passes.")),
     ("Volatility forecasting",
      3, 2,
-     ("Builds directly on toolkit/performance.py (rolling volatility) "
-     "and toolkit/options.py (implied volatility): EWMA/GARCH-lite "
-     "forecasts with walk-forward evaluation."),
+     ("DONE in Round 7.2 and Round E: EWMA/GARCH-lite 1-day-ahead "
+      "variance forecasts, walk-forward scored against a naive baseline "
+      "(docs/volatility-forecast-model-card.md); forward ledger built, "
+      "0 rows, workflow not deployed. Kept on the plan until the plan "
+      "is revised."),
      ),
     ("Opt-in macro providers (FRED/ECB/IMF)",
      3, 2,
      ("PLANNED, not implemented: the FRED / ECB / IMF / SEC row stays "
-     "partial (SEC EDGAR is implemented; FRED, ECB and IMF are not). "
+     "partial (SEC EDGAR, ECB reference rates and World Bank macro are implemented; FRED and IMF are not). "
      "An env-key FRED provider was built in Round 7.1 and then "
      "dropped by a binding constraint update, so FRED stays on the "
      "plan; keyed providers stay out of the no-key chain.")),
@@ -970,7 +1006,12 @@ def render():
                  "execution and personal finance. App UIs are no longer "
                  "a stop: a fixture-driven prototype exists (Round U — a "
                  "prototype, not a live surface). Model zoos stay out "
-                 "unless an extra passes the evaluation harness.")
+                 "unless an extra passes the evaluation harness. Rounds "
+                 "7, 8, U and E are complete on main (1142 tests passing "
+                 "on a fresh clone of main 94a6db6, 2026-11-28); Round 9 "
+                 "(agents) is pre-registered in "
+                 "docs/round-9-protocol.md and not yet built — no Round 9 "
+                 "row changes status in this regeneration.")
     lines.append("")
     for _name, repo, licence, rows in REPOS:
         lines.append(f"## {repo} ({licence})")
@@ -988,8 +1029,11 @@ def render():
     lines.append("")
     lines.append("Impact for a world-market user (1–5) divided by effort "
                  "(1–5). Rank is the tie-break when ratios are equal. "
-                 "None of these is started — this table is the plan, not "
-                 "the work.")
+                 "Three items on this plan are done since it was written "
+                 "(universe screener, volatility forecasting, second "
+                 "price source opt-in); they stay listed until the plan "
+                 "itself is revised — this table is the plan, not the "
+                 "work.")
     lines.append("")
     lines.append("| Rank | Item | Impact | Effort | Impact/effort | Why here |")
     lines.append("|---|---|---|---|---|---|")
@@ -1014,8 +1058,12 @@ def render():
                  "moves two rows from 'not planned' to 'partial': "
                  "structured JSON handoffs (multi-agent-market-research) "
                  "and the multi-provider LLM factory (tradingagents). "
-                 "The executable agent team that would use it (PR B) is "
-                 "not in scope for this change.")
+                 "The executable agent team that uses it is PR #29 "
+                 "(Round 6 PR B, branch llm-agent-team): open, unmerged, "
+                 "and conflicting with main as of 2026-11-27; Round 9.1 "
+                 "hardens it (docs/round-9-protocol.md). Its known "
+                 "volume gap is closed on main by Round 7.1 (Yahoo "
+                 "per-bar volume in toolkit/connectors.py).")
     lines.append("")
     return "\n".join(lines)
 
