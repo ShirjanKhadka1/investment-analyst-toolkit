@@ -1,0 +1,184 @@
+[
+  {
+    "name": "fabricated-source-01",
+    "kind": "fabricated-source",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "sources list adds Bloomberg Terminal, absent from the log"
+  },
+  {
+    "name": "fabricated-source-02",
+    "kind": "fabricated-source",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "sources cite EDGAR 10-Q, log has 10-K"
+  },
+  {
+    "name": "gate-blocked-honest-01",
+    "kind": "gate-blocked-honest",
+    "expected": "PASS",
+    "gate_verdict": "BLOCK",
+    "note": "log gate BLOCK, memo faithfully claims BLOCK"
+  },
+  {
+    "name": "gate-mismatch-01",
+    "kind": "gate-mismatch",
+    "expected": "BLOCK",
+    "gate_verdict": "BLOCK",
+    "note": "log gate BLOCK, memo claims PASS"
+  },
+  {
+    "name": "gate-mismatch-02",
+    "kind": "gate-mismatch",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "log gate PASS, memo claims BLOCK"
+  },
+  {
+    "name": "grounded-01",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "fully grounded, all numbers exact"
+  },
+  {
+    "name": "grounded-02",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "currency symbol and gross margin cited"
+  },
+  {
+    "name": "grounded-03",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "minimal memo, few numbers"
+  },
+  {
+    "name": "grounded-04",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "plan numbers cited, no gate counts"
+  },
+  {
+    "name": "grounded-05",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "fundamentals-led thesis"
+  },
+  {
+    "name": "grounded-06",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "Q3 quarter label is a name, not a claim"
+  },
+  {
+    "name": "grounded-07",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "S&P500 index name is a name, not a claim"
+  },
+  {
+    "name": "grounded-08",
+    "kind": "grounded",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "no numeric tokens in the body at all"
+  },
+  {
+    "name": "missing-section-01",
+    "kind": "missing-section",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "no Key risks section"
+  },
+  {
+    "name": "missing-section-02",
+    "kind": "missing-section",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "no Sources section"
+  },
+  {
+    "name": "planted-01",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted target 45.00, evidence target 147.00"
+  },
+  {
+    "name": "planted-02",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted revenue 250.00, evidence 385.00"
+  },
+  {
+    "name": "planted-03",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted NPL 7.8%, evidence 3.2%"
+  },
+  {
+    "name": "planted-04",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted multiple 15.5x, no x evidence"
+  },
+  {
+    "name": "planted-05",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted volume 1000000"
+  },
+  {
+    "name": "planted-06",
+    "kind": "planted",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "planted fee 0.25"
+  },
+  {
+    "name": "rounded-in-01",
+    "kind": "rounded-in",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "12.5% vs evidence 12.54% (0.32% off)"
+  },
+  {
+    "name": "rounded-in-02",
+    "kind": "rounded-in",
+    "expected": "PASS",
+    "gate_verdict": "PASS",
+    "note": "42.4% vs evidence 42.36% (0.09% off); 129.0 formatting variant"
+  },
+  {
+    "name": "rounded-out-01",
+    "kind": "rounded-out",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "42.9% vs evidence 42.36% (1.27% off)"
+  },
+  {
+    "name": "rounded-out-02",
+    "kind": "rounded-out",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "132.00 vs evidence 129.00 (2.33% off)"
+  },
+  {
+    "name": "unparseable-01",
+    "kind": "unparseable",
+    "expected": "BLOCK",
+    "gate_verdict": "PASS",
+    "note": "target written 147..00, fail-closed"
+  }
+]

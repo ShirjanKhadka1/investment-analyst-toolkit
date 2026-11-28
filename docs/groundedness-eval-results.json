@@ -1,0 +1,407 @@
+{
+  "provider": "fake",
+  "tokens_per_call": [
+    10,
+    20
+  ],
+  "provider_calls": 26,
+  "tokens_used": 780,
+  "fixtures": [
+    {
+      "name": "fabricated-source-01",
+      "kind": "fabricated-source",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": [
+        "fabricated source: 'Bloomberg Terminal'"
+      ]
+    },
+    {
+      "name": "fabricated-source-02",
+      "kind": "fabricated-source",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": [
+        "fabricated source: 'EDGAR 10-Q: revenue 385.00, net income 97.00'"
+      ]
+    },
+    {
+      "name": "gate-blocked-honest-01",
+      "kind": "gate-blocked-honest",
+      "expected": "PASS",
+      "gate_verdict": "BLOCK",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 21,
+      "numbers_grounded": 21,
+      "reasons": []
+    },
+    {
+      "name": "gate-mismatch-01",
+      "kind": "gate-mismatch",
+      "expected": "BLOCK",
+      "gate_verdict": "BLOCK",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": false,
+      "numbers_checked": 21,
+      "numbers_grounded": 21,
+      "reasons": [
+        "gate mismatch: memo claims gate PASS but the log's gate verdict is BLOCK"
+      ]
+    },
+    {
+      "name": "gate-mismatch-02",
+      "kind": "gate-mismatch",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": false,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": [
+        "gate mismatch: memo claims gate BLOCK but the log's gate verdict is PASS"
+      ]
+    },
+    {
+      "name": "grounded-01",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": []
+    },
+    {
+      "name": "grounded-02",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": []
+    },
+    {
+      "name": "grounded-03",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 10,
+      "numbers_grounded": 10,
+      "reasons": []
+    },
+    {
+      "name": "grounded-04",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 16,
+      "numbers_grounded": 16,
+      "reasons": []
+    },
+    {
+      "name": "grounded-05",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 13,
+      "numbers_grounded": 13,
+      "reasons": []
+    },
+    {
+      "name": "grounded-06",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 18,
+      "numbers_grounded": 18,
+      "reasons": []
+    },
+    {
+      "name": "grounded-07",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 17,
+      "numbers_grounded": 17,
+      "reasons": []
+    },
+    {
+      "name": "grounded-08",
+      "kind": "grounded",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 0,
+      "numbers_grounded": 0,
+      "reasons": []
+    },
+    {
+      "name": "missing-section-01",
+      "kind": "missing-section",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 19,
+      "numbers_grounded": 19,
+      "reasons": [
+        "missing section: key risks"
+      ]
+    },
+    {
+      "name": "missing-section-02",
+      "kind": "missing-section",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "BLOCK",
+      "gate_agreement": true,
+      "numbers_checked": 18,
+      "numbers_grounded": 18,
+      "reasons": [
+        "missing section: sources"
+      ]
+    },
+    {
+      "name": "planted-01",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 21,
+      "reasons": [
+        "unsourced number: '45.00' (line 13)"
+      ]
+    },
+    {
+      "name": "planted-02",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 21,
+      "reasons": [
+        "unsourced number: '250.00' (line 4)"
+      ]
+    },
+    {
+      "name": "planted-03",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 21,
+      "reasons": [
+        "unsourced number: '7.8%' (line 7)"
+      ]
+    },
+    {
+      "name": "planted-04",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 23,
+      "numbers_grounded": 22,
+      "reasons": [
+        "unsourced number: '15.5x' (line 4)"
+      ]
+    },
+    {
+      "name": "planted-05",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 23,
+      "numbers_grounded": 22,
+      "reasons": [
+        "unsourced number: '1000000' (line 4)"
+      ]
+    },
+    {
+      "name": "planted-06",
+      "kind": "planted",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 23,
+      "numbers_grounded": 22,
+      "reasons": [
+        "unsourced number: '0.25' (line 7)"
+      ]
+    },
+    {
+      "name": "rounded-in-01",
+      "kind": "rounded-in",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": []
+    },
+    {
+      "name": "rounded-in-02",
+      "kind": "rounded-in",
+      "expected": "PASS",
+      "gate_verdict": "PASS",
+      "checker": "PASS",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reasons": []
+    },
+    {
+      "name": "rounded-out-01",
+      "kind": "rounded-out",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 20,
+      "numbers_grounded": 19,
+      "reasons": [
+        "unsourced number: '42.9%' (line 4)"
+      ]
+    },
+    {
+      "name": "rounded-out-02",
+      "kind": "rounded-out",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 20,
+      "numbers_grounded": 19,
+      "reasons": [
+        "unsourced number: '132.00' (line 4)"
+      ]
+    },
+    {
+      "name": "unparseable-01",
+      "kind": "unparseable",
+      "expected": "BLOCK",
+      "gate_verdict": "PASS",
+      "checker": "BLOCK",
+      "no_checker": "PASS",
+      "keyword_only": "PASS",
+      "gate_agreement": true,
+      "numbers_checked": 21,
+      "numbers_grounded": 21,
+      "reasons": [
+        "unparseable number: '147..00' (line 13)"
+      ]
+    }
+  ],
+  "summary": {
+    "n_fixtures": 26,
+    "checker_correct": 26,
+    "checker_accuracy": 1.0,
+    "false_passes": 0,
+    "false_blocks": 0,
+    "grounded_pass_rate": 1.0,
+    "grounded_passed": 11,
+    "grounded_total": 11,
+    "planted_block_rate": 1.0,
+    "planted_blocked": 6,
+    "planted_total": 6,
+    "unsourced_block_rate": 1.0,
+    "unsourced_blocked": 15,
+    "unsourced_total": 15,
+    "gate_agreement_rate": 0.9230769230769231,
+    "gate_agreements": 24,
+    "gate_total": 26,
+    "no_checker_accuracy": 0.4230769230769231,
+    "keyword_only_accuracy": 0.46153846153846156,
+    "verdict": "win"
+  },
+  "run_date": "2026-11-28",
+  "thresholds": {
+    "block_rate_min": 1.0,
+    "grounded_pass_min": 0.95,
+    "gate_agreement_min": 0.9
+  }
+}
