@@ -38,6 +38,7 @@ from __future__ import annotations
 import datetime as _dt
 import gzip as _gzip
 import json as _json
+import re as _re
 import time as _time
 import urllib.error as _urlerror
 import urllib.parse as _urlparse
@@ -79,6 +80,12 @@ def declared_user_agent(contact_email):
 # SEC ceiling is 10 requests/second; stay at half of it.
 _MIN_INTERVAL_SECONDS = 0.2
 _TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+_TICKERS_EXCHANGE_URL = ("https://www.sec.gov/files/"
+                         "company_tickers_exchange.json")
+_SIC_BROWSE_URL = (
+    "https://www.sec.gov/cgi-bin/browse-edgar"
+    "?action=getcompany&SIC={sic}&type=10-K&count={count}&start={start}"
+)
 _SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
 _FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
 _CONCEPT_URL = (
@@ -99,11 +106,15 @@ __all__ = [
     "declared_user_agent",
     "fetch_company_concept",
     "fetch_company_facts",
+    "fetch_sic_browse_page",
     "fetch_submissions",
     "freshest_annual_value_as_of",
     "get_fundamentals",
     "get_fundamentals_as_of",
+    "get_sic_peers",
     "latest_annual_value",
+    "parse_company_tickers_exchange",
+    "parse_sic_browse_page",
     "ticker_to_cik",
 ]
 
@@ -151,6 +162,32 @@ def _get_json(url, user_agent=None):
             if raw[:2] == b"\x1f\x8b":
                 raw = _gzip.decompress(raw)
             return _json.loads(raw.decode("utf-8"))
+    except _urlerror.HTTPError as exc:
+        raise RuntimeError(
+            f"EDGAR request failed ({exc.code}) for {url}") from exc
+    except _urlerror.URLError as exc:
+        raise RuntimeError(
+            f"EDGAR network call failed for {url}: {exc.reason}") from exc
+
+
+def _get_text(url, user_agent=None):
+    """Fetch a URL as text (for the browse-edgar HTML pages).
+
+    Same host allowlist and throttle as :func:`_get_json`; the
+    response is decoded as UTF-8 (errors replaced) instead of
+    parsed as JSON. Raises RuntimeError on HTTP / network failure.
+    """
+    _check_edgar_url(url)
+    _throttle()
+    headers = {"User-Agent": user_agent or EDGAR_USER_AGENT,
+               "Accept-Encoding": "gzip, deflate"}
+    req = _urlrequest.Request(url, headers=headers)
+    try:
+        with _urlrequest.urlopen(req, timeout=30) as resp:
+            raw = resp.read()
+            if raw[:2] == b"\x1f\x8b":
+                raw = _gzip.decompress(raw)
+            return raw.decode("utf-8", errors="replace")
     except _urlerror.HTTPError as exc:
         raise RuntimeError(
             f"EDGAR request failed ({exc.code}) for {url}") from exc
@@ -378,4 +415,212 @@ def get_fundamentals(ticker, concepts, user_agent=None):
         "retrieved_at": _dt.datetime.now(_dt.timezone.utc).isoformat(
             timespec="seconds"),
         "values": values,
+    }
+
+
+# ---------------------------------------------------------------------------
+# SIC peer lookup (Round 10, PR 10.2)
+# ---------------------------------------------------------------------------
+# EDGAR's full-text search API (efts.sec.gov) is a text search over
+# filing content — it has no structured SIC filter and is not a peer
+# lookup. The working route (verified live 2026-11-28) is the
+# browse-edgar CGI, which returns one HTML table row per company
+# that has filed a 10-K in the SIC, and the SEC's bulk
+# company_tickers_exchange.json, which maps CIK -> ticker. The
+# browse-edgar list is historical, not current: most rows are
+# defunct companies (or individuals who filed as owners) with no
+# current ticker, so only ticker-mapped rows are returned as peers.
+# SIC 3571 has 114 rows (two pages of 100 + 14); 9 map to a ticker,
+# 8 once the filer itself is excluded.
+
+# One results-table row: a CIK link cell followed by the company
+# name cell. The CIK in the link text and in the href agree; the
+# pattern requires both cells so header/footer CIK mentions never
+# match.
+_SIC_ROW_RE = _re.compile(
+    r"CIK=(\d{10})[^<]*</a></td>\s*<td[^>]*>([^<]+)</td>")
+
+# The browse-edgar "Next 100" button is present exactly when another
+# page of rows follows (verified live 2026-11-28: page 1 of SIC 3571
+# carries it, page 2 does not).
+_SIC_NEXT_RE = _re.compile(r"Next100")
+
+# Cap on browse-edgar pages per lookup: a SIC with more rows than
+# this is not paged further (the lookup reports the pages it read).
+_MAX_SIC_PAGES = 20
+
+
+def parse_sic_browse_page(html):
+    """Parse one browse-edgar SIC results page (pure, no network).
+
+    Returns [{"cik": int, "name": str}] in page order — one entry
+    per results-table row. A page with no rows returns []. Raises
+    ValueError when the input is not text (a wrong-type recording
+    is a fixture bug, not an empty SIC).
+    """
+    if not isinstance(html, str):
+        raise TypeError("browse-edgar page must be text")
+    rows = []
+    for cik_text, name in _SIC_ROW_RE.findall(html):
+        rows.append({"cik": int(cik_text), "name": name.strip()})
+    return rows
+
+
+def parse_company_tickers_exchange(data):
+    """Parse company_tickers_exchange.json (pure, no network).
+
+    The file is {"fields": ["cik", "name", "ticker", "exchange"],
+    "data": [[cik, name, ticker, exchange], ...]}. Returns
+    {cik_int: {"cik", "name", "ticker", "tickers", "exchange"}}.
+    One CIK can carry several tickers (1,435 of 7,988 CIKs in the
+    2026-11-28 file): a common stock plus preferred / notes
+    classes (SMCI + SMCIP for Super Micro) or several common
+    classes (GOOGL + GOOG). ``ticker`` is the one picked for
+    pricing by :func:`_pick_ticker` and ``tickers`` is the full
+    list in file order, so the choice is auditable.
+    """
+    if not isinstance(data, dict):
+        raise TypeError("company_tickers_exchange.json must be a dict")
+    if not isinstance(data.get("data"), list):
+        raise TypeError(
+            "company_tickers_exchange.json must have a 'data' list")
+    grouped = {}
+    for row in data["data"]:
+        if not isinstance(row, list) or len(row) < 4:
+            raise ValueError(
+                "company_tickers_exchange.json row must be "
+                "[cik, name, ticker, exchange]")
+        cik, name, ticker, exchange = row[0], row[1], row[2], row[3]
+        grouped.setdefault(int(cik), []).append({
+            "cik": int(cik),
+            "name": name,
+            "ticker": ticker if ticker else None,
+            "exchange": exchange if exchange else None,
+        })
+    by_cik = {}
+    for cik, rows in grouped.items():
+        usable = [row for row in rows if row.get("ticker")]
+        if not usable:
+            # A CIK with no ticker at all (delisted, no class
+            # listed): kept with ticker None so the caller counts
+            # it as "without a ticker" instead of crashing.
+            by_cik[cik] = {
+                "cik": cik,
+                "name": rows[0]["name"],
+                "ticker": None,
+                "tickers": [],
+                "exchange": rows[0]["exchange"],
+            }
+            continue
+        picked = _pick_ticker(usable)
+        by_cik[cik] = {
+            "cik": cik,
+            "name": picked["name"],
+            "ticker": picked["ticker"],
+            "tickers": [row["ticker"] for row in rows
+                        if row["ticker"]],
+            "exchange": picked["exchange"],
+        }
+    return by_cik
+
+
+def _pick_ticker(rows):
+    """Pick one pricing ticker for a CIK with several (pure).
+
+    The shortest ticker wins; on a tie the first row in file
+    order wins. Preferred / notes classes carry a suffix on the
+    common ticker (SMCI vs SMCIP, BAC vs BAC-PB), so the common
+    stock is the shortest; the rule agrees with first-in-file
+    in 1,416 of the 1,435 multi-ticker CIKs in the 2026-11-28
+    file. Rows with no ticker are skipped; an all-empty group
+    raises ValueError.
+    """
+    usable = [row for row in rows if row.get("ticker")]
+    if not usable:
+        raise ValueError("no ticker for CIK "
+                         f"{rows[0]['cik'] if rows else '?'}")
+    best = None
+    for index, row in enumerate(usable):
+        key = (len(row["ticker"]), index)
+        if best is None or key < best[0]:
+            best = (key, row)
+    return best[1]
+
+
+def fetch_sic_browse_page(sic, count=100, start=0, user_agent=None):
+    """One browse-edgar SIC results page, as HTML text.
+
+    ``sic`` is a 4-digit SIC string; ``count`` rows per page from
+    ``start`` (the CGI's paging). Raises ValueError on a bad SIC
+    and RuntimeError on a failed fetch.
+    """
+    sic = str(sic).strip()
+    if len(sic) != 4 or not sic.isdigit():
+        raise ValueError(f"SIC must be 4 digits, got {sic!r}")
+    if count <= 0 or start < 0:
+        raise ValueError("count must be positive and start non-negative")
+    return _get_text(
+        _SIC_BROWSE_URL.format(sic=sic, count=count, start=start),
+        user_agent=user_agent)
+
+
+def get_sic_peers(sic, *, exclude_cik=None, user_agent=None, count=100):
+    """Real peers in a SIC, discovered from EDGAR — never invented.
+
+    Pages through the browse-edgar CGI for ``sic`` (all pages, not
+    just the first 100 rows) and maps each row's CIK to a ticker
+    via the SEC's bulk company_tickers_exchange.json. Returns
+    {"sic", "source", "rows_parsed", "pages", "without_ticker",
+    "peers": [{"cik" (10-digit string), "name", "ticker",
+    "exchange"}]}. Rows with no current ticker are counted in
+    ``without_ticker`` and are not peers (no price exists for
+    them); the filer itself (``exclude_cik``) is excluded. Raises
+    RuntimeError when the SIC page or the ticker map cannot be
+    fetched, and ValueError on a bad SIC — callers with no peer
+    source report the peers section UNKNOWN with the reason,
+    never a made-up list.
+    """
+    sic = str(sic).strip()
+    if len(sic) != 4 or not sic.isdigit():
+        raise ValueError(f"SIC must be 4 digits, got {sic!r}")
+    if exclude_cik is not None:
+        exclude_cik = int(str(exclude_cik).strip())
+    rows = []
+    pages = 0
+    start = 0
+    while pages < _MAX_SIC_PAGES:
+        html = fetch_sic_browse_page(
+            sic, count=count, start=start, user_agent=user_agent)
+        page_rows = parse_sic_browse_page(html)
+        rows.extend(page_rows)
+        pages += 1
+        if len(page_rows) < count or not _SIC_NEXT_RE.search(html):
+            break
+        start += count
+    tickers = _get_json(_TICKERS_EXCHANGE_URL, user_agent=user_agent)
+    by_cik = parse_company_tickers_exchange(tickers)
+    peers = []
+    without_ticker = 0
+    for row in rows:
+        mapped = by_cik.get(row["cik"])
+        if mapped is None or not mapped["ticker"]:
+            without_ticker += 1
+            continue
+        if exclude_cik is not None and row["cik"] == exclude_cik:
+            continue
+        peers.append({
+            "cik": f"{row['cik']:010d}",
+            "name": mapped["name"],
+            "ticker": mapped["ticker"],
+            "tickers": mapped["tickers"],
+            "exchange": mapped["exchange"],
+        })
+    return {
+        "sic": sic,
+        "source": ("SEC EDGAR browse-edgar SIC search "
+                   "(cgi-bin/browse-edgar) + company_tickers_exchange.json"),
+        "rows_parsed": len(rows),
+        "pages": pages,
+        "without_ticker": without_ticker,
+        "peers": peers,
     }

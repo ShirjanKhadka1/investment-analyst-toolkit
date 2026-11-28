@@ -1,7 +1,9 @@
 """Run the pre-registered 9.3 dossier eval suite (Round 9, PR 9.3).
 
 Builds the two fixture dossiers and scores them against the
-protocol's two baselines:
+protocol's two baselines, plus (Round 10, PR 10.2) the REAL Apple
+dossier from the committed live recording
+(``examples/real-aapl-2026-11-27.json``, AAPL as of 2026-11-27):
 
 - fixture 1: synthetic EDGAR facts (examples/dossier/
   synthetic-edgar-facts.json, DEMO Corporation) + Yahoo prices +
@@ -10,6 +12,17 @@ protocol's two baselines:
   (examples/research-demo-fundamentals.csv and
   examples/research-demo-peers.csv, synthetic NEPSE-style company)
   + peers + risks + checklist (no prices, no DCF — comps only).
+- real filer: the committed AAPL recording — raw companyfacts
+  subset, submissions (SIC 3571 Electronic Computers), 251 Yahoo
+  closes to 2026-11-27, SIC peer discovery (114 rows, 8
+  ticker-mapped peers) and the peers' P/E multiples computed from
+  their own Yahoo closes and EDGAR filings. The DCF forecast is
+  the filed FY2026 free cash flow, flat for 5 years, at the
+  discount rate and terminal growth recorded in the fixture's
+  ``dcf_assumptions`` — assumptions, stated in full, never
+  filings. The real run is reported alongside the two fixture
+  wins, in full: unsourced count, Reality Checker verdict,
+  section coverage, per-concept filed values, peer table.
 
 Baselines (pre-registered in the Round 9 protocol before any
 fixture ran):
@@ -42,7 +55,10 @@ passing, and strictly more sourced sections than the rules-mode
 baseline. Any fixture failing any of those is "no edge" for that
 fixture, and the pipeline is not claimed to beat the baselines.
 A dossier about a real company is never claimed validated until
-this suite passes first.
+this suite passes first. Round 10, PR 10.2 extends the win rule
+to the real AAPL run: it must meet the same bar (0 unsourced,
+Pass, 10/10) or the verdict for the real filer is "no edge",
+published with the exact reason.
 
 Usage:
   python3 scripts/evaluate_dossier.py [--date YYYY-MM-DD]
@@ -60,11 +76,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from toolkit import dossier
+from toolkit import edgar as edgar_mod
 from toolkit.groundedness import check_memo
 from toolkit.rules_mode import run_global_rules_team
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURE_DIR = ROOT / "examples" / "dossier"
+REAL_FIXTURE = ROOT / "examples" / "real-aapl-2026-11-27.json"
 DEFAULT_OUTPUT = ROOT / "docs" / "dossier-eval-results.json"
 
 # Comparable sections: the dossier sections and the BNT runbook
@@ -131,6 +149,98 @@ def demo_fixture_inputs():
                               "level"}],
         "next_event": {"event": "FY 2082/83 annual report",
                        "due_date": "2026-11-15"},
+    }
+
+
+def real_filer_inputs():
+    """Inputs for the real AAPL dossier, from the committed recording.
+
+    Every number comes from ``examples/real-aapl-2026-11-27.json``
+    (the live fetch, committed by
+    ``scripts/fetch_real_aapl_dossier.py``) — nothing is typed
+    here except the two risk wordings and the next-event label,
+    which are caller-supplied prose with no bare numbers (the
+    same pattern as the fixture dossiers). The DCF forecast is
+    built from the filed free cash flow (operating cash flow
+    minus capex, both read from the recording with the dossier's
+    own point-in-time reader) plus the assumptions recorded in
+    the fixture — flat for the stated years, at the stated
+    discount rate and terminal growth.
+    """
+    fixture = json.loads(REAL_FIXTURE.read_text(encoding="utf-8"))
+    facts = fixture["edgar_facts"]
+    as_of = fixture["as_of"]
+    ocf, _taxonomy, _tag = edgar_mod.freshest_annual_value_as_of(
+        facts, dossier.DOSSIER_EDGAR_CONCEPTS["operating_cash_flow"],
+        as_of)
+    capex, _taxonomy, _tag = edgar_mod.freshest_annual_value_as_of(
+        facts, dossier.DOSSIER_EDGAR_CONCEPTS["capex"], as_of)
+    filed_fcf = ocf["value"] - capex["value"]
+    assumptions = fixture["dcf_assumptions"]
+    years = assumptions["forecast_years"]
+    terminal_growth = assumptions["terminal_growth"]
+    return {
+        "ticker": fixture["ticker"], "as_of": as_of,
+        "company_name": fixture["company_name"],
+        "exchange": fixture["exchange"],
+        "industry": fixture["sic_description"],
+        "sic": fixture["sic"],
+        "sic_description": fixture["sic_description"],
+        "sic_peers": fixture["sic_peers"],
+        "edgar_facts": facts,
+        "prices": fixture["prices"],
+        "peers": [
+            {"symbol": peer["ticker"], "metric": "pe_ratio",
+             "value": peer["pe_ratio"],
+             "source": "SEC EDGAR SIC 3571 peer P/E "
+                       "(Yahoo close / EDGAR EPS)"}
+            for peer in fixture["peer_multiples"]],
+        "dcf": {
+            "free_cash_flows": [filed_fcf] * years,
+            "discount_rate": assumptions["discount_rate"],
+            "terminal_growth": terminal_growth,
+            "terminal_year_fcf": round(
+                filed_fcf * (1 + terminal_growth), 2),
+        },
+        "risks": [
+            {"risk": "Revenue concentration in hardware products",
+             "trigger": "Next 10-K revenue below the filed FY 2026 "
+                        "revenue"},
+            {"risk": "Debt refinancing as liabilities grow",
+             "trigger": "Total liabilities above the filed FY 2026 "
+                        "level in the next filing"},
+        ],
+        "next_event": {"event": "Q1 FY 2027 10-Q filing",
+                       "due_date": "2027-02-04"},
+        "ts": f"{as_of}T00:00:00Z",
+    }
+
+
+def real_filer_detail():
+    """The real run's provenance detail for the eval summary.
+
+    SIC discovery, the peer table (multiples and exclusions) and
+    the DCF assumptions, straight from the committed recording —
+    so the summary JSON carries the full real-filer evidence, not
+    just the win/loss row.
+    """
+    fixture = json.loads(REAL_FIXTURE.read_text(encoding="utf-8"))
+    sic_peers = fixture["sic_peers"]
+    return {
+        "sic": fixture["sic"],
+        "sic_description": fixture["sic_description"],
+        "sic_rows_parsed": sic_peers["rows_parsed"],
+        "sic_pages": sic_peers["pages"],
+        "sic_peers_with_ticker": len(sic_peers["peers"]),
+        "sic_without_ticker": sic_peers["without_ticker"],
+        "comps_peers": [peer["ticker"]
+                        for peer in fixture["peer_multiples"]],
+        "peer_multiples": fixture["peer_multiples"],
+        "peer_exclusions": fixture["peer_exclusions"],
+        "dcf_assumptions": fixture["dcf_assumptions"],
+        "last_close": fixture["prices"]["pairs"][-1][1],
+        "last_close_date": fixture["prices"]["pairs"][-1][0],
+        "price_bars": len(fixture["prices"]["pairs"]),
     }
 
 
@@ -218,7 +328,7 @@ def bnt_coverage(baseline):
     return covered
 
 
-def evaluate_fixture(name, inputs, run_date):
+def evaluate_fixture(name, inputs, run_date, extra=None):
     """Build one fixture dossier and score it. Returns the row."""
     result = dossier.run_dossier(inputs)
     data = result["dossier"]
@@ -267,6 +377,8 @@ def evaluate_fixture(name, inputs, run_date):
         and reality["verdict"] == "Pass"
         and row["beats_rules_baseline"]
         and row["sections_covered_count"] == len(COMPARABLE_SECTIONS))
+    if extra:
+        row.update(extra)
     return row
 
 
@@ -290,6 +402,9 @@ def main(argv=None):
                          edgar_fixture_inputs(), run_date),
         evaluate_fixture("demo-csvs",
                          demo_fixture_inputs(), run_date),
+        evaluate_fixture("real-aapl",
+                         real_filer_inputs(), run_date,
+                         extra=real_filer_detail()),
     ]
     bnt = {
         "note": baseline["note"],
@@ -331,6 +446,25 @@ def main(argv=None):
               f"-> {'WIN' if row['win'] else 'NO EDGE'}")
         for fix in row["fixes"]:
             print(f"  fix: {fix}")
+        if row["fixture"] == "real-aapl":
+            print(f"  SIC {row['sic']} ({row['sic_description']}): "
+                  f"{row['sic_rows_parsed']} rows in "
+                  f"{row['sic_pages']} pages, "
+                  f"{row['sic_peers_with_ticker']} ticker-mapped peers, "
+                  f"{row['sic_without_ticker']} without a ticker")
+            for peer in row["peer_multiples"]:
+                print(f"  peer {peer['ticker']}: price "
+                      f"{peer['price']} on {peer['price_date']}, "
+                      f"EPS {peer['eps']}, P/E {peer['pe_ratio']}x "
+                      f"(net income {peer['net_income']} filed "
+                      f"{peer['net_income_filed']})")
+            for item in row["peer_exclusions"]:
+                print(f"  peer {item['ticker']}: EXCLUDED — "
+                      f"{item['reason']}")
+            print(f"  DCF assumptions: {row['dcf_assumptions']}")
+            print(f"  last close {row['last_close']} on "
+                  f"{row['last_close_date']} "
+                  f"({row['price_bars']} Yahoo bars)")
     print(f"\n[BNT runbook baseline] numeric claims="
           f"{bnt['numeric_claim_count']} (no event log), unparseable="
           f"{bnt['unparseable_token_count']}, comparable sections="

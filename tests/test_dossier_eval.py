@@ -40,12 +40,43 @@ EXPECTED = {
         "dossier_sourced_count": 9, "rules_sourced_count": 1,
         "sections_covered_count": 10, "win": True,
     },
+    "real-aapl": {
+        "status": "complete", "reality_checker": "Pass",
+        "unsourced_numbers": 0, "unparseable_numbers": 0,
+        "numbers_checked": 61, "numbers_grounded": 61,
+        "dossier_sourced_count": 23, "rules_sourced_count": 4,
+        "sections_covered_count": 10, "win": True,
+    },
 }
 
 
 def test_eval_fixtures_exist():
     assert (FIXTURE_DIR / "synthetic-edgar-facts.json").exists()
     assert (FIXTURE_DIR / "bnt-runbook-baseline.json").exists()
+    assert (REPO_ROOT / "examples" / "real-aapl-2026-11-27.json").exists()
+
+
+def test_real_filer_row_carries_peer_and_sic_detail(tmp_path):
+    output = tmp_path / "results.json"
+    assert eval_suite.main(["--date", "2026-11-28",
+                            "--output", str(output)]) == 0
+    summary = json.loads(output.read_text(encoding="utf-8"))
+    row = {r["fixture"]: r for r in summary["fixtures"]}["real-aapl"]
+    assert row["sic"] == "3571"
+    assert row["sic_description"] == "Electronic Computers"
+    assert row["sic_rows_parsed"] == 114
+    assert row["sic_pages"] == 2
+    assert row["sic_peers_with_ticker"] == 8
+    assert row["sic_without_ticker"] == 105
+    assert row["comps_peers"] == ["DELL", "OMCL", "OSS", "SMCI"]
+    assert row["peer_multiples"][0]["ticker"] == "DELL"
+    assert row["peer_multiples"][0]["pe_ratio"] == 34.81
+    assert [item["ticker"] for item in row["peer_exclusions"]] == [
+        "OURA", "SCKT", "XNDU", "ZEPP"]
+    assert row["valuation"]["dcf_enterprise_value"] == 1923637181695.24
+    assert row["valuation"]["dcf_per_share"] == 114.74
+    assert row["valuation"]["comps"][0]["implied_price"] == 256.89
+    assert row["valuation"]["comps"][0]["multiple"] == 28.23
 
 
 def test_eval_returns_win_with_pinned_numbers(tmp_path):
@@ -57,7 +88,7 @@ def test_eval_returns_win_with_pinned_numbers(tmp_path):
     assert summary["verdict"] == "win"
     assert summary["date"] == "2026-11-28"
     rows = {row["fixture"]: row for row in summary["fixtures"]}
-    assert set(rows) == {"synthetic-edgar", "demo-csvs"}
+    assert set(rows) == {"synthetic-edgar", "demo-csvs", "real-aapl"}
     for name, expected in EXPECTED.items():
         row = rows[name]
         for key, value in expected.items():
