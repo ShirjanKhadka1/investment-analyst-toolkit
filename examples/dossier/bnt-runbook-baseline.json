@@ -1,0 +1,28 @@
+{
+  "company": "Bottlers Nepal (Terai) \u2014 NEPSE: BNT",
+  "has_event_log": false,
+  "note": "finance-research-agents/docs/worked-example/bottlers-nepal-terai-bnt-research-note.md",
+  "note_counts_method": "toolkit.groundedness.extract_numbers over the note text; the note was never written to the checker grammar, so its 202 numeric claims have no event log to trace against.",
+  "numeric_claim_count": 202,
+  "sections": [
+    "## 0. Run contract (Research Orchestrator)",
+    "## 1. Frozen input ledger (Ledger Controller) \u2014 verdict: Complete with stated gaps",
+    "## 2. The frozen audited year (Financial Analyst + Statement Reconciler)",
+    "## 3. What the numbers say (Financial Analyst, recomputed \u2014 not copied)",
+    "## 4. Forensic pass (Forensic Analyst) \u2014 flags are questions, not accusations",
+    "## 5. Market context (Nepal Market Researcher + Valuation Analyst, sanity checks only)",
+    "## 6. Nepal frictions the downside must carry (Risk Stance Analyst input)",
+    "## 7. Structured debate (Debate Analyst) \u2014 every argument answered or marked",
+    "## 8. Risk scenarios (Risk Stance Analyst) \u2014 each with an observable trigger",
+    "## 9. Risk Veto verdict (Debate Analyst + Reality Checker)",
+    "## 10. Accuracy audit (Accuracy Auditor)",
+    "## 11. Open questions (carried, not hidden)",
+    "## Sources"
+  ],
+  "stated_limits": [
+    "Verified-inputs dataset plus model skeleton; no DCF claimed.",
+    "The ~Rs 81M bridge gap is unresolved.",
+    "EM beverage beta anchor vintage unverified."
+  ],
+  "unparseable_token_count": 170
+}

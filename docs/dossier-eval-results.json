@@ -1,0 +1,120 @@
+{
+  "bnt_unsourced_advantage": "dossier 0 unsourced numbers on every fixture vs 202 numeric claims in the BNT note with no event log to trace against",
+  "date": "2026-11-28",
+  "fixtures": [
+    {
+      "as_of": "2026-03-31",
+      "beats_rules_baseline": true,
+      "checker_verdict": "PASS",
+      "comparable_sections_covered": [
+        "Thesis",
+        "Business",
+        "Industry",
+        "Financials",
+        "Forensic",
+        "Valuation",
+        "Key risks",
+        "What would change my mind",
+        "Open questions",
+        "Sources"
+      ],
+      "dossier_sourced_count": 23,
+      "fixes": [],
+      "fixture": "synthetic-edgar",
+      "numbers_checked": 58,
+      "numbers_grounded": 58,
+      "reality_checker": "Pass",
+      "rules_sourced_count": 4,
+      "sections_covered_count": 10,
+      "status": "complete",
+      "ticker": "DEMO",
+      "unparseable_numbers": 0,
+      "unsourced_numbers": 0,
+      "valuation": {
+        "comps": [
+          {
+            "implied_price": 20.86,
+            "method": "P/E",
+            "metric": "eps",
+            "metric_value": 1.94,
+            "multiple": 10.75,
+            "multiple_source": "median of 2 peer pe_ratio values"
+          }
+        ],
+        "dcf_enterprise_value": 1795776221.54,
+        "dcf_per_share": 29.52,
+        "not_built": []
+      },
+      "win": true
+    },
+    {
+      "as_of": "2026-03-31",
+      "beats_rules_baseline": true,
+      "checker_verdict": "PASS",
+      "comparable_sections_covered": [
+        "Thesis",
+        "Business",
+        "Industry",
+        "Financials",
+        "Forensic",
+        "Valuation",
+        "Key risks",
+        "What would change my mind",
+        "Open questions",
+        "Sources"
+      ],
+      "dossier_sourced_count": 9,
+      "fixes": [],
+      "fixture": "demo-csvs",
+      "numbers_checked": 22,
+      "numbers_grounded": 22,
+      "reality_checker": "Pass",
+      "rules_sourced_count": 1,
+      "sections_covered_count": 10,
+      "status": "complete",
+      "ticker": "DEMO",
+      "unparseable_numbers": 0,
+      "unsourced_numbers": 0,
+      "valuation": {
+        "comps": [
+          {
+            "implied_price": 336.0,
+            "method": "P/B",
+            "metric": "book_value_per_share",
+            "metric_value": 240.0,
+            "multiple": 1.4,
+            "multiple_source": "median of 1 peer price_to_book value"
+          }
+        ],
+        "dcf_enterprise_value": null,
+        "dcf_per_share": null,
+        "not_built": [
+          "DCF not built: no free-cash-flow inputs supplied"
+        ]
+      },
+      "win": true
+    }
+  ],
+  "runbook_baseline_bnt": {
+    "comparable_sections_covered": [
+      "Thesis",
+      "Financials",
+      "Forensic",
+      "Valuation",
+      "Key risks",
+      "Open questions",
+      "Sources"
+    ],
+    "has_event_log": false,
+    "note": "finance-research-agents/docs/worked-example/bottlers-nepal-terai-bnt-research-note.md",
+    "numeric_claim_count": 202,
+    "sections_covered_count": 7,
+    "stated_limits": [
+      "Verified-inputs dataset plus model skeleton; no DCF claimed.",
+      "The ~Rs 81M bridge gap is unresolved.",
+      "EM beverage beta anchor vintage unverified."
+    ],
+    "unparseable_token_count": 170
+  },
+  "verdict": "win"
+}
